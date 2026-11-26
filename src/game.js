@@ -1,10 +1,14 @@
 import * as T from 'three';
 import { addRegion, buildWorld } from './world.js';
+import { FoodFight } from './foodfight.js';
+import { Flurries } from './flurries.js';
+import { COURSES, COURSE_TIME, coursePoint, rollSnow } from './courses.js';
 import { DishGuide } from './guidance.js';
 import { foodModel, caster, animateFood } from './models.js';
 import {
   DISHES,
   SPAWN,
+  TRAVEL,
   LIMIT,
   dishSpawn,
   slideMove,
@@ -73,7 +77,12 @@ export class Hunt {
     this.camera = new T.PerspectiveCamera(63, 1, 0.045, 4100);
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
-    this.tool = caster();
+    this.fight = new FoodFight(this);
+    this.standardTool = caster();
+    this.wideTool = this.fight.art.upgrade('wide');
+    this.wideTool.visible = false;
+    this.tool = new T.Group();
+    this.tool.add(this.standardTool, this.wideTool);
     this.camera.add(this.tool);
     this.tool.position.set(0.3, -0.25, -0.37);
     this.tool.rotation.set(0.1, 0.32, -0.1);
@@ -111,7 +120,8 @@ export class Hunt {
     });
     const shadowPlane = new T.PlaneGeometry(2.4, 2.4);
     shadowPlane.rotateX(-Math.PI / 2);
-    this.targets = DISHES.map((d, i) => {
+    this.weather = new Flurries(this.scene);
+    this.allTargets = DISHES.map((d, i) => {
       const model = foodModel(d.id, this.scene.background),
         shadow = new T.Mesh(shadowPlane, shade);
       this.scene.add(model, shadow);
@@ -151,9 +161,40 @@ export class Hunt {
     this.tool.position.x = Math.min(0.39, 0.25 * this.camera.aspect);
     this.tool.scale.setScalar(this.camera.aspect < 1 ? 0.72 : 1);
   }
-  async reset(mode = 'hunt', spot = SPAWN) {
-    if (mode !== 'hunt') await this.region.prepareAt(spot.x, spot.z);
+  get regional() {
+    return (
+      this.mode === 'city' ||
+      this.mode === 'roam' ||
+      (this.mode === 'campaign' && this.level > 0)
+    );
+  }
+  get timeLimit() {
+    return this.mode === 'campaign' ? COURSE_TIME : LIMIT;
+  }
+  get course() {
+    return COURSES[this.level];
+  }
+  async reset(mode = 'campaign', spot = SPAWN) {
     this.mode = mode;
+    this.level = 0;
+    this.bankedTime = 0;
+    this.bankedCount = 0;
+    this.shots = 0;
+    this.saved = { shots: 0 };
+    await this.beginCourse(0, spot);
+  }
+  async beginCourse(level, spot = TRAVEL[COURSES[level].stop]) {
+    const campaign = this.mode === 'campaign';
+    if (
+      this.mode === 'city' ||
+      this.mode === 'roam' ||
+      (campaign && level > 0)
+    ) {
+      const region = await this.ensureRegion();
+      await region.prepareAt(spot.x, spot.z);
+    }
+    this.level = level;
+    this.intermission = false;
     this.active = true;
     this.elapsed = 0;
     this.last = 0;
@@ -166,46 +207,92 @@ export class Hunt {
     this.velocityY = 0;
     this.lift = 0;
     this.steps = 0;
-    this.shots = 0;
     this.count = 0;
+    this.shots = this.saved.shots;
+    this.fight.reset(this.saved);
+    $('#hit-flash').style.opacity = '0';
     this.yaw = Math.atan2(16, 4);
     this.pitch = -0.022;
     this.keys.clear();
-    this.joy = { x: 0, z: 0 };
-    this.touchId = null;
-    this.camera.position.set(spot.x, 1.62, spot.z);
+    this.clearTouch();
+    this.targets = [];
+    this.arrive(spot);
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    for (const t of this.targets) {
+    const anchors = campaign
+      ? new Map(
+          this.course.dishes.map(([id, dx, dz]) => [
+            id,
+            coursePoint(this.course, dx, dz),
+          ])
+        )
+      : null;
+    for (const t of this.allTargets) {
       t.caught = false;
-      t.model.visible = t.shadow.visible = mode !== 'roam';
-      const anchor = dishSpawn(t, mode);
+      t.model.visible = t.shadow.visible =
+        this.mode !== 'roam' && (!anchors || anchors.has(t.id));
+      if (!t.model.visible) continue;
+      this.targets.push(t);
+      const anchor = anchors ? anchors.get(t.id) : dishSpawn(t, this.mode);
       t.x = anchor.x;
       t.z = anchor.z;
       t.model.position.set(t.x, this.height(t.x, t.z), t.z);
       t.shadow.position.set(t.x, this.height(t.x, t.z) + 0.055, t.z);
       t.vx = t.vz = 0;
     }
-    if (mode !== 'hunt') this.arrive(spot);
     this.guide.reset(0);
-    $('#compass').disabled = mode === 'roam';
+    if (this.mode !== 'roam') this.stockGravy(spot);
+    this.weather.setSnowing(rollSnow());
+    this.weatherAt = 50 + Math.random() * 45;
+    $('#compass').disabled = this.mode === 'roam';
     this.resize();
     this.setHUD();
     this.toast(
-      mode === 'city'
-        ? 'One side and one dessert per landmark. Open the map to travel.'
-        : mode === 'hunt'
-          ? 'Capture all ' + DISHES.length + ' dishes before supper.'
-          : 'Free roam · ' + (spot.name || 'Community Park'),
+      campaign
+        ? 'Course ' +
+            (level + 1) +
+            ' · ' +
+            this.course.name +
+            ' · Capture four dishes.'
+        : this.mode === 'city'
+          ? 'One side and one dessert per landmark. Open the map to travel.'
+          : this.mode === 'hunt'
+            ? 'Capture all twelve dishes before supper.'
+            : 'Free roam · ' + (spot.name || 'Community Park'),
       3
     );
+  }
+  stockGravy(spot) {
+    this.gravyStop = spot;
+    const points =
+      this.mode === 'campaign'
+        ? this.course.gravy.map(([x, z]) => coursePoint(this.course, x, z))
+        : this.mode === 'city'
+          ? [
+              { x: spot.x - 8, z: spot.z + 8 },
+              { x: spot.x + 9, z: spot.z - 11 },
+            ]
+          : [
+              { x: -52, z: 28 },
+              { x: -110, z: -63 },
+              { x: 132, z: -75 },
+              { x: 160, z: 19 },
+            ];
+    this.fight.stock(points);
+  }
+  async advance() {
+    if (!this.intermission || this.level >= COURSES.length - 1) return;
+    await this.beginCourse(this.level + 1);
+  }
+  async retry() {
+    await this.beginCourse(this.level);
   }
   async teleport(spot) {
     await this.region.prepareAt(spot.x, spot.z);
     this.arrive(spot);
+    if (this.mode === 'city') this.stockGravy(spot);
     this.guide.reset(this.elapsed);
   }
-  arrive(spot) {
-    this.region?.update(spot.x, spot.z);
+  openSpot(spot) {
     let x = spot.x,
       z = spot.z;
     for (let i = 0; this.blocked(x, z) && i < 100; i++) {
@@ -215,12 +302,18 @@ export class Hunt {
       z = spot.z + Math.sin(a) * d;
     }
     if (this.blocked(x, z)) throw Error('No open landing near this landmark.');
+    return { x, z };
+  }
+  arrive(spot) {
+    if (this.regional) this.region.update(spot.x, spot.z);
+    const { x, z } = this.openSpot(spot);
     this.camera.position.set(x, this.height(x, z) + 1.62, z);
     this.lift = 0;
     this.velocityY = 0;
     this.tileTime = 1;
   }
   resume(lock = true) {
+    if (!this.active || this.intermission) return;
     this.playing = true;
     this.last = 0;
     this.keys.clear();
@@ -251,10 +344,10 @@ export class Hunt {
     this.active = false;
   }
   height(x, z) {
-    return this.mode !== 'hunt' && this.region ? this.region.height(x, z) : 0;
+    return this.regional && this.region ? this.region.height(x, z) : 0;
   }
   blocked(x, z) {
-    if (this.mode === 'hunt') return this.world.solids.blocked(x, z);
+    if (!this.regional) return this.world.solids.blocked(x, z);
     return this.world.solids.occupied(x, z) || this.region.blocked(x, z);
   }
   look(dx, dy) {
@@ -450,6 +543,8 @@ export class Hunt {
     this.abort?.abort();
     this.viewportObserver?.disconnect();
     this.renderer.setAnimationLoop(null);
+    this.weather?.dispose();
+    this.fight.dispose();
     this.renderer.dispose();
   }
   aim() {
@@ -457,7 +552,7 @@ export class Hunt {
     const p = this.camera.position;
     this.camera.getWorldDirection(direction);
     let best = null,
-      bestDepth = 35;
+      bestDepth = this.fight.wide ? 52 : 35;
     for (const t of this.targets) {
       if (t.caught) continue;
       toward.copy(t.model.position);
@@ -467,11 +562,14 @@ export class Hunt {
       if (
         depth <= 0 ||
         depth > bestDepth ||
-        toward.lengthSq() - depth * depth > (1.12 + depth * 0.015) ** 2
+        toward.lengthSq() - depth * depth >
+          ((this.fight.wide ? 2.8 : 1.12) +
+            depth * (this.fight.wide ? 0.05 : 0.015)) **
+            2
       )
         continue;
-      ray.set(p, direction);
-      ray.far = depth;
+      ray.far = toward.length();
+      ray.set(p, toward.normalize());
       if (
         ray.intersectObjects(this.world.walls, false).length ||
         this.region?.occludes(ray)
@@ -486,7 +584,10 @@ export class Hunt {
     if (!this.playing || this.cooldown > 0) return;
     const t = this.aim();
     this.shots++;
-    this.cooldown = 0.58;
+    this.wideCast = this.fight.wide > 0;
+    if (this.wideCast) this.fight.wide--;
+    this.net.material.color.setHex(this.wideCast ? 0x8bffe0 : 0xffdc91);
+    this.cooldown = this.wideCast ? 0.3 : 0.58;
     this.netTime = 0.24;
     this.camera.getWorldDirection(direction);
     this.netStart.set(0.19, -0.15, -0.63).applyMatrix4(this.camera.matrixWorld);
@@ -504,22 +605,31 @@ export class Hunt {
       this.count++;
       this.guide.reset(this.elapsed);
       sound('catch');
-      this.toast(t.name + ' captured!', 1.8);
+      const bonus = this.fight.reward(t);
+      this.toast(t.name + ' captured! ' + bonus, bonus ? 3.2 : 1.8);
       this.setHUD();
-      if (this.count === DISHES.length) {
+      if (this.count === this.targets.length) {
         sound('win');
-        this.finish(true);
+        if (this.mode === 'campaign' && this.level < COURSES.length - 1) {
+          this.pause();
+          this.intermission = true;
+          this.bankedTime += this.elapsed;
+          this.bankedCount += this.count;
+          this.saved = { ...this.fight.checkpoint(), shots: this.shots };
+          this.events.courseClear(bonus);
+        } else this.finish(true);
       }
     }
   }
-  finish(won) {
+  finish(won, reason = 'time') {
     this.pause();
     this.active = false;
     this.events.end({
       won,
-      time: this.elapsed,
+      reason,
+      time: this.bankedTime + this.elapsed,
       shots: this.shots,
-      count: this.count,
+      count: this.bankedCount + this.count,
     });
   }
   moveTargets(dt) {
@@ -564,20 +674,42 @@ export class Hunt {
   setHUD() {
     const roam = this.mode === 'roam';
     $('#progress-pips').hidden = roam;
-    this.pips.forEach((pip, i) =>
-      pip.classList.toggle('filled', this.targets[i].caught)
-    );
+    this.pips.forEach((pip, i) => {
+      pip.hidden = i >= this.targets.length;
+      pip.classList.toggle('filled', !!this.targets[i]?.caught);
+    });
+    this.standardTool.visible = !this.fight.wide;
+    this.wideTool.visible = !!this.fight.wide;
+    $('#gear-name').textContent = this.fight.wide
+      ? 'Wishbone slinger'
+      : 'Net caster';
+    $('#vitals').hidden = roam;
+    $('#health-value').textContent = this.fight.health;
+    $('#vitals').classList.toggle('low', this.fight.health <= 35);
+    const bonuses = [
+      this.fight.wide ? 'Wishbone ×' + this.fight.wide : '',
+      this.fight.speed ? 'Boots ' + Math.ceil(this.fight.speed) + 's' : '',
+    ].filter(Boolean);
+    $('#boosts').textContent = bonuses.join(' · ');
+    $('#boosts').hidden = !bonuses.length || roam;
+    const warning = roam ? '' : this.fight.warning();
+    $('#incoming').textContent = warning;
+    $('#incoming').hidden = !warning;
     $('#counter').previousElementSibling.textContent = roam
       ? 'MODE'
-      : 'DISHES CAPTURED';
+      : this.mode === 'campaign'
+        ? 'COURSE ' + (this.level + 1) + ' / ' + COURSES.length
+        : 'DISHES CAPTURED';
     $('#counter').textContent = roam
       ? 'Free roam'
-      : this.count + ' / ' + DISHES.length;
+      : this.count + ' / ' + this.targets.length;
     $('#time').previousElementSibling.textContent = roam
       ? 'TIME AFIELD'
       : 'SUPPER IN';
     $('#time').textContent = formatTime(
-      roam ? this.elapsed : Math.max(0, Math.ceil(LIMIT - this.elapsed))
+      roam
+        ? this.elapsed
+        : Math.max(0, Math.ceil(this.timeLimit - this.elapsed))
     );
     const bearing = ((((-this.yaw * 180) / Math.PI) % 360) + 360) % 360;
     $('#bearing').textContent =
@@ -586,8 +718,7 @@ export class Hunt {
       String(Math.round(bearing) % 360).padStart(3, '0') +
       '°';
     const p = this.camera.position,
-      far =
-        this.mode !== 'hunt' && Math.max(Math.abs(p.x), Math.abs(p.z)) > 610;
+      far = this.regional && Math.max(Math.abs(p.x), Math.abs(p.z)) > 610;
     drawMap($('#radar'), far && this.region ? this.region.data : this.data, {
       x: p.x,
       z: p.z,
@@ -595,6 +726,7 @@ export class Hunt {
       targets: roam ? [] : this.targets,
       player: p,
       yaw: this.yaw,
+      pickups: this.fight.pickups,
     });
   }
   frame(time) {
@@ -623,8 +755,8 @@ export class Hunt {
       }
     }
     this.elapsed += delta;
-    if (this.mode !== 'roam' && this.elapsed >= LIMIT) {
-      this.elapsed = LIMIT;
+    if (this.mode !== 'roam' && this.elapsed >= this.timeLimit) {
+      this.elapsed = this.timeLimit;
       this.finish(false);
       return;
     }
@@ -648,7 +780,12 @@ export class Hunt {
       k.has('ShiftLeft') ||
       k.has('ShiftRight') ||
       Math.hypot(this.joy.x, this.joy.z) > 0.85;
-    const speed = this.mode === 'roam' ? (sprint ? 33 : 13) : sprint ? 13 : 7.2,
+    const speed =
+        this.mode === 'roam'
+          ? sprint
+            ? 33
+            : 13
+          : (sprint ? 13 : 7.2) * (this.fight.speed > 0 ? 1.65 : 1),
       sn = Math.sin(this.yaw),
       cs = Math.cos(this.yaw);
     slideMove(
@@ -666,9 +803,29 @@ export class Hunt {
       this.height(p.x, p.z) + 1.62 + this.lift + Math.sin(this.steps) * 0.038;
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     this.camera.updateMatrixWorld();
-    if (this.mode !== 'roam') this.moveTargets(dt);
-    if (this.mode !== 'hunt' && this.region && (this.tileTime += dt) > 0.5) {
+    if (this.mode !== 'roam') {
+      this.moveTargets(dt);
+      this.fight.update(dt, delta);
+      if (!this.fight.health) {
+        this.setHUD();
+        this.finish(false, 'health');
+        return;
+      }
+    }
+    $('#hit-flash').style.opacity = String(this.fight.hitFlash * 0.72);
+    if (this.elapsed >= this.weatherAt) {
+      this.weather.setSnowing(rollSnow());
+      this.weatherAt = this.elapsed + 50 + Math.random() * 45;
+    }
+    this.weather.update(dt, this.camera);
+    if (this.regional && this.region && (this.tileTime += dt) > 0.5) {
       this.region.update(p.x, p.z);
+      if (this.mode === 'city') {
+        const next = TRAVEL.find(
+          (s) => s !== this.gravyStop && Math.hypot(p.x - s.x, p.z - s.z) < 85
+        );
+        if (next && !this.isBlocked(next.x, next.z)) this.stockGravy(next);
+      }
       this.tileTime = 0;
     }
     this.cooldown = Math.max(0, this.cooldown - dt);
@@ -684,7 +841,7 @@ export class Hunt {
       this.netTime -= dt;
       const progress = 1 - Math.max(0, this.netTime) / 0.24;
       this.net.position.lerpVectors(this.netStart, this.netEnd, progress);
-      this.net.scale.setScalar(0.12 + progress * 1.3);
+      this.net.scale.setScalar(0.12 + progress * (this.wideCast ? 2.8 : 1.3));
       this.net.material.opacity = 1 - progress * 0.5;
       this.net.visible = this.netTime > 0;
     }
@@ -714,6 +871,7 @@ export class Hunt {
       this.guide.update(this, target);
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
+    this.world.trees.update(p.x, p.z, this.camera);
     this.renderer.render(this.scene, this.camera);
   }
 }

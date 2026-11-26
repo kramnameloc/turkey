@@ -150,12 +150,12 @@ export function contains(points, x, z) {
   }
   return inside;
 }
-// Dimensions match the cropped photographs that the renderer places at the GIS trunk.
+// Surveyed trunk location, crown spread and low boughs define both the 3D trees and their collision footprint.
 const TREES = {
-  pine: { aspect: 0.49, trunkX: 0.5, lowBranches: 0, crown: 0.44 },
-  maple: { aspect: 0.92, trunkX: 0.496, lowBranches: 0.19, crown: 0.45 },
-  gold: { aspect: 1.11, trunkX: 0.556, lowBranches: 0.065, crown: 0.45 },
-  bare: { aspect: 0.857, trunkX: 0.48, lowBranches: 0.2, crown: 0.39 },
+  pine: { aspect: 0.49, lowBranches: 0, crown: 0.44 },
+  maple: { aspect: 0.92, lowBranches: 0.19, crown: 0.45 },
+  gold: { aspect: 1.11, lowBranches: 0.065, crown: 0.45 },
+  bare: { aspect: 0.857, lowBranches: 0.2, crown: 0.39 },
 };
 export function treeShape(tree) {
   const species = (tree.species || '').toLowerCase();
@@ -167,7 +167,7 @@ export function treeShape(tree) {
   else if (species.includes('oak') || seed === 1 || seed === 3)
     variety = 'bare';
   else if (seed < 6) variety = 'gold';
-  const { aspect, trunkX, lowBranches, crown } = TREES[variety];
+  const { aspect, lowBranches, crown } = TREES[variety];
   const height =
     (tree.height || 8) * (0.88 + 0.24 * Math.abs(Math.sin(tree.x + tree.z)));
   const width = height * aspect;
@@ -180,9 +180,29 @@ export function treeShape(tree) {
     variety,
     height,
     width,
-    trunkX,
     radius: Math.max(0.25, width * (0.075 + (crown - 0.075) * fullness)),
   };
+}
+export const PARK_SIGNS = [
+  { title: 'COMMUNITY PARK', x: -67, z: 26.8, angle: 1.89 },
+  { title: 'POND OVERLOOK', x: 57.8, z: 68.7, angle: 0.68 },
+];
+export const SIGN_WIDTH = 3.8,
+  SIGN_DEPTH = 0.16;
+function signFootprint({ x, z, angle }) {
+  const c = Math.cos(angle),
+    s = Math.sin(angle);
+  const points = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([u, v]) => {
+    const along = (u * SIGN_WIDTH) / 2,
+      across = (v * SIGN_DEPTH) / 2;
+    return [x + along * c + across * s, z - along * s + across * c];
+  });
+  return { points };
 }
 export const BODY_RADIUS = 0.62;
 export function segmentDistanceSq(x, z, ax, az, bx, bz) {
@@ -195,7 +215,7 @@ export function segmentDistanceSq(x, z, ax, az, bx, bz) {
   return (ax + along * dx - x) ** 2 + (az + along * dz - z) ** 2;
 }
 export class Obstacles {
-  constructor(data) {
+  constructor(data, signs = []) {
     this.cells = new Map();
     this.bounds = data.bounds;
     const add = (feature, minX, maxX, minZ, maxZ) => {
@@ -215,7 +235,11 @@ export class Obstacles {
         }
       }
     };
-    for (const { points } of [...data.buildings, ...data.water]) {
+    for (const { points } of [
+      ...data.buildings,
+      ...data.water,
+      ...signs.map(signFootprint),
+    ]) {
       const xs = points.map((p) => p[0]),
         zs = points.map((p) => p[1]);
       add(
@@ -335,6 +359,7 @@ export function drawMap(
     z = 0,
     width = 550,
     targets = DISHES,
+    pickups = [],
     player = SPAWN,
     yaw = Math.PI / 2,
     labels = false,
@@ -415,6 +440,13 @@ export function drawMap(
     c.strokeText(name, textX, textY);
     c.fillText(name, textX, textY);
   });
+  for (const item of pickups) {
+    const x = px(item.x),
+      y = py(item.z);
+    c.fillStyle = '#70f0b2';
+    c.fillRect(x - 2, y - 5, 4, 10);
+    c.fillRect(x - 5, y - 2, 10, 4);
+  }
   for (const t of targets.filter((t) => !t.caught)) {
     const pos = t.model?.position ?? t;
     c.save();

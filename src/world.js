@@ -1,6 +1,15 @@
 import * as T from 'three';
 import { parkFloor, pavement } from './surfaces.js';
-import { Obstacles, regionData, treeShape, BODY_RADIUS } from './field.js';
+import {
+  Obstacles,
+  regionData,
+  SPAWN,
+  BODY_RADIUS,
+  PARK_SIGNS,
+  SIGN_WIDTH,
+  SIGN_DEPTH,
+} from './field.js';
+import { TreeStand } from './trees.js';
 const loader = new T.TextureLoader();
 function texture(url, repeat = false) {
   return loader.loadAsync(url).then((t) => {
@@ -16,61 +25,6 @@ function geometry(positions, uvs) {
   if (uvs) g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
   g.computeVertexNormals();
   return g;
-}
-const unitPlane = new T.PlaneGeometry(1, 1);
-unitPlane.translate(0, 0.5, 0);
-function forest(trees, images) {
-  const group = new T.Group(),
-    dummy = new T.Object3D();
-  const groups = new Map();
-  for (const t of trees) {
-    const shape = treeShape(t);
-    if (!groups.has(shape.variety)) groups.set(shape.variety, []);
-    groups.get(shape.variety).push({ tree: t, shape });
-  }
-  for (const [name, matches] of groups) {
-    const tex = images[name];
-    const m = new T.MeshBasicMaterial({
-      map: tex,
-      alphaTest: 0.36,
-      side: T.DoubleSide,
-    });
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.trunkOffset = { value: matches[0].shape.trunkX - 0.5 };
-      shader.vertexShader =
-        'uniform float trunkOffset;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        `
-        #include <begin_vertex>
-        vec3 trunk = (modelMatrix * instanceMatrix * vec4(0.,0.,0.,1.)).xyz;
-        vec2 toEye = normalize(cameraPosition.xz - trunk.xz + vec2(.0001));
-        float billboardX = transformed.x - trunkOffset;
-        transformed.x = toEye.y * billboardX;
-        transformed.z = -toEye.x * billboardX;
-      `
-      );
-    };
-    const mesh = new T.InstancedMesh(unitPlane, m, matches.length);
-    matches.forEach(({ tree: t, shape }, i) => {
-      dummy.position.set(t.x, t.ground || 0, t.z);
-      dummy.scale.set(shape.width, shape.height, shape.width);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-      const seed = Math.abs(Math.sin(t.x * 3.1 + t.z));
-      mesh.setColorAt(
-        i,
-        new T.Color().setRGB(
-          0.78 + seed * 0.22,
-          0.76 + seed * 0.21,
-          0.77 + seed * 0.18
-        )
-      );
-    });
-    mesh.computeBoundingSphere();
-    group.add(mesh);
-  }
-  return group;
 }
 function buildings(list, photo, bounds, elev, wallMats) {
   const group = new T.Group(),
@@ -298,7 +252,7 @@ function fieldGround(data, photo, grass) {
   g.translate((b.maxX + b.minX) / 2, -0.018, (b.maxZ + b.minZ) / 2);
   return new T.Mesh(g, groundMaterial(photo, grass));
 }
-function parkSign(title, x, z, angle) {
+function parkSign({ title, x, z, angle }) {
   const board = document.createElement('canvas');
   board.width = 768;
   board.height = 248;
@@ -324,16 +278,16 @@ function parkSign(title, x, z, angle) {
   const g = new T.Group(),
     wood = new T.MeshLambertMaterial({ color: '#80664b' });
   for (const dx of [-1.63, 1.63]) {
-    const m = new T.Mesh(new T.BoxGeometry(0.15, 1.08, 0.16), wood);
+    const m = new T.Mesh(new T.BoxGeometry(0.15, 1.08, SIGN_DEPTH), wood);
     m.position.set(dx, 0.54, 0);
     g.add(m);
   }
-  const back = new T.Mesh(new T.BoxGeometry(3.8, 1.23, 0.12), wood);
+  const back = new T.Mesh(new T.BoxGeometry(SIGN_WIDTH, 1.23, 0.12), wood);
   back.position.y = 1.65;
   g.add(back);
   for (const side of [-1, 1]) {
     const sign = new T.Mesh(
-      new T.PlaneGeometry(3.78, 1.21),
+      new T.PlaneGeometry(SIGN_WIDTH - 0.02, 1.21),
       new T.MeshBasicMaterial({ map: t })
     );
     sign.position.set(0, 1.65, side * 0.065);
@@ -363,18 +317,14 @@ function water(scene, rings) {
   scene.add(new T.Mesh(geometry(positions), surface));
 }
 export async function buildWorld(scene, data) {
-  const [photo, grass, maple, pine, sky, brick, civic, gold, bare] =
-    await Promise.all([
-      texture(data.orthophoto.url),
-      texture('/scenery/grass.webp', true),
-      texture('/scenery/maple.webp'),
-      texture('/scenery/pine.webp'),
-      texture('/scenery/sky.webp'),
-      texture('/scenery/brick-facade.webp', true),
-      texture('/scenery/civic-facade.webp', true),
-      texture('/scenery/tree-2.webp'),
-      texture('/scenery/tree-3.webp'),
-    ]);
+  const [photo, grass, sky, brick, civic, treeTexture] = await Promise.all([
+    texture(data.orthophoto.url),
+    texture('/scenery/grass.webp', true),
+    texture('/scenery/sky.webp'),
+    texture('/scenery/brick-facade.webp', true),
+    texture('/scenery/civic-facade.webp', true),
+    texture('/scenery/tree-materials.webp'),
+  ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
   scene.fog = new T.FogExp2('#b8c0ac', 0.00063);
@@ -392,25 +342,24 @@ export async function buildWorld(scene, data) {
     () => 0,
     walls
   );
-  scene.add(
-    fieldGround(data, photo, grass),
-    structures,
-    forest(data.trees, { maple, pine, gold, bare })
-  );
+  const trees = new TreeStand(scene, treeTexture);
+  trees.add('park', data.trees);
+  trees.update(SPAWN.x, SPAWN.z);
+  scene.add(fieldGround(data, photo, grass), structures);
+  const signs = PARK_SIGNS.map(parkSign);
   scene.add(
     parkFloor(data, photo),
     pavement([...data.roads, ...data.paths], () => 0),
-    parkSign('COMMUNITY PARK', -67, 26.8, 1.89),
-    parkSign('POND OVERLOOK', 57.8, 68.7, 0.68)
+    ...signs
   );
   parkFurniture(scene, data);
   water(scene, data.water);
-  const solids = new Obstacles(data);
+  const solids = new Obstacles(data, PARK_SIGNS);
   return {
-    walls: structures.children,
+    walls: [...structures.children, ...signs.flatMap((sign) => sign.children)],
     solids,
     grass,
-    treeImages: { maple, pine, gold, bare },
+    trees,
     wallMaterials: walls,
   };
 }
@@ -525,13 +474,13 @@ export async function addRegion(scene, world) {
       height,
       world.wallMaterials
     );
-    cluster.add(forest(trees, world.treeImages));
     entry.solids = new Obstacles({
       buildings: buildingsList,
       trees,
       water: [],
       bounds: b,
     });
+    world.trees.add(tile.url, trees);
     entry.mesh = cluster;
     scene.add(cluster);
   }
@@ -544,13 +493,13 @@ export async function addRegion(scene, world) {
         ensureTile(t).catch(() => {});
       } else if (!near && old) {
         if (old.mesh) {
+          world.trees.remove(t.url);
           scene.remove(old.mesh);
           old.mesh.traverse((m) => {
             if (m.isMesh) {
-              if (m.geometry !== unitPlane) m.geometry.dispose();
+              m.geometry.dispose();
               if (!world.wallMaterials.includes(m.material))
                 m.material.dispose();
-              if (m.isInstancedMesh) m.dispose();
             }
           });
         }

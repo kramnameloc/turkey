@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BODY_RADIUS, Obstacles, treeShape, slideMove } from '../src/field.js';
+import {
+  BODY_RADIUS,
+  Obstacles,
+  treeShape,
+  slideMove,
+  PARK_SIGNS,
+  SIGN_WIDTH,
+  SIGN_DEPTH,
+} from '../src/field.js';
 import { clearTrail, relativeBearing, walkingTrail } from '../src/trail.js';
 
 const bounds = { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
@@ -69,4 +77,52 @@ test('the navigation needle gives the correct turn when a dish is behind or besi
   assert.ok(
     Math.abs(relativeBearing(p, { x: -8, z: 0 }, Math.PI / 2)) < 0.00001
   );
+});
+
+test('both trail signs block their faces, posts and ends, but leave a walkable route around', () => {
+  const geometry = new Obstacles(
+    { buildings: [], water: [], bounds },
+    PARK_SIGNS
+  );
+  const blocked = (x, z) => geometry.blocked(x, z);
+  for (const sign of PARK_SIGNS) {
+    const c = Math.cos(sign.angle),
+      s = Math.sin(sign.angle);
+    const point = (along, normal) => ({
+      x: sign.x + along * c + normal * s,
+      z: sign.z - along * s + normal * c,
+    });
+    for (const [along, normal] of [
+      [0, 0],
+      [1.63, 0],
+      [-1.63, 0],
+      [SIGN_WIDTH / 2, 0],
+      [-SIGN_WIDTH / 2, 0],
+      [0, SIGN_DEPTH / 2],
+    ]) {
+      const p = point(along, normal);
+      assert.ok(blocked(p.x, p.z), sign.title);
+    }
+    for (const facing of [-1, 1]) {
+      const start = point(0, 4 * facing),
+        goal = point(0, -4 * facing);
+      const p = { ...start };
+      slideMove(p, goal.x - start.x, goal.z - start.z, blocked);
+      assert.ok(
+        facing * ((p.x - sign.x) * s + (p.z - sign.z) * c) >=
+          SIGN_DEPTH / 2 + BODY_RADIUS,
+        sign.title
+      );
+      assert.equal(clearTrail(start, goal, blocked), false);
+      const route = walkingTrail(start, goal, blocked);
+      assert.ok(route.length > 1);
+      assert.deepEqual(route.at(-1), goal);
+      for (const q of route) {
+        assert.ok(clearTrail(start, q, blocked));
+        Object.assign(start, q);
+      }
+    }
+    const beyond = point(SIGN_WIDTH / 2 + BODY_RADIUS + 0.15, 0);
+    assert.equal(blocked(beyond.x, beyond.z), false);
+  }
 });

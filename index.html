@@ -9,9 +9,54 @@
     <meta name="theme-color" content="#161915" />
     <meta
       name="description"
-      content="Play Turkey Takeover, a first-person Thanksgiving food hunt in Broomfield, Colorado."
+      content="Play as a turkey. Dodge flying dinner rolls and catch twelve runaway Thanksgiving dishes across Broomfield, Colorado."
     />
-    <link rel="icon" href="/ui/mark.svg" />
+    <link rel="canonical" href="https://turkey.kramnameloc.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Gobbler Ops" />
+    <meta property="og:title" content="Turkey Takeover" />
+    <meta
+      property="og:description"
+      content="Dinner is on the run, and it throws back. Play the Thanksgiving food fight in Broomfield, Colorado."
+    />
+    <meta property="og:url" content="https://turkey.kramnameloc.com/" />
+    <meta
+      property="og:image"
+      content="https://turkey.kramnameloc.com/social/turkey-takeover-card.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Turkey Takeover game artwork featuring the Gobbler Ops turkey and runaway Thanksgiving food in Colorado."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Turkey Takeover" />
+    <meta
+      name="twitter:description"
+      content="A turkey, twelve runaway dishes, and one Thanksgiving food fight."
+    />
+    <meta
+      name="twitter:image"
+      content="https://turkey.kramnameloc.com/social/turkey-takeover-card.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Turkey Takeover game artwork featuring the Gobbler Ops turkey and runaway Thanksgiving food in Colorado."
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="180x180"
+      href="/social/apple-touch-icon.png"
+    />
+    <link rel="icon" href="/ui/mark.svg" type="image/svg+xml" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/social/apple-touch-icon.png"
+    />
     <title>Turkey Takeover · Gobbler Ops</title>
   </head>
   <body>
@@ -28,6 +73,14 @@
           <button class="nav-item" data-action="map">Hunt map</button>
         </nav>
         <div class="tools">
+          <button
+            class="icon-button"
+            data-action="share"
+            aria-label="Share game"
+            title="Share game"
+          >
+            <i data-i="share"></i>
+          </button>
           <button
             class="icon-button"
             data-action="sound"
@@ -58,8 +111,9 @@
           <h1 id="title"><span>TURKEY</span><span>TAKEOVER</span></h1>
           <div class="title-rule" aria-hidden="true"><b></b><b></b><b></b></div>
           <p>
-            Dinner is on the run. Take the field as a wild turkey and capture
-            runaway sides and desserts in Broomfield, Colorado.
+            Dinner is on the run, and it throws back. Chase twelve runaway
+            dishes through three Thanksgiving food fights in Broomfield,
+            Colorado.
           </p>
           <div class="actions">
             <button class="primary" data-action="start">
@@ -86,12 +140,12 @@
           <span class="stat-icon"><i data-i="target"></i></span
           ><span
             ><small>THE OBJECTIVE</small
-            ><strong id="lobby-total">12 dishes</strong></span
+            ><strong id="lobby-total">12 dishes · 3 courses</strong></span
           >
         </button>
         <div class="stat">
           <span class="stat-icon"><i data-i="clock"></i></span
-          ><span><small>TIME LIMIT</small><strong>5 minutes</strong></span>
+          ><span><small>PER COURSE</small><strong>2 minutes</strong></span>
         </div>
         <div class="stat best">
           <span class="stat-icon"><i data-i="flag"></i></span
@@ -115,11 +169,17 @@
         aria-label="Three-dimensional Broomfield hunting grounds"
       ></canvas>
       <img src="/cover/wing.webp" id="wing" alt="" />
+      <div id="hit-flash" aria-hidden="true"></div>
       <div class="hud">
         <div class="hud-top">
           <div class="hud-box">
             <small>DISHES CAPTURED</small><strong id="counter"></strong>
             <div id="progress-pips" aria-hidden="true"></div>
+            <div id="vitals" aria-label="Health">
+              <span aria-hidden="true">♥</span>
+              <span id="health-value">100</span> HP
+            </div>
+            <span id="boosts" hidden></span>
           </div>
           <button
             id="compass"
@@ -151,6 +211,7 @@
         </div>
         <div id="crosshair" aria-hidden="true"><b></b></div>
         <div id="in-world-label" hidden></div>
+        <div id="incoming" hidden></div>
         <div id="notice" role="status"></div>
         <div class="hud-bottom">
           <button
@@ -164,7 +225,9 @@
           </button>
           <div class="equipment">
             <small>CAPTURE TOOL</small
-            ><strong><i data-i="focus"></i> Net caster</strong
+            ><strong
+              ><i data-i="focus"></i>
+              <span id="gear-name">Net caster</span></strong
             ><span id="net-state">READY</span>
           </div>
         </div>
@@ -194,6 +257,33 @@
         </button>
       </div>
       <div id="panel-content"></div>
+    </dialog>
+    <dialog id="share-link" aria-labelledby="share-title">
+      <div class="panel-head">
+        <div class="panel-brand">
+          <img src="/ui/mark.svg" alt="" /> GOBBLER OPS
+        </div>
+        <button
+          type="button"
+          class="icon-button"
+          data-action="dismiss-share"
+          aria-label="Close share panel"
+        >
+          <i data-i="x"></i>
+        </button>
+      </div>
+      <div class="share-body">
+        <h2 class="panel-title" id="share-title">Share the hunt</h2>
+        <label class="travel-label" for="share-url">GAME LINK</label>
+        <input
+          id="share-url"
+          type="url"
+          readonly
+          value="https://turkey.kramnameloc.com/"
+        />
+        <button class="primary" data-action="copy-link">Copy link</button
+        ><span id="share-status" role="status"></span>
+      </div>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

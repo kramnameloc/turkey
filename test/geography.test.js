@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import test from 'node:test';
-import { DISHES, Obstacles, SPAWN, TRAVEL, dishSpawn } from '../src/field.js';
+import {
+  DISHES,
+  Obstacles,
+  SPAWN,
+  TRAVEL,
+  PARK_SIGNS,
+  dishSpawn,
+} from '../src/field.js';
 
 const asset = (path) => new URL('../public' + path, import.meta.url);
 const json = (path) => JSON.parse(readFileSync(asset(path), 'utf8'));
@@ -9,7 +16,7 @@ const park = json('/geo/broomfield.json'),
   region = json('/geo/region.json');
 
 test('every park dish can be reached from the spawn without crossing water or buildings', () => {
-  const obstacles = new Obstacles(park);
+  const obstacles = new Obstacles(park, PARK_SIGNS);
   const remaining = new Set(DISHES);
   const step = 4;
   const queue = [[SPAWN.x, SPAWN.z]],
@@ -71,7 +78,7 @@ test('regional imagery, elevation, and all streaming tiles are present and regis
 
 test('citywide travel arrivals and nearby food anchors are on open ground', () => {
   assert.equal(new Set(DISHES.map((d) => d.id)).size, DISHES.length);
-  const parkObstacles = new Obstacles(park);
+  const parkObstacles = new Obstacles(park, PARK_SIGNS);
   for (const [i, stop] of TRAVEL.entries()) {
     const tile = region.tiles.find(
       ({ bounds: b }) =>

@@ -1,7 +1,9 @@
 let ctx,
   muted = false;
 try {
-  muted = localStorage.getItem('gobbler-muted') === '1';
+  muted =
+    typeof window !== 'undefined' &&
+    window.localStorage.getItem('gobbler-muted') === '1';
 } catch {}
 export function isMuted() {
   return muted;
@@ -50,6 +52,18 @@ export function sound(event) {
       note(n, n * 1.004, i * 0.085, 0.23, 0.09)
     );
   }
+  if (event === 'windup') {
+    note(240, 440, 0, 0.14, 0.035);
+    note(360, 590, 0.2, 0.15, 0.03);
+  }
+  if (event === 'toss') note(480, 260, 0, 0.2, 0.035, 'triangle');
+  if (event === 'splat') note(120, 42, 0, 0.2, 0.07, 'triangle');
+  if (event === 'toot') {
+    note(99, 62, 0, 0.18, 0.045, 'sawtooth');
+    note(86, 49, 0.2, 0.12, 0.035, 'sawtooth');
+  }
+  if (event === 'bonus' || event === 'heal')
+    [440, 554, 740].forEach((f, i) => note(f, f * 1.02, i * 0.08, 0.17, 0.045));
   if (event === 'ready') note(460, 700, 0, 0.12, 0.055);
   if (event === 'flap') note(110, 52, 0, 0.12, 0.055, 'triangle');
 }

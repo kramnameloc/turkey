@@ -76,5 +76,39 @@
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "changes": "Selected the photographed exterior from the archive, cropped for use on repeated exterior walls and encoded in WebP."
+  },
+  "tree-materials.webp": {
+    "title": "3D tree bark, leaves, and needles",
+    "credits": [
+      {
+        "title": "Quercus robur in winter",
+        "author": "Betelguese",
+        "source": "https://commons.wikimedia.org/wiki/File:Quercus_robur_in_winter.JPG",
+        "license": "CC BY-SA 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+      },
+      {
+        "title": "Autumn Tree",
+        "author": "datsvs",
+        "source": "https://purepng.com/photo/5762/nature-autumn-tree",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      },
+      {
+        "title": "Cottonwood during autumn leaf coloration along Hinkey Summit Road just north of Paradise Valley, Nevada",
+        "author": "Famartin",
+        "source": "https://commons.wikimedia.org/wiki/File:2014-10-09_15_30_44_Cottonwood_during_autumn_leaf_coloration_along_Hinkey_Summit_Road_just_north_of_Paradise_Valley,_Nevada.JPG",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      {
+        "title": "High-res tree textures",
+        "author": "rubberduck",
+        "source": "https://opengameart.org/content/high-res-tree-textures-treecollection1kpng-0",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    ],
+    "changes": "Cropped and resized oak bark, then sampled color palettes from the original maple, cottonwood and spruce images. Used those colors to draw individual leaves and needles on branching sprays. Packed the four surfaces into a texture atlas for the 3D trees. The bark strip retains its source license."
   }
 }

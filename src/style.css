@@ -1466,3 +1466,96 @@ body.touch-mode .touch {
     padding: 14px 20px;
   }
 }
+
+#hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 42%,
+    #bc3c298f 78%,
+    #9d2d20 100%
+  );
+}
+#vitals,
+#boosts {
+  display: block;
+  margin-top: 5px;
+  font: 600 0.8rem/1.1 var(--cond);
+  letter-spacing: 0.045em;
+}
+#vitals {
+  color: #a5edbd;
+}
+#vitals.low {
+  color: #ff9a83;
+}
+#boosts {
+  color: #ffce84;
+}
+#incoming {
+  position: absolute;
+  top: calc(50% + 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  width: max-content;
+  max-width: 80%;
+  text-align: center;
+  font: 700 clamp(0.85rem, 2vmin, 1.2rem)/1.15 var(--cond);
+  color: #ffddb7;
+  border: 1px solid #d58b55;
+  background: #452b1de8;
+  border-radius: 2px;
+}
+.equipment strong #gear-name {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+.gravy-key {
+  color: #a5edbd;
+}
+.field-note {
+  padding: 12px 14px;
+  background: #262c23;
+  border-left: 2px solid #98ab73;
+}
+.field-note p {
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+.touch-mode #boosts {
+  max-width: 96px;
+}
+@media (prefers-reduced-motion: reduce) {
+  #hit-flash {
+    display: none;
+  }
+}
+
+#share-link {
+  width: min(440px, 92vw);
+}
+.share-body {
+  padding: clamp(18px, 4vw, 32px);
+}
+.share-body .travel-label {
+  margin-top: 20px;
+}
+#share-url {
+  display: block;
+  width: 100%;
+  margin: 7px 0 16px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  background: #252b21;
+  color: var(--cream);
+  font: inherit;
+}
+#share-status {
+  margin-left: 10px;
+  color: var(--muted);
+}

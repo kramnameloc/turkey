@@ -1,4 +1,5 @@
 import './style.css';
+import { COURSES } from './courses.js';
 import { fillIcons, icon } from './icons.js';
 import {
   DISHES,
@@ -22,7 +23,14 @@ let game,
   mapLevel = 'park',
   selectedSpot = 0,
   previousFocus = null;
-const bestKey = (mode) => 'gobbler-best-' + mode + '-' + DISHES.length;
+const bestKey = (mode) => 'gobbler-foodfight-v1-' + mode;
+const startAction = (mode) =>
+  ({
+    campaign: 'start',
+    city: 'city-hunt',
+    hunt: 'park-trial',
+    roam: 'explore',
+  })[mode];
 const button = (label, action, primary = false, glyph = '') =>
   '<button class="' +
   (primary ? 'primary' : 'secondary') +
@@ -40,7 +48,7 @@ const heading = (k, t) =>
   '</div><h2 id="panel-title" class="panel-title">' +
   t +
   '</h2>';
-function best(mode = 'hunt') {
+function best(mode = 'campaign') {
   try {
     const n = Number(localStorage.getItem(bestKey(mode)));
     return n > 0 ? n : 0;
@@ -75,7 +83,11 @@ function show(screenName, html) {
   content.innerHTML = html;
   panel.scrollTop = 0;
   panel.setAttribute('aria-labelledby', 'panel-title');
-  $('.panel-head [data-action="close"]').hidden = screen === 'loading';
+  $('.panel-head [data-action="close"]').hidden = [
+    'loading',
+    'course-clear',
+    'course-error',
+  ].includes(screen);
 }
 function dismiss() {
   if (panel.open) panel.close();
@@ -110,7 +122,7 @@ function openFromGame() {
   else if (!game?.active) modalOrigin = 'home';
 }
 function closePanel() {
-  if (loading) return;
+  if (loading || screen === 'course-clear' || screen === 'course-error') return;
   if (screen === 'end' || screen === 'error' || screen === 'fullscreen-error') {
     home();
     return;
@@ -197,11 +209,14 @@ function guide(tab = 'dishes') {
     heading('FIELD MANUAL', isControls ? 'How to play' : 'Field guide') +
       '<p class="panel-text">' +
       (isControls
-        ? 'Get within 35 meters and cast when the reticle turns amber.'
-        : 'Catch every side and dessert before supper. Look for the orange diamonds on the map. If you lose sight of the food, arrows will guide you.') +
+        ? 'Cast when the reticle turns amber. Step sideways or flap when a dish winds up.'
+        : 'The main hunt serves four dishes at each of three Broomfield landmarks. Orange diamonds mark food. A mint cross marks an Emergency Gravy Boat.') +
       '</p>' +
       tabs +
-      (isControls ? controls : '<div class="targets">' + list + '</div>') +
+      (isControls
+        ? controls +
+          '<div class="field-note"><strong>Food fight rules</strong><p>Captures can give 20 seconds of buttered boots or four long-range, wide casts from the wishbone slinger. Both equip automatically. Walk into a green gravy boat for up to 35 health. If a sprout starts tooting, move.</p></div>'
+        : '<div class="targets">' + list + '</div>') +
       '<div class="panel-actions">' +
       (game?.active
         ? button('Back to hunt', 'resume', true, 'focus')
@@ -218,6 +233,7 @@ async function map(level) {
   )
     selectedSpot = game.guide.suggestedStop;
   openFromGame();
+  if (game?.active && game.mode === 'campaign') return courseMap();
   if (level) mapLevel = level;
   else mapLevel = game?.active && game.mode !== 'hunt' ? 'city' : 'park';
   const city = mapLevel === 'city',
@@ -263,7 +279,7 @@ async function map(level) {
       '<div class="panel-actions">' +
       (active
         ? button('Return to field', 'resume', true, 'focus')
-        : button('Hunt Community Park', 'start', true, 'focus')) +
+        : button('Park time trial', 'park-trial', true, 'focus')) +
       '</div>';
   }
   show(
@@ -321,6 +337,7 @@ async function map(level) {
       targets: active && game.mode === 'roam' ? [] : targets,
       labels: true,
       places: city ? TRAVEL : [],
+      pickups: active ? game.fight.pickups : [],
     };
     const render = () =>
       drawMap(canvas, d, {
@@ -392,8 +409,10 @@ function pause() {
         ? 'Your place in Broomfield is saved for this session.'
         : game.count +
           ' of ' +
-          DISHES.length +
-          ' dishes captured. The supper clock is paused.') +
+          game.targets.length +
+          ' dishes captured. ' +
+          (game.mode === 'campaign' ? game.course.name + '. ' : '') +
+          'The supper clock is paused.') +
       '</p><div class="panel-actions">' +
       button('Resume', 'resume', true, 'focus') +
       button('Hunt map', 'map', false, 'map') +
@@ -402,7 +421,82 @@ function pause() {
       '</div>'
   );
 }
-function end({ won, time, shots, count }) {
+function courseMap() {
+  const course = game.course,
+    origin = TRAVEL[course.stop],
+    p = game.camera.position;
+  show(
+    'map',
+    heading(
+      'COURSE ' + (game.level + 1) + ' OF ' + COURSES.length,
+      course.name
+    ) +
+      '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Map of the current course"></canvas><div class="map-key"><span><b class="start-marker"></b> You</span><span><b></b> Runaway dish</span><span class="gravy-key">✚ Emergency gravy</span></div><div class="panel-actions">' +
+      button('Return to field', 'resume', true, 'focus') +
+      '</div>'
+  );
+  drawMap($('#zone-map'), game.regional ? game.region.data : game.data, {
+    x: origin.x,
+    z: origin.z,
+    width: Math.max(
+      300,
+      Math.abs(p.x - origin.x) * 2.2,
+      Math.abs(p.z - origin.z) * 4.1
+    ),
+    targets: game.targets,
+    pickups: game.fight.pickups,
+    player: p,
+    yaw: game.yaw,
+  });
+}
+function courseClear(bonus) {
+  const next = COURSES[game.level + 1];
+  show(
+    'course-clear',
+    heading('COURSE ' + (game.level + 1) + ' CLEARED', game.course.name) +
+      '<p class="panel-text">All four dishes are on the table. ' +
+      (bonus ? bonus + ' ' : '') +
+      'Next up is ' +
+      next.name +
+      '.</p><div class="result-stats"><div class="result-cell"><small>COURSE TIME</small><strong>' +
+      formatTime(game.elapsed) +
+      '</strong></div><div class="result-cell"><small>TURKEY HEALTH</small><strong>' +
+      game.fight.health +
+      ' / 100</strong></div></div><div class="panel-actions">' +
+      button('Continue to ' + next.name, 'next-course', true, 'map') +
+      button('Return to lobby', 'home') +
+      '</div>'
+  );
+}
+async function changeCourse(retry) {
+  if (loading) return;
+  loading = true;
+  const next = COURSES[game.level + (retry ? 0 : 1)];
+  show(
+    'loading',
+    heading('ON THE MENU', next.name) +
+      '<p class="panel-text">' +
+      next.menu +
+      '. Setting the table…</p><div class="loading-line"></div>'
+  );
+  try {
+    if (retry) await game.retry();
+    else await game.advance();
+    resume();
+  } catch {
+    show(
+      'course-error',
+      heading('HUNT MAP', 'Travel interrupted') +
+        '<p class="panel-text">Your course checkpoint is saved for this run.</p><div class="panel-actions">' +
+        button('Try again', retry ? 'retry-course' : 'next-course', true) +
+        button('Return to lobby', 'home') +
+        '</div>'
+    );
+  } finally {
+    loading = false;
+  }
+}
+function end({ won, time, shots, count, reason }) {
   modalOrigin = 'end';
   let record = false;
   if (won && (!best(game.mode) || time < best(game.mode))) {
@@ -421,18 +515,24 @@ function end({ won, time, shots, count }) {
     'end',
     heading(
       won ? 'MISSION COMPLETE' : 'SUPPER BELL',
-      won ? 'Dinner is served!' : 'Time for supper'
+      won
+        ? 'Dinner is served!'
+        : reason === 'health'
+          ? 'You got basted!'
+          : 'Time for supper'
     ) +
       '<p class="panel-text">' +
       (won
         ? record
           ? 'The full Thanksgiving menu is at the table. New personal best!'
           : 'The full Thanksgiving menu is at the table.'
-        : 'Supper started with ' +
-          count +
-          ' of ' +
-          DISHES.length +
-          ' dishes. The rest are still out there.') +
+        : reason === 'health'
+          ? 'The side dishes won the food fight. Watch for the windup and grab an Emergency Gravy Boat when your health dips.'
+          : 'Supper started with ' +
+            count +
+            ' of ' +
+            DISHES.length +
+            ' dishes. The rest are still out there.') +
       '</p><div class="result-stats">' +
       cells
         .map(
@@ -446,17 +546,22 @@ function end({ won, time, shots, count }) {
         .join('') +
       '</div><div class="panel-actions">' +
       button(
-        'Hunt again',
-        game.mode === 'city' ? 'city-hunt' : 'start',
+        !won && game.mode === 'campaign'
+          ? 'Retry ' + game.course.name
+          : 'Hunt again',
+        !won && game.mode === 'campaign'
+          ? 'retry-course'
+          : startAction(game.mode),
         true,
         'focus'
       ) +
+      button('Share game', 'share', false, 'share') +
       button('Return to lobby', 'home') +
       '</div>'
   );
   refreshBest();
 }
-async function start(mode = 'hunt') {
+async function start(mode = 'campaign') {
   if (loading) return;
   loading = true;
   wakeAudio();
@@ -471,7 +576,7 @@ async function start(mode = 'hunt') {
     if (!engineRequest)
       engineRequest = (async () => {
         const { Hunt } = await import('./game.js');
-        const g = new Hunt({ pause, map: () => map(), end });
+        const g = new Hunt({ pause, map: () => map(), end, courseClear });
         try {
           await g.init();
           return g;
@@ -484,10 +589,12 @@ async function start(mode = 'hunt') {
         throw e;
       });
     game = await engineRequest;
-    if (mode !== 'hunt') await game.ensureRegion();
     $('#lobby').hidden = true;
     $('#arena').hidden = false;
-    await game.reset(mode, mode === 'hunt' ? SPAWN : TRAVEL[selectedSpot]);
+    await game.reset(
+      mode,
+      mode === 'hunt' || mode === 'campaign' ? SPAWN : TRAVEL[selectedSpot]
+    );
     loading = false;
     resume();
   } catch (error) {
@@ -503,17 +610,40 @@ async function start(mode = 'hunt') {
           ? 'The field needs WebGL 2. Enable graphics acceleration in your browser and try again.'
           : 'A map or photograph could not load. Check your connection to the game and retry.') +
         '</p><div class="panel-actions">' +
-        button(
-          'Retry',
-          mode === 'hunt' ? 'start' : mode === 'city' ? 'city-hunt' : 'explore',
-          true
-        ) +
+        button('Retry', startAction(mode), true) +
         button('Back to lobby', 'home') +
         '</div>'
     );
   }
 }
+const publicLink = document.querySelector('link[rel="canonical"]').href;
+async function shareGame() {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Turkey Takeover', url: publicLink });
+      return;
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+    }
+  }
+  $('#share-status').textContent = '';
+  $('#share-url').value = publicLink;
+  $('#share-link').showModal();
+}
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(publicLink);
+    $('#share-status').textContent = 'Copied!';
+  } catch {
+    $('#share-url').focus();
+    $('#share-url').select();
+    $('#share-status').textContent = 'Select and copy the game link.';
+  }
+}
 const actions = {
+  share: shareGame,
+  'copy-link': copyLink,
+  'dismiss-share': () => $('#share-link').close(),
   home,
   close: closePanel,
   guide: () => guide(),
@@ -523,13 +653,17 @@ const actions = {
   'city-map': () => map('city'),
   'park-map': () => map('park'),
   start: () => start(),
+  'park-trial': () => start('hunt'),
+  'next-course': () => changeCourse(false),
+  'retry-course': () => changeCourse(true),
   'city-hunt': () => start('city'),
   explore: () => start('roam'),
   resume,
   pause,
   credits,
   travel: async () => {
-    if (loading || !game?.active || game.mode === 'hunt') return;
+    if (loading || !game?.active || !['city', 'roam'].includes(game.mode))
+      return;
     const spot = TRAVEL[selectedSpot];
     loading = true;
     show(
@@ -615,7 +749,7 @@ document.addEventListener(
   { capture: true, passive: true }
 );
 if (!document.fullscreenEnabled) $('[data-action="fullscreen"]').hidden = true;
-$('#lobby-total').textContent = DISHES.length + ' dishes';
+$('#lobby-total').textContent = DISHES.length + ' dishes · 3 courses';
 fillIcons();
 syncSound();
 syncFull();
