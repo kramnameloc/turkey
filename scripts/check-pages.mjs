@@ -35,7 +35,7 @@ function attribute(tags, name, value, key) {
 }
 
 const html = (await asset('/', /text\/html/)).toString();
-const tags = html.match(/<(?:meta|link|script)\b[^>]*>/gi) || [];
+const tags = html.match(/<(?:meta|link|script|img)\b[^>]*>/gi) || [];
 assert.equal(attribute(tags, 'rel', 'canonical', 'href'), canonical);
 assert.equal(attribute(tags, 'property', 'og:url', 'content'), canonical);
 assert.ok(
@@ -47,6 +47,9 @@ assert.ok(attribute(tags, 'property', 'og:description', 'content'));
 const card = attribute(tags, 'property', 'og:image', 'content');
 assert.equal(card, canonical + 'social/turkey-takeover-card.jpg');
 assert.equal(attribute(tags, 'name', 'twitter:image', 'content'), card);
+const cardPath = new URL(card).pathname;
+assert.equal(attribute(tags, 'class', 'cover-art', 'src'), cardPath);
+assert.equal(attribute(tags, 'class', 'share-preview', 'src'), cardPath);
 assert.equal(
   attribute(tags, 'name', 'twitter:card', 'content'),
   'summary_large_image'
@@ -54,11 +57,18 @@ assert.equal(
 assert.equal(attribute(tags, 'property', 'og:image:width', 'content'), '1200');
 assert.equal(attribute(tags, 'property', 'og:image:height', 'content'), '630');
 assert.ok(attribute(tags, 'property', 'og:image:alt', 'content'));
-const icon = new URL(
+const touchIcon = new URL(
   attribute(tags, 'rel', 'apple-touch-icon', 'href'),
   canonical
 );
-assert.equal(icon.origin, new URL(canonical).origin);
+const iconLinks = tags.filter((tag) => /^<link\s[^>]*\brel="icon"/i.test(tag));
+const favicon = new URL(
+  attribute(iconLinks, 'sizes', '32x32', 'href'),
+  canonical
+);
+assert.equal(attribute(iconLinks, 'sizes', '32x32', 'type'), 'image/png');
+assert.equal(touchIcon.origin, new URL(canonical).origin);
+assert.equal(favicon.origin, new URL(canonical).origin);
 const entry = attribute(tags, 'type', 'module', 'src');
 assert.match(entry || '', /^\/assets\/[\w-]+\.js$/);
 if (process.env.EXPECTED_ENTRY)
@@ -68,20 +78,23 @@ if (process.env.EXPECTED_ENTRY)
     'Waiting for the new release'
   );
 const css = attribute(tags, 'rel', 'stylesheet', 'href');
-const [js, sheet, photo, badge, geo, dish] = await Promise.all([
+const [js, sheet, photo, badge, geo, dish, faviconImage] = await Promise.all([
   asset(entry, /javascript/),
   asset(css, /text\/css/),
-  asset(new URL(card).pathname, /image\/jpeg/),
-  asset(icon.pathname, /image\/png/),
+  asset(cardPath, /image\/jpeg/),
+  asset(touchIcon.pathname, /image\/png/),
   asset('/geo/region.json', /json/),
   asset('/dishes/pumpkinPie.webp', /image\/webp/),
+  asset(favicon.pathname, /image\/png/),
 ]);
 assert.ok(js.length && sheet.length && JSON.parse(geo).tiles.length);
 assert.equal(photo.readUInt16BE(0), 0xffd8);
 assert.ok(photo.length < 1_000_000, 'Keep the social JPEG lightweight');
-assert.equal(badge.toString('ascii', 1, 4), 'PNG');
-assert.equal(badge.readUInt32BE(16), 180);
-assert.equal(badge.readUInt32BE(20), 180);
+for (const [iconImage, size] of [[badge, 180], [faviconImage, 32]]) {
+  assert.equal(iconImage.toString('ascii', 1, 4), 'PNG');
+  assert.equal(iconImage.readUInt32BE(16), size);
+  assert.equal(iconImage.readUInt32BE(20), size);
+}
 assert.equal(dish.toString('ascii', 8, 12), 'WEBP');
 const [maps, mountains, dem, turkey, oaks, grasses, grassCover, rangeMesh] =
   await Promise.all([

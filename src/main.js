@@ -505,10 +505,8 @@ function credits() {
       links('/geo/sources.json', 'Map sources and coverage') +
       '</p><h3>Pearl Street and the teahouse</h3><p>The Boulder walk compresses the blocks between the mall and 1770 13th Street. Street-level photographs and the city’s civic-area plan guided the original scenery. ImageGen supplied the shopfronts and ornamental textures. ' +
       links('/scenery/pearl-sources.json', 'Boulder references and artwork') +
-      '</p><h3>Cover photography</h3><p>Wild turkey by Frank Schulenburg, Flatirons by Kpsudeep, and Rocky Flats prairie by Zach Schiff / USFWS. The cropped and color-graded composite is licensed under ' +
-      links('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0') +
-      '. ' +
-      links('/cover/credits.json', 'Original photographs') +
+      '</p><h3>Game artwork</h3><p>The menu and share preview use the same poster, created with ImageGen. It depicts a Bourbon Red turkey chasing a slice of pumpkin pie below the Flatirons. ' +
+      links('/cover/credits.json', 'Artwork and photography credits') +
       '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       'The grass clumps and seed heads are adapted from grass by Georgeous (Sketchfab Standard). ' +
       'Parked vehicles on Dover use Kenney’s Car Kit (CC0). Soft-surface trails use Gravel Ground 01 by Rob Tuytel (CC0). Road surfaces, ironwork, and residential masonry are adapted from Street by Pasha (CC BY 4.0). ' +

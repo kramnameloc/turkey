@@ -29,7 +29,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Turkey Takeover game artwork featuring the Gobbler Ops turkey and runaway Thanksgiving food in Colorado."
+      content="Turkey Takeover. A Bourbon Red turkey chases a runaway slice of pumpkin pie beneath the Colorado Flatirons."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Turkey Takeover" />
@@ -43,15 +43,14 @@
     />
     <meta
       name="twitter:image:alt"
-      content="Turkey Takeover game artwork featuring the Gobbler Ops turkey and runaway Thanksgiving food in Colorado."
+      content="Turkey Takeover. A Bourbon Red turkey chases a runaway slice of pumpkin pie beneath the Colorado Flatirons."
     />
     <link
       rel="icon"
       type="image/png"
-      sizes="180x180"
-      href="/social/apple-touch-icon.png"
+      sizes="32x32"
+      href="/ui/turkey-favicon.png"
     />
-    <link rel="icon" href="/ui/mark.svg" type="image/svg+xml" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
@@ -63,7 +62,7 @@
     <main id="lobby">
       <header class="mast">
         <a class="brand" href="#lobby" aria-label="Gobbler Ops hunt lobby"
-          ><img src="/ui/mark.svg" alt="" /><span
+          ><img src="/social/apple-touch-icon.png" alt="" /><span
             >GOBBLER<span class="brand-light">OPS</span></span
           ></a
         >
@@ -99,19 +98,29 @@
         </div>
       </header>
       <section class="hero" aria-labelledby="title">
-        <div class="cover-art"></div>
-        <div class="hero-shade"></div>
-        <div class="hero-frame" aria-hidden="true">
-          <b></b><b></b><b></b><b></b>
-        </div>
+        <figure class="menu-poster">
+          <h1 id="title">
+            <img
+              class="cover-art"
+              src="/social/turkey-takeover-card.jpg"
+              alt="Turkey Takeover"
+              width="1200"
+              height="630"
+              fetchpriority="high"
+            />
+          </h1>
+          <figcaption>
+            <span>Player breed · Bourbon Red turkey</span>
+            <span><i data-i="pin"></i>39.9185° N &nbsp; 105.0688° W</span>
+          </figcaption>
+        </figure>
         <div class="intro">
           <div class="eyebrow">
             <span class="dash"></span> A THANKSGIVING ROAD TRIP
           </div>
-          <h1 id="title"><span>TURKEY</span><span>TAKEOVER</span></h1>
-          <div class="title-rule" aria-hidden="true"><b></b><b></b><b></b></div>
+          <h2>Dinner is on the run, and it throws back.</h2>
           <p>
-            Dinner is on the run, and it throws back. Chase runaway dishes through three hunts a day, from Denver arrivals to tea in Boulder.
+            Chase runaway dishes through three hunts a day, from Denver arrivals to tea in Boulder.
           </p>
           <div class="actions">
             <button class="primary" data-action="start">
@@ -122,13 +131,6 @@
               <i data-i="controller"></i>How to play
             </button>
           </div>
-        </div>
-        <div class="species-tag" aria-hidden="true">
-          <div class="leader"></div>
-          <div><small>PLAYER BREED</small><strong>Bourbon Red turkey</strong></div>
-        </div>
-        <div class="photo-coordinate">
-          <i data-i="pin"></i>39.9185° N &nbsp; 105.0688° W
         </div>
       </section>
       <section class="intel" aria-label="Hunt information">
@@ -261,7 +263,7 @@
     <dialog id="panel">
       <div class="panel-head">
         <div class="panel-brand">
-          <img alt="" src="/ui/mark.svg" /> GOBBLER OPS
+          <img alt="" src="/social/apple-touch-icon.png" /> GOBBLER OPS
         </div>
         <button
           data-action="close"
@@ -276,7 +278,7 @@
     <dialog id="share-link" aria-labelledby="share-title">
       <div class="panel-head">
         <div class="panel-brand">
-          <img src="/ui/mark.svg" alt="" /> GOBBLER OPS
+          <img src="/social/apple-touch-icon.png" alt="" /> GOBBLER OPS
         </div>
         <button
           type="button"
@@ -287,6 +289,14 @@
           <i data-i="x"></i>
         </button>
       </div>
+      <img
+        class="share-preview"
+        src="/social/turkey-takeover-card.jpg"
+        alt="Turkey Takeover. A Bourbon Red turkey chases a runaway slice of pumpkin pie beneath the Colorado Flatirons."
+        width="1200"
+        height="630"
+        loading="lazy"
+      />
       <div class="share-body">
         <h2 class="panel-title" id="share-title">Share the hunt</h2>
         <label class="travel-label" for="share-url">GAME LINK</label>
