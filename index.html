@@ -145,10 +145,10 @@
             ><strong id="lobby-total">12 dishes · 3 courses</strong></span
           >
         </button>
-        <div class="stat">
+        <button class="stat" data-action="timer" aria-label="Hunt timer" aria-pressed="true">
           <span class="stat-icon"><i data-i="clock"></i></span
-          ><span><small>PER COURSE</small><strong>2 minutes</strong></span>
-        </div>
+          ><span><small>HUNT TIMER</small><strong id="lobby-timer">On · 2 min/course</strong></span>
+        </button>
         <div class="stat best">
           <span class="stat-icon"><i data-i="flag"></i></span
           ><span
@@ -249,7 +249,7 @@
           <div id="stick" role="group" aria-label="Movement joystick">
             <b></b>
           </div>
-          <button id="touch-flap" aria-label="Flap">
+          <button id="touch-flap" aria-label="Flap" title="Tap to jump, hold to glide">
             <i data-i="feather"></i><span>Flap</span></button
           ><button id="touch-fire" aria-label="Cast net">
             <i data-i="focus"></i><span>Cast</span>

@@ -28,6 +28,24 @@ let game,
   mapLevel = 'park',
   selectedSpot = 0,
   previousFocus = null;
+const timerKey = 'gobbler-hunt-timer';
+let timerEnabled = true;
+try {
+  timerEnabled = localStorage.getItem(timerKey) !== 'off';
+} catch {}
+function syncTimer() {
+  $('#lobby-timer').textContent = timerEnabled
+    ? 'On · 2 min/course'
+    : 'Off · No time limit';
+  for (const control of document.querySelectorAll('[data-action="timer"]')) {
+    control.setAttribute('aria-pressed', String(timerEnabled));
+    control.title = timerEnabled
+      ? 'Turn the hunt timer off'
+      : 'Turn the hunt timer on';
+  }
+  const state = $('#pause-timer-state');
+  if (state) state.textContent = timerEnabled ? 'On' : 'Off';
+}
 const bestKey = (mode) => 'gobbler-foodfight-v1-' + mode;
 const startAction = (mode) =>
   ({
@@ -179,7 +197,7 @@ function guide(tab = 'dishes') {
         ['Aim', 'Swipe the view'],
         ['Cast net', 'Tap Cast'],
         ['Aim and cast', 'Drag Cast, then release'],
-        ['Flap jump', 'Tap Flap'],
+        ['Jump / glide', 'Tap / hold Flap'],
         ['Find next dish', 'Tap the compass'],
         ['Camera view', 'Tap the camera button'],
         ['Use door or display', 'Tap the prompt'],
@@ -191,7 +209,7 @@ function guide(tab = 'dishes') {
         ['Aim', 'Mouse'],
         ['Cast net', 'Left click / F'],
         ['Sprint', 'Shift'],
-        ['Flap jump', 'Space'],
+        ['Jump / glide', 'Tap / hold Space'],
         ['Find next dish', 'H'],
         ['Camera view', 'V'],
         ['Use door or display', 'G'],
@@ -256,11 +274,17 @@ async function map(level) {
       'map',
       heading('COMMUNITY PARK', 'Parade route') +
         '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Parade loop and current lead balloon"></canvas>' +
-        '<p class="panel-text">The gold line follows Main Street, 1st Avenue and Community Park Road. The star marks Jett at the head of the parade.</p>' +
+        '<p class="panel-text">The gold line follows Main Street, 1st Avenue and Community Park Road. The star marks the lead crew.</p>' +
         '<label class="travel-label">WATCH A BALLOON<select id="parade-balloon">' +
         game.parade.floats
           .map(
-            ({ label }, i) => '<option value="' + i + '">' + label + '</option>'
+            ({ label, release }, i) =>
+              '<option value="' +
+              i +
+              '">' +
+              label +
+              (release ? ' · crew only' : '') +
+              '</option>'
           )
           .join('') +
         '</select></label><div class="panel-actions">' +
@@ -329,7 +353,12 @@ async function map(level) {
       '<div class="panel-actions">' +
       (active
         ? button('Return to field', 'resume', true, 'focus')
-        : button('Park time trial', 'park-trial', true, 'focus')) +
+        : button(
+            timerEnabled ? 'Park time trial' : 'Park hunt',
+            'park-trial',
+            true,
+            'focus'
+          )) +
       '</div>';
   }
   show(
@@ -451,6 +480,7 @@ function credits() {
       '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       'The grass clumps and seed heads are adapted from grass by Georgeous (Sketchfab Standard). ' +
       'Road surfaces, ironwork, and residential masonry are adapted from Street by Pasha (CC BY 4.0). ' +
+      'Street furniture and controls are adapted from AndrewPunchak and pixelsquare, posed spectators from PolyOne Studio, ranch houses from Designed By Jonathan, and shrubs from LOLIPOP (CC BY 4.0). ' +
       'The balloon models are by Macys Parade and the 1993 Sonic model is by pika39019 (CC BY 4.0). ' +
       'The oak models and November foliage are adapted from the Oak trees pack by LOLIPOP (CC BY 4.0). ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
@@ -479,9 +509,14 @@ function pause() {
             game.targets.length +
             ' dishes captured. ' +
             (game.mode === 'campaign' ? game.course.name + '. ' : '') +
-            'The supper clock is paused.') +
+            (timerEnabled
+              ? 'The supper clock is paused.'
+              : 'Play at your own pace.')) +
       '</p><div class="panel-actions">' +
       button('Resume', 'resume', true, 'focus') +
+      '<button class="secondary" data-action="timer" aria-label="Hunt timer">' +
+      icon('clock') +
+      'Hunt timer · <span id="pause-timer-state"></span></button>' +
       button(
         game.mode === 'parade' ? 'Parade map' : 'Hunt map',
         'map',
@@ -494,6 +529,7 @@ function pause() {
       button('Return to lobby', 'home') +
       '</div>'
   );
+  syncTimer();
 }
 function courseMap() {
   const course = game.course,
@@ -535,7 +571,9 @@ function courseMap() {
       (parade ? '<span class="dover-key">★ Balloon parade</span>' : '') +
       '</div>' +
       (finale
-        ? '<p class="panel-text">Follow the trail from County Commons to 735 Dover St. Enter the cottage and inspect the display. The supper clock is held.</p>'
+        ? '<p class="panel-text">Follow the trail from County Commons to 735 Dover St. Enter the cottage and inspect the display. ' +
+          (timerEnabled ? 'The supper clock is held.' : '') +
+          '</p>'
         : '') +
       '<div class="panel-actions">' +
       button('Return to field', 'resume', true, 'focus') +
@@ -571,9 +609,13 @@ function courseClear(bonus) {
       (bonus ? bonus + ' ' : '') +
       'Next up is ' +
       next.name +
-      '.</p><div class="result-stats"><div class="result-cell"><small>COURSE TIME</small><strong>' +
-      formatTime(game.elapsed) +
-      '</strong></div><div class="result-cell"><small>TURKEY HEALTH</small><strong>' +
+      '.</p><div class="result-stats">' +
+      (timerEnabled
+        ? '<div class="result-cell"><small>COURSE TIME</small><strong>' +
+          formatTime(game.elapsed) +
+          '</strong></div>'
+        : '') +
+      '<div class="result-cell"><small>TURKEY HEALTH</small><strong>' +
       game.fight.health +
       ' / 100</strong></div></div><div class="panel-actions">' +
       button('Continue to ' + next.name, 'next-course', true, 'map') +
@@ -612,17 +654,28 @@ async function changeCourse(retry) {
 function end({ won, time, shots, count, reason }) {
   modalOrigin = 'end';
   let record = false;
-  if (won && (!best(game.mode) || time < best(game.mode))) {
+  if (
+    won &&
+    game.timedRun &&
+    timerEnabled &&
+    (!best(game.mode) || time < best(game.mode))
+  ) {
     try {
       localStorage.setItem(bestKey(game.mode), String(time));
       record = true;
     } catch {}
   }
   const cells = [
-    ['CAPTURED', count + ' / ' + DISHES.length],
-    ['TIME AFIELD', formatTime(time)],
+    ...(game.untimed
+      ? []
+      : [['DISHES CAPTURED', count + ' / ' + DISHES.length]]),
+    ...(game.paradeHits ? [['PURSUERS NETTED', game.paradeCaptures]] : []),
+    ...(timerEnabled ? [['TIME AFIELD', formatTime(time)]] : []),
     ['NETS CAST', shots],
-    ['ACCURACY', (shots ? Math.round((count / shots) * 100) : 0) + '%'],
+    [
+      'ACCURACY',
+      (shots ? Math.round(((count + game.paradeHits) / shots) * 100) : 0) + '%',
+    ],
   ];
   show(
     'end',
@@ -630,9 +683,11 @@ function end({ won, time, shots, count, reason }) {
       won ? 'MISSION COMPLETE' : 'SUPPER BELL',
       won
         ? 'Dinner is served!'
-        : reason === 'health'
-          ? 'You got basted!'
-          : 'Time for supper'
+        : reason === 'parade'
+          ? 'Caught by the parade!'
+          : reason === 'health'
+            ? 'You got basted!'
+            : 'Time for supper'
     ) +
       '<p class="panel-text">' +
       (won
@@ -644,13 +699,15 @@ function end({ won, time, shots, count, reason }) {
           : record
             ? 'The full Thanksgiving menu is at the table. New personal best!'
             : 'The full Thanksgiving menu is at the table.'
-        : reason === 'health'
-          ? 'The side dishes won the food fight. Watch for the windup and grab an Emergency Gravy Boat when your health dips.'
-          : 'Supper started with ' +
-            count +
-            ' of ' +
-            DISHES.length +
-            ' dishes. The rest are still out there.') +
+        : reason === 'parade'
+          ? 'Cast your net again to catch a pursuer. Hold Flap to glide over the crowd.'
+          : reason === 'health'
+            ? 'The side dishes won the food fight. Watch for the windup and grab an Emergency Gravy Boat when your health dips.'
+            : 'Supper started with ' +
+              count +
+              ' of ' +
+              DISHES.length +
+              ' dishes. The rest are still out there.') +
       '</p><div class="result-stats">' +
       cells
         .map(
@@ -666,7 +723,11 @@ function end({ won, time, shots, count, reason }) {
       button(
         !won && game.mode === 'campaign'
           ? 'Retry ' + game.course.name
-          : 'Hunt again',
+          : game.mode === 'parade'
+            ? 'Rejoin the parade'
+            : game.mode === 'roam'
+              ? 'Explore again'
+              : 'Hunt again',
         !won && game.mode === 'campaign'
           ? 'retry-course'
           : startAction(game.mode),
@@ -710,6 +771,7 @@ async function start(mode = 'campaign') {
         throw e;
       });
     game = await engineRequest;
+    game.timerEnabled = timerEnabled;
     $('#lobby').hidden = true;
     $('#arena').hidden = false;
     await game.reset(
@@ -825,6 +887,20 @@ const actions = {
       loading = false;
     }
   },
+  timer: () => {
+    timerEnabled = !timerEnabled;
+    try {
+      localStorage.setItem(timerKey, timerEnabled ? 'on' : 'off');
+    } catch {}
+    if (game) {
+      game.timerEnabled = timerEnabled;
+      if (game.active) game.setHUD();
+    }
+    if (screen === 'pause') {
+      pause();
+      content.querySelector('[data-action="timer"]').focus();
+    } else syncTimer();
+  },
   sound: () => {
     toggleAudio();
     syncSound();
@@ -885,6 +961,7 @@ document.addEventListener(
 if (!document.fullscreenEnabled) $('[data-action="fullscreen"]').hidden = true;
 $('#lobby-total').textContent = DISHES.length + ' dishes · 3 courses';
 fillIcons();
+syncTimer();
 syncSound();
 syncFull();
 refreshBest();

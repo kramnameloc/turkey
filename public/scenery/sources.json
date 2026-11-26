@@ -329,5 +329,50 @@
       }
     ],
     "changes": "Reduced mesh density, resized the original color textures and packed Sonic’s materials into one atlas. Centered and scaled each balloon for the parade and adapted its fabric material for daylight."
+  },
+  "/models/streetscape.glb": {
+    "credits": [
+      {
+        "title": "Bush models pack (gameready, LODs)",
+        "author": "LOLIPOP",
+        "source": "https://sketchfab.com/3d-models/bush-models-pack-gameready-lods-f2d9ffd3e6a94cf0b9464ccd66a4c2f8",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "City Props Pack",
+        "author": "AndrewPunchak",
+        "source": "https://sketchfab.com/3d-models/city-props-pack-0feac2741ab24469a6998702995c73a3",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Free Pack - Lowpoly People",
+        "author": "PolyOne Studio",
+        "source": "https://sketchfab.com/3d-models/free-pack-lowpoly-people-6c13a4d1d04943e487313f377b4f3548",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Suburban Home",
+        "author": "Designed By Jonathan",
+        "source": "https://sketchfab.com/3d-models/suburban-home-a0c72713894e418d8f93223c91eb1eac",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Street Props bench potbox stopsign street light",
+        "author": "pixelsquare",
+        "source": "https://sketchfab.com/3d-models/street-props-bench-potbox-stopsign-street-light-4f071e9f581f4e9e852d76ba5467c964",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    ],
+    "changes": "Selected and grounded individual street props, two shrub LODs and six standing figures. Applied clothing colors, simplified the traffic controls and adapted the signal lenses. Removed the house display lot and adapted its masonry and windows for brick and siding variants. Repacked textures for the game.",
+    "reference": {
+      "title": "Main Street looking toward First Avenue, Broomfield, July 2026",
+      "source": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.91645,-105.07167&heading=175",
+      "use": "Visual reference for ranch proportions, brick colors, planting, and signal masts."
+    }
   }
 }

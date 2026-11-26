@@ -1,4 +1,10 @@
 import * as T from 'three';
+import {
+  loadStreetscape,
+  streetScenery,
+  ranchHouses,
+  streetSegments,
+} from './streetscape.js';
 import { FieldGrasses, loadGrasses } from './grass.js';
 import { parkFloor } from './surfaces.js';
 import {
@@ -9,6 +15,7 @@ import {
 } from './streets.js';
 import {
   Obstacles,
+  contains,
   plantParkSaplings,
   regionData,
   SPAWN,
@@ -17,6 +24,7 @@ import {
   SIGN_WIDTH,
   SIGN_DEPTH,
 } from './field.js';
+import { DOVER } from './dover-location.js';
 import { makeTerrain } from './terrain.js';
 import { loadOaks, TreeStand } from './trees.js';
 const loader = new T.TextureLoader();
@@ -233,74 +241,6 @@ function buildings(list, photo, bounds, elev, wallMats) {
     );
   return group;
 }
-function parkFurniture(scene, data, height) {
-  const pieces = [],
-    v = new T.Object3D(),
-    colors = [];
-  function part(x, y, z, w, h, d, col, a = 0) {
-    v.position.set(x, y + height(x, z), z);
-    v.rotation.set(0, a, 0);
-    v.scale.set(w, h, d);
-    v.updateMatrix();
-    pieces.push(v.matrix.clone());
-    colors.push(col);
-  }
-  let last = [];
-  for (const p of data.paths.filter((p) => p.type === 'Multi-Use Path')) {
-    const [x, z] = p.points[0],
-      [nx, nz] = p.points[1] || p.points[0],
-      ang = Math.atan2(nx - x, nz - z);
-    if (
-      Math.abs(x) > 320 ||
-      Math.abs(z) > 300 ||
-      last.some(([a, b]) => Math.hypot(x - a, z - b) < 42)
-    )
-      continue;
-    last.push([x, z]);
-    const bx = x + Math.cos(ang) * 2.6,
-      bz = z - Math.sin(ang) * 2.6;
-    for (const [y, w, h, d, col] of [
-      [0.45, 1.9, 0.12, 0.48, '#936b46'],
-      [0.82, 1.9, 0.39, 0.09, '#916d4e'],
-    ])
-      part(
-        bx + (y > 0.5 ? 0.21 : 0) * Math.cos(ang),
-        y,
-        bz - (y > 0.5 ? 0.21 : 0) * Math.sin(ang),
-        d,
-        h,
-        w,
-        col,
-        ang
-      );
-    for (const s of [-0.7, 0.7])
-      part(
-        bx + s * Math.sin(ang),
-        0.23,
-        bz + s * Math.cos(ang),
-        0.34,
-        0.45,
-        0.09,
-        '#393c36',
-        ang
-      );
-    const lx = x - Math.cos(ang) * 2.7,
-      lz = z + Math.sin(ang) * 2.7;
-    part(lx, 2.1, lz, 0.095, 4.2, 0.095, '#3e4640');
-    part(lx, 4.23, lz, 0.32, 0.28, 0.32, '#e4d8ab');
-    part(lx, 4.4, lz, 0.42, 0.075, 0.42, '#455149');
-  }
-  const m = new T.InstancedMesh(
-    new T.BoxGeometry(),
-    new T.MeshStandardMaterial(),
-    pieces.length
-  );
-  pieces.forEach((p, i) => {
-    m.setMatrixAt(i, p);
-    m.setColorAt(i, new T.Color(colors[i]));
-  });
-  scene.add(m);
-}
 export function groundMaterial(photo, grass, options = {}) {
   const mat = new T.MeshBasicMaterial({ ...options, map: photo });
   mat.onBeforeCompile = (shader) => {
@@ -407,6 +347,7 @@ export async function buildWorld(scene, data) {
     streets,
     houses,
     grassModels,
+    streetModels,
   ] = await Promise.all([
     texture(data.orthophoto.url),
     texture('/scenery/grass.webp', true),
@@ -423,6 +364,7 @@ export async function buildWorld(scene, data) {
     streetMaterials(texture),
     texture('/scenery/street-houses.webp', true),
     loadGrasses(),
+    loadStreetscape(),
   ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
@@ -437,14 +379,16 @@ export async function buildWorld(scene, data) {
   walls.push(houseMaterial(houses));
   const terrain = makeTerrain(fine, regional.elevation, data.bounds);
   const { height } = terrain;
+  const solids = new Obstacles(data, PARK_SIGNS);
+  const junctions = streetJunctions(data.roads);
+  const scenery = streetScenery(data, junctions, streetModels, height, solids);
   const structures = buildings(
-    data.buildings,
+    data.buildings.filter((b) => !scenery.houses.has(b)),
     photo,
     data.bounds,
     height,
     walls
   );
-  const solids = new Obstacles(data, PARK_SIGNS);
   const plantings = [...data.trees, ...plantParkSaplings(data, solids)];
   const grasses = new FieldGrasses(scene, grassModels, height);
   grasses.update(SPAWN.x, SPAWN.z);
@@ -458,20 +402,33 @@ export async function buildWorld(scene, data) {
     new T.Mesh(terrain.parkGround(), groundMaterial(photo, grass)),
     structures
   );
-  const junctions = streetJunctions(data.roads);
   const signs = PARK_SIGNS.map((s) => parkSign(s, height));
   scene.add(
     parkFloor({ ...data, trees: plantings }, height),
-    pavement([...data.roads, ...data.paths], terrain, streets, junctions, {
-      crossingRoads: data.roads,
-    }),
+    pavement(
+      [...data.roads, ...data.paths, ...scenery.frontWalks],
+      terrain,
+      streets,
+      junctions,
+      {
+        crossingRoads: data.roads,
+      }
+    ),
     streetDetails(data.roads, junctions, terrain, streets),
     ...signs
   );
-  parkFurniture(scene, data, height);
+  scene.add(scenery.group, scenery.homes);
   water(scene, data.water, height);
   return {
-    walls: [...structures.children, ...signs.flatMap((sign) => sign.children)],
+    streetModels,
+    updateSignals: scenery.updateSignals,
+    paradeSignal: scenery.signalCrossing,
+    frontWalks: scenery.frontWalks,
+    walls: [
+      ...scenery.homes.children,
+      ...structures.children,
+      ...signs.flatMap((sign) => sign.children),
+    ],
     solids,
     grass,
     terrain,
@@ -554,8 +511,34 @@ export async function addRegion(scene, world) {
         ...t,
         ground: height(t.x, t.z),
       }));
+    // Only detail homes around the playable landmarks. Keep the quest cottage's
+    // surveyed wall and attached entrance together at Dover.
+    const sites = (data.detailMaps ?? []).filter(
+      ({ bounds }) =>
+        bounds.minX <= tile.bounds.maxX &&
+        bounds.maxX >= tile.bounds.minX &&
+        bounds.minZ <= tile.bounds.maxZ &&
+        bounds.maxZ >= tile.bounds.minZ
+    );
+    const localHomes = buildingsList.filter(
+      (h) =>
+        h.type === 'Single Family' &&
+        sites.some((s) => covers(s, ...h.points[0], 0)) &&
+        !contains(h.points, DOVER.x, DOVER.z)
+    );
+    const roads = streetSegments(
+      [...new Set(sites.flatMap((s) => s.roads))].filter(
+        (r) => r.type !== 'Parking Lot'
+      )
+    );
+    const { homes, houses } = ranchHouses(
+      localHomes,
+      roads,
+      world.streetModels,
+      height
+    );
     const cluster = buildings(
-      buildingsList,
+      buildingsList.filter((h) => !houses.has(h)),
       photo,
       b,
       height,
@@ -568,6 +551,7 @@ export async function addRegion(scene, world) {
       bounds: b,
     });
     world.trees.add(tile.url, trees);
+    if (homes.children.length) cluster.add(...homes.children);
     entry.mesh = cluster;
     scene.add(cluster);
   }
@@ -583,7 +567,8 @@ export async function addRegion(scene, world) {
           world.trees.remove(t.url);
           scene.remove(old.mesh);
           old.mesh.traverse((m) => {
-            if (m.isMesh) {
+            if (m.isInstancedMesh) m.dispose();
+            else if (m.isMesh) {
               m.geometry.dispose();
               if (!world.wallMaterials.includes(m.material))
                 m.material.dispose();

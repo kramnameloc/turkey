@@ -671,6 +671,10 @@ kbd {
 .hud-top .clock-box {
   margin-left: auto;
 }
+.clock-box[hidden] + [data-action="pause"] {
+  margin-left: auto;
+  grid-column: -2;
+}
 .hud-btn {
   width: 36px;
   height: 36px;
@@ -836,6 +840,7 @@ body.touch-mode .touch {
   letter-spacing: 0.095em;
   margin-top: 2px;
 }
+#touch-flap.held,
 #touch-fire.held,
 #touch-flap:active {
   color: #261c13;
@@ -1603,9 +1608,6 @@ body.touch-mode .touch {
   }
 }
 
-.parade-mode .equipment,
-.parade-mode #touch-fire,
-.parade-mode #crosshair,
 .parade-mode .compass-find {
   display: none;
 }

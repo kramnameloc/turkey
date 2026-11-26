@@ -39,6 +39,33 @@ material.onBeforeCompile = (shader) => {
     `
     );
 };
+// The imported spectators are posed meshes. Weight their stride from hip to
+// ankle so each foot can travel independently while the torso stays upright.
+function walkingMaterial(source) {
+  const walking = source.clone();
+  walking.onBeforeCompile = (shader, renderer) => {
+    source.onBeforeCompile(shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute float stepSwing;'
+      )
+      .replace(
+        '#include <project_vertex>',
+        `
+        float foot = 1.0 - smoothstep(0.03, 0.84, position.y);
+        float legSwing = stepSwing * clamp(position.x / 0.085, -1.0, 1.0);
+        transformed.z += legSwing * foot * 0.29;
+        transformed.y += max(0.0, legSwing) * foot * 0.13;
+        #include <project_vertex>
+      `
+      );
+  };
+  walking.customProgramCacheKey = () =>
+    'spectator stride ' + source.customProgramCacheKey();
+  return walking;
+}
+
 const coats = [
   0x933533, 0x35645c, 0xd3a048, 0x486989, 0x886687, 0xa75e38, 0xd2c7a6,
   0x344a59,
@@ -152,8 +179,10 @@ export function paradeCrowd(route, data, world, shade) {
       clearance: (width * 0.5 + 0.36) ** 2,
     }))
   );
-  const sidewalks = data.paths.filter((p) => p.type.includes('Sidewalk'));
-  const placed = [];
+  const sidewalks = [...data.paths, ...(world.frontWalks ?? [])].filter((p) =>
+    p.type.includes('Sidewalk')
+  );
+  const people = [];
   for (const side of [-1, 1]) {
     for (let d = 3 + random() * 6; d < route.length; d += 12 + random() * 18) {
       const family = 2 + Math.floor(random() * 3);
@@ -172,9 +201,13 @@ export function paradeCrowd(route, data, world, shade) {
           )
         )
           continue;
-        if (placed.some((o) => Math.hypot(p.x - o.x, p.z - o.z) < 0.72))
+        if (
+          people.some(
+            ({ model }) =>
+              Math.hypot(p.x - model.position.x, p.z - model.position.z) < 0.72
+          )
+        )
           continue;
-        placed.push(p);
         const child = i === 1 && family > 2,
           scale = child ? 0.66 + random() * 0.14 : 0.91 + random() * 0.16;
         const obj = new T.Object3D();
@@ -194,60 +227,135 @@ export function paradeCrowd(route, data, world, shade) {
         obj.rotation.y = p.yaw - (side * Math.PI) / 2 + (random() - 0.5) * 0.65;
         obj.scale.set(scale * (0.93 + random() * 0.16), scale, scale);
         obj.updateMatrix();
-        outfits[Math.floor(random() * outfits.length)].push(obj.matrix);
+        const height = scale * 1.7;
+        obj.userData = { aimHeight: height * 0.55, labelHeight: height + 0.15 };
+        const person = {
+          name: 'Parade spectator',
+          isParadeParticipant: true,
+          model: obj,
+          radius: 0.29 * scale,
+          height,
+          home: obj.position.clone(),
+          homeYaw: obj.rotation.y,
+          shadowIndex: people.length,
+        };
+        people.push(person);
+        outfits[Math.floor(random() * outfits.length)].push(person);
       }
     }
   }
-  const layers = outfits.map((matrices, i) => {
+  const walking = walkingMaterial(material);
+  const walkingPoses = new Map();
+  const layers = outfits.map((outfit, i) => {
+    // Six standing poses share the sidewalk with the original waving families.
+    const person = world.streetModels?.get('Onlooker' + (i + 1))?.[0];
+    if (person && !walkingPoses.has(person.material))
+      walkingPoses.set(person.material, walkingMaterial(person.material));
     const near = new T.InstancedMesh(
-      spectator(i, true),
-      material,
-      matrices.length
+      person ? person.geometry.clone() : spectator(i, true),
+      person ? walkingPoses.get(person.material) : walking,
+      outfit.length
     );
     const far = new T.InstancedMesh(
       spectator(i, false),
-      material,
-      matrices.length
+      walking,
+      outfit.length
     );
+    if (person) near.name = 'Street spectator ' + (i + 1);
     for (const people of [near, far]) {
+      people.geometry.setAttribute(
+        'stepSwing',
+        new T.InstancedBufferAttribute(
+          new Float32Array(outfit.length),
+          1
+        ).setUsage(T.DynamicDrawUsage)
+      );
       people.count = 0;
       people.frustumCulled = false;
       people.instanceMatrix.setUsage(T.DynamicDrawUsage);
       crowd.add(people);
     }
-    return { near, far, matrices };
+    return { near, far, outfit };
   });
   const shadows = new T.InstancedMesh(
     new T.PlaneGeometry(0.92, 0.68).rotateX(-Math.PI / 2),
     shade,
-    placed.length
+    people.length
   );
-  let id = 0;
-  for (const matrices of outfits)
-    for (const matrix of matrices) {
-      const m = matrix.clone();
-      m.elements[13] += 0.018;
-      shadows.setMatrixAt(id++, m);
-    }
+  const shadowMatrix = new T.Matrix4();
+  function updateShadow(person) {
+    shadowMatrix.copy(person.model.matrix);
+    shadowMatrix.elements[13] = person.model.position.y + 0.018;
+    shadows.setMatrixAt(person.shadowIndex, shadowMatrix);
+  }
+  for (const person of people) updateShadow(person);
   shadows.name = 'Spectator shadows';
+  shadows.frustumCulled = false;
   crowd.add(shadows);
   let lastX = Infinity,
-    lastZ = Infinity;
-  function update(time, viewer) {
+    lastZ = Infinity,
+    dirty = true;
+  function capture(person) {
+    shadows.setMatrixAt(person.shadowIndex, shadowMatrix.makeScale(0, 0, 0));
+    shadows.instanceMatrix.needsUpdate = true;
+    dirty = true;
+  }
+  function reset() {
+    for (const person of people) {
+      person.caught = false;
+      person.model.position.copy(person.home);
+      person.model.rotation.y = person.homeYaw;
+      person.stride = 0;
+      person.lastStride = null;
+      person.model.updateMatrix();
+      updateShadow(person);
+    }
+    dirty = true;
+    shadows.instanceMatrix.needsUpdate = true;
+  }
+  function update(time, viewer, moving) {
     waveTime.value = time;
-    if (Math.hypot(viewer.x - lastX, viewer.z - lastZ) < 5) return;
+    if (moving) {
+      for (const person of moving) {
+        if (
+          !person.home ||
+          (person.lastStride === person.stride &&
+            person.lastYaw === person.model.rotation.y)
+        )
+          continue;
+        person.lastStride = person.stride;
+        person.lastYaw = person.model.rotation.y;
+        person.model.updateMatrix();
+        updateShadow(person);
+        person.model.matrix.elements[13] +=
+          Math.abs(Math.sin(person.stride)) * 0.055;
+        dirty = true;
+        shadows.instanceMatrix.needsUpdate = true;
+      }
+    }
+    if (!dirty && Math.hypot(viewer.x - lastX, viewer.z - lastZ) < 5) return;
+    dirty = false;
     lastX = viewer.x;
     lastZ = viewer.z;
-    for (const { near, far, matrices } of layers) {
+    for (const { near, far, outfit } of layers) {
       near.count = far.count = 0;
-      for (const m of matrices) {
+      for (const person of outfit) {
+        if (person.caught) continue;
+        const m = person.model.matrix;
         const d = (m.elements[12] - lastX) ** 2 + (m.elements[14] - lastZ) ** 2;
         if (d > 220 ** 2) continue;
         const mesh = d < 48 ** 2 ? near : far;
+        mesh.geometry.attributes.stepSwing.setX(
+          mesh.count,
+          Math.sin(person.stride || 0)
+        );
         mesh.setMatrixAt(mesh.count++, m);
       }
-      near.instanceMatrix.needsUpdate = far.instanceMatrix.needsUpdate = true;
+      for (const mesh of [near, far]) {
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.geometry.attributes.stepSwing.needsUpdate = true;
+      }
     }
   }
-  return { group: crowd, update };
+  return { group: crowd, people, update, reset, capture };
 }

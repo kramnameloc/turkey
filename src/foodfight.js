@@ -135,12 +135,22 @@ export class FoodFight {
     this.lull = Math.max(1.7, 3.9 - this.hunt.level * 0.55) + Math.random() * 2;
     sound(a.kind === 'sprout' ? 'toot' : 'toss');
   }
+  tickDamage(dt) {
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 2.6);
+  }
+  takeHit(damage) {
+    if (this.invulnerable > 0) return false;
+    this.health = Math.max(0, this.health - damage);
+    this.invulnerable = 1.1;
+    this.hitFlash = 1;
+    return true;
+  }
   update(dt, elapsed = dt) {
     const g = this.hunt,
       p = g.camera.position;
     this.speed = Math.max(0, this.speed - elapsed);
-    this.invulnerable = Math.max(0, this.invulnerable - dt);
-    this.hitFlash = Math.max(0, this.hitFlash - dt * 2.6);
+    this.tickDamage(dt);
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const item = this.pickups[i];
       if (Math.hypot(item.x - p.x, item.z - p.z) > 125) continue;
@@ -228,10 +238,7 @@ export class FoodFight {
           point.y < p.y - TURKEY_EYE + TURKEY_HEIGHT + 0.2
         ) {
           done = true;
-          if (this.invulnerable === 0) {
-            this.health = Math.max(0, this.health - THROWS[a.kind].damage);
-            this.invulnerable = 1.1;
-            this.hitFlash = 1;
+          if (this.takeHit(THROWS[a.kind].damage)) {
             sound(a.kind === 'sprout' ? 'toot' : 'splat');
             g.toast(
               THROWS[a.kind].hit + ' −' + THROWS[a.kind].damage + ' HP',

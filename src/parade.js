@@ -3,6 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { paradeRoute } from './parade-route.js';
 import { paradeCrowd } from './parade-crowd.js';
+import { BODY_RADIUS, TURKEY_HEIGHT } from './turkey-scale.js';
+import { clearTrail, walkingTrail } from './trail.js';
+import { overlapsBody } from './body-collision.js';
 
 const spacing = 26,
   marchSpeed = 0.74,
@@ -72,7 +75,20 @@ function turkeyHandler(avatar, phase) {
       beakIndex = i;
     }
   }
-  return { body, mixer, phase, skin, beakIndex };
+  body.userData.aimHeight = TURKEY_HEIGHT * 0.57;
+  body.userData.labelHeight = TURKEY_HEIGHT + 0.18;
+  return {
+    name: 'Balloon handler',
+    isParadeParticipant: true,
+    model: body,
+    radius: BODY_RADIUS,
+    height: TURKEY_HEIGHT,
+    body,
+    mixer,
+    phase,
+    skin,
+    beakIndex,
+  };
 }
 
 export class Parade {
@@ -87,6 +103,11 @@ export class Parade {
     this.group = new T.Group();
     this.group.name = 'Main Street balloon parade';
     this.height = world.height;
+    this.occupied = (x, z) => world.solids.occupied(x, z);
+    this.time = 0;
+    this.chasers = new Set();
+    this.nearbyActors = [];
+    this.signalCrossing = world.paradeSignal;
     const shade = new T.MeshBasicMaterial({
       map: shadowMap,
       transparent: true,
@@ -113,7 +134,16 @@ export class Parade {
         this.group.add(h.body, h.shadow);
       }
       this.group.add(balloon, shadow);
-      return { label: balloon.userData.paradeLabel, balloon, anchors, handlers, shadow };
+      const float = {
+        label: balloon.userData.paradeLabel,
+        balloon,
+        anchors,
+        handlers,
+        shadow,
+        shadowSize: shadow.scale.clone(),
+      };
+      for (const h of handlers) h.float = float;
+      return float;
     });
     this.ropes = new T.InstancedMesh(
       new T.CylinderGeometry(0.022, 0.022, 1, 5),
@@ -126,7 +156,10 @@ export class Parade {
     this.group.add(this.ropes);
   }
   get leader() {
-    return this.floats[0].balloon.position;
+    const first = this.floats[0];
+    if (!first.release) return first.balloon.position;
+    const center = this.route.sample(this.headDistance);
+    return new T.Vector3(center.x, this.height(center.x, center.z), center.z);
   }
   get headDistance() {
     return startDistance + this.time * marchSpeed;
@@ -136,68 +169,247 @@ export class Parade {
     const viewer = this.route.sample(distance + 19, 10);
     return { viewer, subject: this.route.sample(distance - 5) };
   }
+  reset() {
+    this.threat = null;
+    this.chasers.clear();
+    this.nearbyActors.length = 0;
+    this.crowd.reset();
+    for (const f of this.floats) {
+      f.release = null;
+      for (const h of f.handlers) {
+        h.caught = false;
+        h.body.rotation.x = 0;
+      }
+      f.balloon.visible = f.shadow.visible = true;
+      f.shadow.scale.copy(f.shadowSize);
+    }
+    this.time = 0;
+  }
+  hit(actor) {
+    if (this.chasers.delete(actor)) {
+      actor.caught = true;
+      if (actor.float) actor.body.visible = actor.shadow.visible = false;
+      else this.crowd.capture(actor);
+      if (this.threat === actor) this.threat = null;
+      return actor.name + ' netted!';
+    }
+    this.chasers.add(actor);
+    actor.attackAt = null;
+    actor.nextPath = 0;
+    actor.path = [];
+    actor.stride = 0;
+    const f = actor.float;
+    if (f && !f.release) {
+      f.release = {
+        time: this.time,
+        position: f.balloon.position.clone(),
+        rotation: f.balloon.rotation.clone(),
+      };
+      return f.label + ' is floating away! Its handler is chasing you.';
+    }
+    return actor.name + ' is chasing you!';
+  }
+  blocks(x, z, radius = BODY_RADIUS, except = null, feet = null) {
+    return this.nearbyActors.some(
+      (actor) => actor !== except && overlapsBody(actor, x, z, feet, radius)
+    );
+  }
+  contactAttack(player, feet) {
+    this.threat = null;
+    let attacker = null;
+    for (const actor of this.chasers) {
+      if (!overlapsBody(actor, player.x, player.z, feet, BODY_RADIUS + 0.4)) {
+        actor.attackAt = null;
+        continue;
+      }
+      actor.attackAt ??= this.time + 0.55;
+      const until = actor.attackAt - this.time;
+      if (until <= 0 && !attacker) {
+        attacker = actor;
+        actor.attackAt = this.time + 1.8;
+      } else if (until < 0.55) this.threat = actor;
+    }
+    return attacker;
+  }
+  pursue(actor, player, dt) {
+    const body = actor.model,
+      p = body.position;
+    const distance = Math.hypot(player.x - p.x, player.z - p.z);
+    const contact = actor.radius + BODY_RADIUS + 0.06;
+    if (distance > 85 || !dt) return;
+    const face = Math.atan2(player.x - p.x, player.z - p.z);
+    body.rotation.y = face;
+    if (distance <= contact) return;
+    if (this.time >= actor.nextPath) {
+      actor.path = clearTrail(p, player, this.occupied)
+        ? []
+        : walkingTrail(p, player, this.occupied);
+      actor.nextPath = this.time + 0.85;
+    }
+    while (
+      actor.path.length &&
+      Math.hypot(actor.path[0].x - p.x, actor.path[0].z - p.z) < 0.55
+    )
+      actor.path.shift();
+    const goal = actor.path[0] || player;
+    const heading = Math.atan2(goal.x - p.x, goal.z - p.z);
+    const step = Math.min(distance - contact, (actor.float ? 4.7 : 3.5) * dt);
+    for (const turn of [0, 0.45, -0.45, 0.92, -0.92, 1.48, -1.48]) {
+      const angle = heading + turn,
+        x = p.x + Math.sin(angle) * step,
+        z = p.z + Math.cos(angle) * step;
+      if (
+        this.occupied(x, z) ||
+        this.blocks(x, z, actor.radius, actor) ||
+        Math.hypot(player.x - x, player.z - z) < contact - 0.001
+      )
+        continue;
+      p.set(x, this.height(x, z) + (actor.float ? 0.023 : 0.055), z);
+      body.rotation.y = angle;
+      actor.stride += step * (actor.float ? 1 / 0.32 : 5);
+      break;
+    }
+  }
   update(time, viewer) {
+    const dt = Math.min(0.06, Math.max(0, time - this.time));
     this.time = time;
-    this.crowd.update(time, viewer || this.viewpoint().viewer);
+    if (viewer)
+      for (const actor of this.chasers) this.pursue(actor, viewer, dt);
+    this.crowd.update(time, viewer || this.viewpoint().viewer, this.chasers);
+    this.nearbyActors.length = 0;
+    const nearby = (p) =>
+      !viewer || (p.x - viewer.x) ** 2 + (p.z - viewer.z) ** 2 < 65 ** 2;
+    for (const person of this.crowd.people)
+      if (!person.caught && nearby(person.model.position))
+        this.nearbyActors.push(person);
     let segment = 0;
-    this.floats.forEach(({ balloon, anchors, handlers, shadow }, i) => {
-      const distance = this.headDistance - i * spacing,
-        phase = time * 0.77 + i * 1.94;
-      const center = this.route.sample(distance, Math.sin(phase * 0.64) * 0.24);
-      const floor = this.height(center.x, center.z);
-      balloon.position.set(
-        center.x,
-        floor + 3.45 + Math.sin(phase) * 0.24,
-        center.z
-      );
-      balloon.rotation.set(
-        Math.cos(phase * 0.52) * 0.021,
-        center.yaw + Math.sin(phase * 0.41) * 0.037,
-        Math.sin(phase * 0.63) * 0.033,
-        'YXZ'
-      );
-      balloon.updateMatrixWorld(true);
-      shadow.position.set(center.x, floor + 0.06, center.z);
-      // Match the ground slope under the large, soft balloon shadow.
-      const slopeX =
-        (this.height(center.x + 2, center.z) -
-          this.height(center.x - 2, center.z)) /
-        4;
-      const slopeZ =
-        (this.height(center.x, center.z + 2) -
-          this.height(center.x, center.z - 2)) /
-        4;
-      shadow.quaternion.setFromUnitVectors(
-        up,
-        delta.set(-slopeX, 1, -slopeZ).normalize()
-      );
-      shadow.rotateY(center.yaw);
-      // The balloons remain visible down the street. At this distance a bird
-      // occupies only a few pixels, so omit its rig and tethers until closer.
-      const crewInView =
-        !viewer || Math.hypot(viewer.x - center.x, viewer.z - center.z) < 155;
-      handlers.forEach(
-        ({ body, mixer, phase, skin, beakIndex, shadow: footShadow }, j) => {
-          body.visible = footShadow.visible = crewInView;
-          if (!crewInView) return;
-          const [side, fore] = crew[j],
-            p = this.route.sample(distance + fore * 4.8, side * 2.4);
-          body.position.set(p.x, this.height(p.x, p.z) + 0.023, p.z);
-          const behind = this.route.sample(
-            distance + fore * 4.8 - 0.12,
-            side * 2.4
-          );
-          const ahead = this.route.sample(
-            distance + fore * 4.8 + 0.12,
-            side * 2.4
-          );
-          body.rotation.y = Math.atan2(ahead.x - behind.x, ahead.z - behind.z);
+    this.floats.forEach(
+      ({ balloon, anchors, handlers, shadow, shadowSize, release }, i) => {
+        const distance = this.headDistance - i * spacing,
+          phase = time * 0.77 + i * 1.94;
+        const center = this.route.sample(
+          distance,
+          Math.sin(phase * 0.64) * 0.24
+        );
+        const floor = this.height(center.x, center.z);
+        // Raise the balloon before the lead edge reaches the mast arms. Its crew
+        // stays on the road while the four tethers lengthen through the crossing.
+        const lift = this.signalCrossing
+          ? 6.4 *
+            (1 -
+              T.MathUtils.smoothstep(
+                Math.hypot(
+                  center.x - this.signalCrossing.x,
+                  center.z - this.signalCrossing.z
+                ),
+                23,
+                48
+              ))
+          : 0;
+        balloon.position.set(
+          center.x,
+          floor + 3.45 + lift + Math.sin(phase) * 0.24,
+          center.z
+        );
+        balloon.rotation.set(
+          Math.cos(phase * 0.52) * 0.021,
+          center.yaw + Math.sin(phase * 0.41) * 0.037,
+          Math.sin(phase * 0.63) * 0.033,
+          'YXZ'
+        );
+        if (release) {
+          const age = Math.max(0, time - release.time);
+          const drift = age - 1 + Math.exp(-age);
+          balloon.position.copy(release.position);
+          balloon.position.x += drift * 1.15;
+          balloon.position.z -= drift * 0.68;
+          balloon.position.y += drift * 2.9;
+          balloon.rotation.copy(release.rotation);
+          balloon.rotation.y += Math.sin(age * 0.28) * 0.24;
+          balloon.rotation.z += Math.sin(age * 0.47) * 0.08;
+          balloon.visible = age < 65;
+          shadow.visible = age < 13;
+          shadow.scale
+            .copy(shadowSize)
+            .multiplyScalar(Math.max(0, 1 - age / 13));
+        }
+        balloon.updateMatrixWorld(true);
+        shadow.position.set(center.x, floor + 0.06, center.z);
+        if (release && shadow.visible) {
+          const { x, z } = balloon.position;
+          shadow.position.set(x, this.height(x, z) + 0.06, z);
+        }
+        // Match the ground slope under the large, soft balloon shadow.
+        const slopeX =
+          (this.height(center.x + 2, center.z) -
+            this.height(center.x - 2, center.z)) /
+          4;
+        const slopeZ =
+          (this.height(center.x, center.z + 2) -
+            this.height(center.x, center.z - 2)) /
+          4;
+        shadow.quaternion.setFromUnitVectors(
+          up,
+          delta.set(-slopeX, 1, -slopeZ).normalize()
+        );
+        shadow.rotateY(center.yaw);
+        // The balloons remain visible down the street. At this distance a bird
+        // occupies only a few pixels, so omit its rig and tethers until closer.
+        const crewInView =
+          !viewer || Math.hypot(viewer.x - center.x, viewer.z - center.z) < 155;
+        handlers.forEach((handler, j) => {
+          const {
+            body,
+            mixer,
+            phase,
+            skin,
+            beakIndex,
+            shadow: footShadow,
+          } = handler;
+          if (handler.caught) {
+            body.visible = footShadow.visible = false;
+            return;
+          }
+          const chasing = this.chasers.has(handler);
+          body.rotation.x =
+            chasing && handler.attackAt != null
+              ? 0.17 * Math.max(0, 1 - Math.abs(handler.attackAt - time) / 0.35)
+              : 0;
+          body.visible = footShadow.visible = chasing
+            ? !viewer ||
+              Math.hypot(
+                body.position.x - viewer.x,
+                body.position.z - viewer.z
+              ) < 155
+            : crewInView;
+          if (!body.visible) return;
+          if (!chasing) {
+            const [side, fore] = crew[j],
+              p = this.route.sample(distance + fore * 4.8, side * 2.4);
+            body.position.set(p.x, this.height(p.x, p.z) + 0.023, p.z);
+            const behind = this.route.sample(
+              distance + fore * 4.8 - 0.12,
+              side * 2.4
+            );
+            const ahead = this.route.sample(
+              distance + fore * 4.8 + 0.12,
+              side * 2.4
+            );
+            body.rotation.y = Math.atan2(
+              ahead.x - behind.x,
+              ahead.z - behind.z
+            );
+          }
+          if (nearby(body.position)) this.nearbyActors.push(handler);
           footShadow.position.copy(body.position);
           footShadow.position.y += 0.018;
           // The planted foot travels about 0.32 m backwards per second of the
           // authored walk at game scale. Match that speed to forward travel.
-          mixer.setTime(time * (marchSpeed / 0.32) + phase);
+          mixer.setTime(
+            (chasing ? handler.stride : time * (marchSpeed / 0.32)) + phase
+          );
           body.updateMatrixWorld(true);
+          if (release) return;
           skin
             .getVertexPosition(beakIndex, beak)
             .applyMatrix4(skin.matrixWorld);
@@ -215,9 +427,9 @@ export class Parade {
             this.ropes.setMatrixAt(segment++, ropePiece.matrix);
             previous.copy(next);
           }
-        }
-      );
-    });
+        });
+      }
+    );
     this.ropes.count = segment;
     this.ropes.instanceMatrix.needsUpdate = true;
   }

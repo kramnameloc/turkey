@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { streetScenery } from './streetscape.js';
 import { pavement, streetDetails } from './streets.js';
 import { groundMaterial } from './world.js';
 import { bluePod } from './soccer.js';
@@ -109,19 +110,31 @@ export async function courseMaps(scene, world, region) {
                 contains
               )
             );
+            let barriers = [];
             if (site.id === 'commons') {
               const pitch = bluePod(site, world.height);
               if (pitch) {
                 mesh.add(pitch.group);
                 site.markings = pitch.markings;
                 site.mapRevision = (site.mapRevision || 0) + 1;
-                site.solids = new Obstacles({
-                  buildings: pitch.barriers,
-                  water: [],
-                  bounds: site.bounds,
-                });
+                barriers = pitch.barriers;
               }
             }
+            site.solids = new Obstacles({
+              buildings: [...site.buildings, ...barriers],
+              trees: site.trees,
+              water: [],
+              bounds: site.bounds,
+            });
+            const scenery = streetScenery(
+              { ...site, buildings: [] },
+              region.junctions,
+              world.streetModels,
+              world.height,
+              site.solids,
+              contains
+            );
+            mesh.add(scenery.group);
             scene.add(mesh);
             site.mesh = mesh;
           })().finally(() => {

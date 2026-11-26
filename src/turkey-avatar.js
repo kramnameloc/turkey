@@ -71,13 +71,16 @@ export class TurkeyAvatar extends T.Group {
     this.play('Attack', true).setDuration(0.43);
   }
 
-  animate(dt, speed, lift) {
-    if (lift > 0.02) {
-      this.play('Jump').setDuration(0.84);
-    } else if (
-      this.current !== this.actions.get('Attack') ||
-      !this.current.isRunning()
-    ) {
+  animate(dt, speed, lift, gliding = false) {
+    const striking =
+      this.current === this.actions.get('Attack') && this.current.isRunning();
+    if (!striking && lift > 0.02) {
+      const jump = this.play('Jump').setDuration(0.84);
+      // The source Jump clip spreads both wings from 0.2 to 0.4 seconds.
+      // Hold that pose during a glide and let the clip fold them on release.
+      if (gliding) jump.time = 0.32;
+      jump.paused = gliding;
+    } else if (!striking) {
       const gait = speed < 0.15 ? 'Stand' : speed < 9 ? 'Walk' : 'Run';
       const action = this.play(gait);
       if (gait !== 'Stand')

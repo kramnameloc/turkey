@@ -16,12 +16,15 @@ Open the local URL printed by Vite in a WebGL 2 browser. The game bundles its ge
 To play on a phone or tablet, connect it to the same Wi-Fi as the computer. Run `npm run build` followed by `npm run play:lan` on the computer, then open the printed **Network** URL on the device. The controls adapt when you rotate the screen.
 
 - **Start hunt** opens a three-course campaign. Capture four dishes in two minutes at Community Park, then play Brunner Farmhouse and County Commons. Health and bonuses carry between courses. After the fourth capture at County Commons, the supper clock stops. Follow the gold trail to 735 Dover St or use **Travel to Dover St** on the course map. Enter the game’s cottage and inspect the pedestal to finish the campaign. The collectible stays in your field guide on this browser. If you run out of health or time, retry the current course from its starting checkpoint.
-- **Watch parade** starts an untimed curbside visit. Four turkey handlers guide each of the 22 balloons around Main Street, 1st Avenue, and Community Park Road. Look for Snoopy carrying Woodstock, Finn riding Jake, Spider-Man, Pikachu, two Sonic designs, and a skating Ronald McDonald. The same procession runs during hunts and free roam near Community Park. The star on the park map marks Jett at the head of the parade. In parade mode, choose any balloon on the map and select **Rejoin the parade** for a curbside view as it approaches.
+- **Hunt timer** in the lobby or pause menu turns the countdown on or off. With it off you can finish every hunt and campaign course at your own pace. Turning it back on resumes the remaining time. The browser remembers your choice. Personal bests are recorded for runs played with the timer on.
+- **Watch parade** starts an untimed curbside visit. Four turkey handlers guide each of the 22 balloons around Main Street, 1st Avenue, and Community Park Road. Look for Snoopy carrying Woodstock, Finn riding Jake, Spider-Man, Pikachu, two Sonic designs, and a skating Ronald McDonald. The same procession runs during hunts and free roam near Community Park. Spectators and marching turkeys block your path. A net hit makes that participant chase you. They can tag you for damage. A second net catches the pursuer. Hitting a handler releases its balloon, and the rest of that crew keeps marching. The star on the park map marks the lead crew. In parade mode, choose any balloon on the map and select **Rejoin the parade** for a curbside view as it approaches.
 - **Hunt map → Park time trial** keeps the original twelve-dish, five-minute park challenge. Orange diamonds mark dishes. Get within 35 meters, aim until the reticle turns amber, and cast.
 - **Hunt map → Greater Broomfield → Citywide hunt** places one side and one dessert at each of six landmarks. Open the map during play to travel between them.
 - **Explore freely** opens the full regional map without a timer. Walk between neighborhoods or use a landmark travel stop.
 
 ## Food fights
+
+Tap jump to hop over shorter enemies. Hold it for a short burst of flight and a slow glide. Releasing jump brings you down faster.
 
 Dishes wind up and throw fossilized dinner rolls, jiggly cranberry cans, or gassy Brussels sprouts. Their throws aim at where you stood during the windup. Sidestep, flap over the food, or take cover. Walk into a mint-marked **Emergency Gravy Boat** to restore up to 35 health. A full-health turkey leaves the gravy for later.
 
@@ -37,7 +40,7 @@ The November forecast rolls a 35% chance of flurries at each course start and on
 | Aim | Mouse, or drag when the pointer is unlocked | Drag the world |
 | Cast net | Left click or F | Tap Cast, or drag from Cast to aim and release to throw |
 | Sprint | Hold Shift while moving | Full stick |
-| Jump / flap | Space | Feather button |
+| Jump / glide | Tap / hold Space | Tap / hold Flap |
 | Find next dish | H or compass | Compass |
 | Switch first person / chase camera | V | Camera button below or beside the minimap |
 | Enter, leave or inspect a display | G at a prompt | Tap the prompt |
@@ -50,7 +53,9 @@ The arrow keys also move forward/back and turn. Q and E tilt the view. Pausing o
 
 The detailed park map spans 1.36 × 1.36 km. The regional map spans 19.2 × 19.2 km around Broomfield, including surrounding communities. Building footprints, streets, paths, trees, and landmarks come from city GIS. USGS/USDA aerial photography covers the ground and rooftops. USGS elevation sampled on a 10-meter grid covers Community Park, Brunner Farmhouse, County Commons and the Dover area, transitioning to 150-meter regional coverage. Roof and tree heights use 2020 USGS lidar where supported. Other buildings and trees use estimates. Six neighborhood maps combine detailed aerial imagery, surveyed trails, streets, named amenities, building footprints and tree locations. The same aerials and trails appear underfoot. The portable soccer goals represent the Commons Blue Pod playing fields. The Dover cottage has an original game interior.
 
-Street surfaces and residential masonry use material artwork from *Street* by Pasha. Crosswalks follow the mapped pedestrian routes, and lane paint uses the city’s road class and one-way records. Street names come from the intersecting roads. Signposts, storm grates, utility covers, and house fronts are illustrative.
+Street surfaces and residential masonry use material artwork from *Street* by Pasha. Crosswalks follow the mapped pedestrian routes, and lane paint uses the city’s road class and one-way records. Street names come from the intersecting roads. At Main and First, four signal masts cycle through the crossing. Nearby detached homes use street-facing ranch models fitted to compatible surveyed footprints. The low brick homes on Main Street and the signal layout were informed by [Broomfield Street View](https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.91645,-105.07167&heading=175). House fronts and individual furniture placements are illustrative.
+
+Slatted benches, bins, path lights, hydrants and shrubs furnish Community Park and the detailed regional neighborhoods. Six posed spectators join the waving families at the parade. Model authors and adaptations are listed in [the scenery credits](public/scenery/sources.json). To rebuild the street model library, put the five credited source downloads in `download-models/streetscape/` and run `blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/export_streetscape.py`. The exporter reads the original pixelsquare ZIP with `bsdtar` and the other four sources as Sketchfab GLBs.
 
 Broadleaf trees use eleven oak forms by LOLIPOP, with early autumn, late autumn and bare crowns. Each mapped trunk uses its lidar or inventory height. A location seed varies the model, crown spread and rotation, and places occasional young oaks near mature park oaks. Conifers use the spruce model.
 

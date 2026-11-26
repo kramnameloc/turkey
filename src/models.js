@@ -872,6 +872,8 @@ export function foodModel(id, environment = null) {
   root.name = id;
   root.scale.setScalar(characterScale);
   root.userData.rig = { pivot, eyes, arms, legs, phase };
+  root.userData.bodyHeight = bounds.max.y * characterScale;
+  root.userData.bodyRadius = 0.5 * characterScale * Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z);
   root.userData.aimHeight = characterScale * (bounds.min.y + bounds.max.y) * 0.5;
   root.userData.labelHeight = characterScale * bounds.max.y + 0.38;
   return root;
