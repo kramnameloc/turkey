@@ -1602,3 +1602,10 @@ body.touch-mode .touch {
     line-height: 1;
   }
 }
+
+.parade-mode .equipment,
+.parade-mode #touch-fire,
+.parade-mode #crosshair,
+.parade-mode .compass-find {
+  display: none;
+}

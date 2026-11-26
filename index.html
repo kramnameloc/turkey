@@ -118,6 +118,8 @@
           <div class="actions">
             <button class="primary" data-action="start">
               <i data-i="focus"></i>Start hunt</button
+            ><button class="secondary" data-action="parade">
+              <i data-i="flag"></i>Watch parade</button
             ><button class="secondary" data-action="controls">
               <i data-i="controller"></i>How to play
             </button>
@@ -224,7 +226,7 @@
               aria-label="Open hunt map"
             >
               <canvas id="radar" width="200" height="160"></canvas
-              ><span><i data-i="map"></i> HUNT MAP <kbd>M</kbd></span>
+              ><span><i data-i="map"></i> <b id="radar-label">HUNT MAP</b> <kbd>M</kbd></span>
             </button>
             <button
               id="view-toggle"

@@ -35,6 +35,7 @@ const startAction = (mode) =>
     city: 'city-hunt',
     hunt: 'park-trial',
     roam: 'explore',
+    parade: 'parade',
   })[mode];
 const button = (label, action, primary = false, glyph = '') =>
   '<button class="' +
@@ -250,6 +251,36 @@ async function map(level) {
   )
     selectedSpot = game.guide.suggestedStop;
   openFromGame();
+  if (game?.active && game.mode === 'parade') {
+    show(
+      'map',
+      heading('COMMUNITY PARK', 'Parade route') +
+        '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Parade loop and current lead balloon"></canvas>' +
+        '<p class="panel-text">The gold line follows Main Street, 1st Avenue and Community Park Road. The star marks Jett at the head of the parade.</p>' +
+        '<label class="travel-label">WATCH A BALLOON<select id="parade-balloon">' +
+        game.parade.floats
+          .map(
+            ({ label }, i) => '<option value="' + i + '">' + label + '</option>'
+          )
+          .join('') +
+        '</select></label><div class="panel-actions">' +
+        button('Rejoin the parade', 'rejoin-parade', true, 'flag') +
+        button('Back to my spot', 'resume') +
+        '</div>'
+    );
+    const p = game.mapPosition;
+    drawMap($('#zone-map'), game.data, {
+      x: -145,
+      z: 149,
+      width: Math.max(585, Math.abs(p.x + 145) * 2.2, Math.abs(p.z - 149) * 4),
+      route: game.parade.route.points,
+      destination: game.parade.leader,
+      targets: [],
+      player: p,
+      yaw: game.yaw,
+    });
+    return;
+  }
   if (game?.active && game.mode === 'campaign') return courseMap();
   if (level) mapLevel = level;
   else mapLevel = game?.active && game.mode !== 'hunt' ? 'city' : 'park';
@@ -311,6 +342,9 @@ async function map(level) {
       (active && game.mode === 'roam'
         ? ''
         : '<span><b></b> Runaway dish</span>') +
+      (active && !city && game.localParade
+        ? '<span class="dover-key">★ Balloon parade</span>'
+        : '') +
       '</div><p class="panel-text">' +
       (city
         ? 'Each of the six hunt stops has a side dish and a dessert. Visit 735 Dover St for the rare find.' +
@@ -356,6 +390,8 @@ async function map(level) {
       yaw: active ? game.yaw : Math.PI / 2,
       targets: active && game.mode === 'roam' ? [] : targets,
       labels: true,
+      route: active && !city ? game.localParade?.route.points : [],
+      destination: active && !city ? game.localParade?.leader : null,
       places: city ? destinations : [],
       pickups: active ? game.fight.pickups : [],
     };
@@ -415,6 +451,7 @@ function credits() {
       '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       'The grass clumps and seed heads are adapted from grass by Georgeous (Sketchfab Standard). ' +
       'Road surfaces, ironwork, and residential masonry are adapted from Street by Pasha (CC BY 4.0). ' +
+      'The balloon models are by Macys Parade and the 1993 Sonic model is by pika39019 (CC BY 4.0). ' +
       'The oak models and November foliage are adapted from the Oak trees pack by LOLIPOP (CC BY 4.0). ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
       '. The western skyline combines USGS terrain with sculpted relief and snow from Snowy Mountain by James Lucas (CC BY-NC 4.0). ' +
@@ -428,20 +465,32 @@ function pause() {
   modalOrigin = 'pause';
   show(
     'pause',
-    heading('FIELD BREAK', 'Hunt paused') +
+    heading(
+      'FIELD BREAK',
+      game.mode === 'parade' ? 'Parade paused' : 'Hunt paused'
+    ) +
       '<p class="panel-text">' +
-      (game.mode === 'roam'
-        ? 'Your place in Broomfield is saved for this session.'
-        : game.count +
-          ' of ' +
-          game.targets.length +
-          ' dishes captured. ' +
-          (game.mode === 'campaign' ? game.course.name + '. ' : '') +
-          'The supper clock is paused.') +
+      (game.mode === 'parade'
+        ? 'The balloons and their turkey crews will pick up where you left them.'
+        : game.mode === 'roam'
+          ? 'Your place in Broomfield is saved for this session.'
+          : game.count +
+            ' of ' +
+            game.targets.length +
+            ' dishes captured. ' +
+            (game.mode === 'campaign' ? game.course.name + '. ' : '') +
+            'The supper clock is paused.') +
       '</p><div class="panel-actions">' +
       button('Resume', 'resume', true, 'focus') +
-      button('Hunt map', 'map', false, 'map') +
-      button('Field guide', 'guide', false, 'book') +
+      button(
+        game.mode === 'parade' ? 'Parade map' : 'Hunt map',
+        'map',
+        false,
+        'map'
+      ) +
+      (game.mode === 'parade'
+        ? ''
+        : button('Field guide', 'guide', false, 'book')) +
       button('Return to lobby', 'home') +
       '</div>'
   );
@@ -451,7 +500,10 @@ function courseMap() {
     origin = TRAVEL[course.stop],
     p = game.mapPosition;
   const finale = game.doverFinale;
-  const route = finale ? doverLeg(p, DOVER_ROUTE).points : [];
+  const parade = game.level === 0 ? game.localParade : null;
+  const route = finale
+    ? doverLeg(p, DOVER_ROUTE).points
+    : parade?.route.points || [];
   const bounds = [
     p,
     ...(finale
@@ -460,6 +512,7 @@ function courseMap() {
           origin,
           ...game.targets.map((t) => t.model.position),
           ...game.fight.pickups,
+          ...route,
         ]),
   ];
   const xs = bounds.map((v) => v.x),
@@ -479,6 +532,7 @@ function courseMap() {
       (finale
         ? '<span class="dover-key">★ Cottage · gold trail</span>'
         : '<span><b></b> Runaway dish</span><span class="gravy-key">✚ Emergency gravy</span>') +
+      (parade ? '<span class="dover-key">★ Balloon parade</span>' : '') +
       '</div>' +
       (finale
         ? '<p class="panel-text">Follow the trail from County Commons to 735 Dover St. Enter the cottage and inspect the display. The supper clock is held.</p>'
@@ -504,7 +558,7 @@ function courseMap() {
     yaw: game.yaw,
     labels: true,
     route,
-    destination: finale ? DOVER_ROUTE.at(-1) : null,
+    destination: finale ? DOVER_ROUTE.at(-1) : parade?.leader,
     places: finale ? [DOVER] : [origin],
   });
 }
@@ -633,7 +687,10 @@ async function start(mode = 'campaign') {
   modalOrigin = 'home';
   show(
     'loading',
-    heading('ENTERING THE FIELD', 'Loading terrain') +
+    heading(
+      'ENTERING THE FIELD',
+      mode === 'parade' ? 'Preparing the parade' : 'Loading terrain'
+    ) +
       '<p class="panel-text">Preparing the Broomfield map and field photography…</p><div class="loading-line"></div>'
   );
   try {
@@ -724,6 +781,13 @@ const actions = {
   'retry-course': () => changeCourse(true),
   'city-hunt': () => start('city'),
   explore: () => start('roam'),
+  parade: () => start('parade'),
+  'rejoin-parade': () => {
+    if (game?.active && game.mode === 'parade') {
+      game.rejoinParade(Number($('#parade-balloon').value));
+      resume();
+    }
+  },
   resume,
   pause,
   credits,

@@ -18,6 +18,8 @@ export class TurkeyAvatar extends T.Group {
     // The player looks down -Z. The source bird faces +Z.
     scene.rotation.y = Math.PI;
     scene.scale.setScalar(TURKEY_MODEL_SCALE);
+    this.body = scene;
+    this.walkClip = animations.find((clip) => clip.name === 'Walk');
     this.add(scene);
     this.mixer = new T.AnimationMixer(scene);
     for (const clip of animations)
@@ -33,6 +35,8 @@ export class TurkeyAvatar extends T.Group {
     this.netCaster = netCaster;
     this.wishbone = wishbone;
     const gear = new T.Group();
+    this.gear = gear;
+    gear.name = 'Turkey equipment';
     gear.add(netCaster, wishbone);
     gear.scale.setScalar(CASTER_SCALE);
     gear.position.set(1.07, 1.13, -0.5).multiplyScalar(TURKEY_MODEL_SCALE);

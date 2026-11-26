@@ -138,8 +138,9 @@ export class Hunt {
     this.tool.add(wing);
     this.world = await buildWorld(this.scene, this.data);
     await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
+    this.groundShadow = shadowTexture();
     const shade = new T.MeshBasicMaterial({
-      map: shadowTexture(),
+      map: this.groundShadow,
       transparent: true,
       depthWrite: false,
     });
@@ -214,7 +215,9 @@ export class Hunt {
     $('#view-name').textContent = this.thirdPerson
       ? 'Chase cam'
       : 'First person';
-    this.tool.visible = !this.thirdPerson && !this.house.inside;
+    this.tool.visible =
+      !this.thirdPerson && !this.house.inside && this.mode !== 'parade';
+    if (this.avatar.gear) this.avatar.gear.visible = this.mode !== 'parade';
     this.avatar.visible = this.thirdPerson;
   }
   toggleView() {
@@ -230,7 +233,7 @@ export class Hunt {
     this.syncView(0, true);
     this.toast(this.thirdPerson ? 'Chase camera' : 'First person');
   }
-  syncView(dt, snap = false, speed = 0) {
+  syncView(dt, snap = false, speed = 0, heading = this.yaw) {
     const p = this.camera.position;
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     this.camera.updateMatrixWorld();
@@ -248,7 +251,7 @@ export class Hunt {
     // At a wall the boom can fold to the eye. Keep feathers out of the near plane.
     this.avatar.visible = this.chaseCamera.distance > 0.9;
     this.avatar.position.set(p.x, this.height(p.x, p.z) + this.lift, p.z);
-    this.avatar.rotation.y = this.yaw;
+    this.avatar.rotation.y = this.cooldown > 0.15 ? this.yaw : heading;
     this.avatar.animate(dt, speed, this.lift);
   }
   leaveCottage() {
@@ -298,6 +301,14 @@ export class Hunt {
     this.syncView(0, true);
     this.setHUD();
   }
+  get untimed() {
+    return this.mode === 'roam' || this.mode === 'parade';
+  }
+  get localParade() {
+    return !this.trackingDover && this.parade?.group.visible
+      ? this.parade
+      : null;
+  }
   get regional() {
     return (
       this.mode === 'city' ||
@@ -314,6 +325,21 @@ export class Hunt {
   async reset(mode = 'campaign', spot = SPAWN) {
     this.leaveCottage();
     this.mode = mode;
+    $('#arena').classList.toggle('parade-mode', mode === 'parade');
+    const mapLabel = mode === 'parade' ? 'Parade map' : 'Hunt map';
+    $('.radar').title = 'Open ' + mapLabel.toLowerCase();
+    $('.radar').setAttribute('aria-label', $('.radar').title);
+    $('#radar-label').textContent = mapLabel.toUpperCase();
+    $('[data-action="pause"]').setAttribute(
+      'aria-label',
+      mode === 'parade' ? 'Pause parade' : 'Pause hunt'
+    );
+    this.updateViewControls();
+    this.nextParadeAttempt = 0;
+    if (mode === 'parade') {
+      await this.loadParade();
+      this.parade.update(0);
+    }
     this.level = 0;
     this.bankedTime = 0;
     this.bankedCount = 0;
@@ -357,7 +383,9 @@ export class Hunt {
     this.keys.clear();
     this.clearTouch();
     this.targets = [];
-    this.arrive(spot);
+    if (this.mode === 'parade') this.rejoinParade();
+    else this.arrive(spot);
+    this.updateParade();
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     const anchors = campaign
       ? new Map(
@@ -370,7 +398,7 @@ export class Hunt {
     for (const t of this.allTargets) {
       t.caught = false;
       t.model.visible = t.shadow.visible =
-        this.mode !== 'roam' && (!anchors || anchors.has(t.id));
+        !this.untimed && (!anchors || anchors.has(t.id));
       if (!t.model.visible) continue;
       this.targets.push(t);
       const anchor = anchors ? anchors.get(t.id) : dishSpawn(t, this.mode);
@@ -381,10 +409,10 @@ export class Hunt {
       t.vx = t.vz = 0;
     }
     this.guide.reset(0);
-    if (this.mode !== 'roam') this.stockGravy(spot);
-    this.weather.setSnowing(rollSnow());
+    if (!this.untimed) this.stockGravy(spot);
+    this.weather.setSnowing(this.mode !== 'parade' && rollSnow());
     this.weatherAt = 50 + Math.random() * 45;
-    $('#compass').disabled = this.mode === 'roam';
+    $('#compass').disabled = this.untimed;
     this.resize();
     this.setHUD();
     this.toast(
@@ -398,9 +426,57 @@ export class Hunt {
           ? 'One side and one dessert per landmark. Open the map to travel.'
           : this.mode === 'hunt'
             ? 'Capture all twelve dishes before supper.'
-            : 'Free roam · ' + (spot.name || 'Community Park'),
+            : this.mode === 'parade'
+              ? 'Main Street parade · Follow the balloons or watch from the curb.'
+              : 'Free roam · ' + (spot.name || 'Community Park'),
       3
     );
+  }
+  loadParade() {
+    this.paradeRequest ??= import('./parade.js')
+      .then(({ Parade }) =>
+        Parade.load(this.data, this.world, this.avatar, this.groundShadow)
+      )
+      .then((parade) => {
+        this.parade = parade;
+        parade.group.visible = false;
+        this.scene.add(parade.group);
+        return parade;
+      })
+      .catch((error) => {
+        this.paradeRequest = null;
+        throw error;
+      });
+    return this.paradeRequest;
+  }
+  updateParade() {
+    const p = this.camera.position;
+    const nearby = !this.house.inside && Math.hypot(p.x + 145, p.z - 148) < 650;
+    if (!this.parade) {
+      if (
+        nearby &&
+        !this.paradeRequest &&
+        this.elapsed >= this.nextParadeAttempt
+      ) {
+        this.loadParade().catch(() => {
+          this.nextParadeAttempt = this.elapsed + 30;
+        });
+      }
+      return;
+    }
+    this.parade.group.visible = nearby;
+    if (nearby) this.parade.update(this.elapsed, p);
+  }
+  rejoinParade(index = 0) {
+    const { viewer, subject } = this.parade.viewpoint(index);
+    this.arrive(viewer);
+    const p = this.camera.position;
+    this.yaw = Math.atan2(p.x - subject.x, p.z - subject.z);
+    this.pitch = Math.atan2(
+      this.height(subject.x, subject.z) + 5.3 - p.y,
+      Math.hypot(p.x - subject.x, p.z - subject.z)
+    );
+    this.syncView(0, true);
   }
   stockGravy(spot) {
     this.gravyStop = spot;
@@ -493,6 +569,7 @@ export class Hunt {
   }
   stop() {
     this.pause();
+    if (this.parade) this.parade.group.visible = false;
     this.active = false;
   }
   height(x, z) {
@@ -527,7 +604,7 @@ export class Hunt {
     this.noticeTime = n;
   }
   findDish() {
-    if (!this.playing || this.house.inside || this.mode === 'roam') return;
+    if (!this.playing || this.house.inside || this.untimed) return;
     this.guide.toggle(this.elapsed);
     this.guide.update(this, this.aim());
   }
@@ -714,7 +791,7 @@ export class Hunt {
     this.renderer.dispose();
   }
   aim() {
-    if (this.mode === 'roam' || this.house.inside) return null;
+    if (this.untimed || this.house.inside) return null;
     const p = this.camera.position,
       view = this.viewCamera;
     view.getWorldDirection(direction);
@@ -762,7 +839,13 @@ export class Hunt {
     return best;
   }
   cast() {
-    if (!this.playing || this.house.inside || this.cooldown > 0) return;
+    if (
+      !this.playing ||
+      this.house.inside ||
+      this.mode === 'parade' ||
+      this.cooldown > 0
+    )
+      return;
     const t = this.aim();
     this.shots++;
     this.wideCast = this.fight.wide > 0;
@@ -770,7 +853,10 @@ export class Hunt {
     this.net.material.color.setHex(this.wideCast ? 0x8bffe0 : 0xffdc91);
     this.cooldown = this.wideCast ? 0.3 : 0.58;
     this.netTime = 0.24;
-    if (this.thirdPerson) this.avatar.cast();
+    if (this.thirdPerson) {
+      this.avatar.rotation.y = this.yaw;
+      this.avatar.cast();
+    }
     this.viewCamera.getWorldDirection(direction);
     this.netStart.set(0.19, -0.15, -0.63).applyMatrix4(this.camera.matrixWorld);
     this.netEnd.copy(this.viewCamera.position).addScaledVector(direction, 28);
@@ -865,8 +951,9 @@ export class Hunt {
     }
   }
   setHUD() {
-    const roam = this.mode === 'roam';
-    $('#progress-pips').hidden = roam;
+    const untimed = this.untimed,
+      parade = this.mode === 'parade';
+    $('#progress-pips').hidden = untimed;
     this.pips.forEach((pip, i) => {
       pip.hidden = i >= this.targets.length;
       pip.classList.toggle('filled', !!this.targets[i]?.caught);
@@ -877,7 +964,7 @@ export class Hunt {
     $('#gear-name').textContent = this.fight.wide
       ? 'Wishbone slinger'
       : 'Net caster';
-    $('#vitals').hidden = roam;
+    $('#vitals').hidden = untimed;
     $('#health-value').textContent = this.fight.health;
     $('#vitals').classList.toggle('low', this.fight.health <= 35);
     const bonuses = [
@@ -885,23 +972,25 @@ export class Hunt {
       this.fight.speed ? 'Boots ' + Math.ceil(this.fight.speed) + 's' : '',
     ].filter(Boolean);
     $('#boosts').textContent = bonuses.join(' · ');
-    $('#boosts').hidden = !bonuses.length || roam;
-    const warning = roam || this.house.inside ? '' : this.fight.warning();
+    $('#boosts').hidden = !bonuses.length || untimed;
+    const warning = untimed || this.house.inside ? '' : this.fight.warning();
     $('#incoming').textContent = warning;
     $('#incoming').hidden = !warning;
-    $('#counter').previousElementSibling.textContent = roam
+    $('#counter').previousElementSibling.textContent = untimed
       ? 'MODE'
       : this.mode === 'campaign'
         ? 'COURSE ' + (this.level + 1) + ' / ' + COURSES.length
         : 'DISHES CAPTURED';
-    $('#counter').textContent = roam
-      ? 'Free roam'
+    $('#counter').textContent = untimed
+      ? parade
+        ? 'Balloon parade'
+        : 'Free roam'
       : this.count + ' / ' + this.targets.length;
-    $('#time').previousElementSibling.textContent = roam
+    $('#time').previousElementSibling.textContent = untimed
       ? 'TIME AFIELD'
       : 'SUPPER IN';
     $('#time').textContent = formatTime(
-      roam
+      untimed
         ? this.elapsed
         : Math.max(0, Math.ceil(this.timeLimit - this.elapsed))
     );
@@ -915,7 +1004,7 @@ export class Hunt {
     const prompt = this.house.prompt(p, this.doverFinale);
     $('#interact').hidden = !prompt;
     $('#interact-name').textContent = prompt;
-    $('#compass').disabled = this.trackingDover || this.house.inside || roam;
+    $('#compass').disabled = this.trackingDover || this.house.inside || untimed;
     if (this.doverFinale) {
       $('#time').previousElementSibling.textContent = 'SUPPER CLOCK';
       $('#time').textContent = 'Held';
@@ -927,14 +1016,16 @@ export class Hunt {
       return;
     }
     const far = this.regional && Math.max(Math.abs(p.x), Math.abs(p.z)) > 610;
-    const route = this.trackingDover ? doverLeg(p, DOVER_ROUTE).points : [];
+    const route = this.trackingDover
+      ? doverLeg(p, DOVER_ROUTE).points
+      : this.localParade?.route.points;
     drawMap($('#radar'), far && this.region ? this.region.data : this.data, {
       x: p.x,
       z: p.z,
       width: far ? 285 : 240,
       route,
-      destination: this.trackingDover ? PORCH : null,
-      targets: roam ? [] : this.targets,
+      destination: this.trackingDover ? PORCH : this.localParade?.leader,
+      targets: untimed ? [] : this.targets,
       player: p,
       yaw: this.yaw,
       pickups: this.fight.pickups,
@@ -966,11 +1057,7 @@ export class Hunt {
       }
     }
     this.elapsed += delta;
-    if (
-      !this.doverFinale &&
-      this.mode !== 'roam' &&
-      this.elapsed >= this.timeLimit
-    ) {
+    if (!this.doverFinale && !this.untimed && this.elapsed >= this.timeLimit) {
       this.elapsed = this.timeLimit;
       this.finish(false);
       return;
@@ -1028,8 +1115,20 @@ export class Hunt {
       TURKEY_EYE +
       this.lift +
       Math.sin(this.steps) * 0.027;
-    this.syncView(dt, false, dt ? Math.hypot(p.x - oldX, p.z - oldZ) / dt : 0);
-    if (!this.house.inside && !this.doverFinale && this.mode !== 'roam') {
+    const movedX = p.x - oldX,
+      movedZ = p.z - oldZ;
+    const travelYaw =
+      Math.hypot(movedX, movedZ) > 0.001
+        ? Math.atan2(-movedX, -movedZ)
+        : this.yaw;
+    this.syncView(
+      dt,
+      false,
+      dt ? Math.hypot(movedX, movedZ) / dt : 0,
+      travelYaw
+    );
+    this.updateParade();
+    if (!this.house.inside && !this.doverFinale && !this.untimed) {
       this.moveTargets(dt);
       this.fight.update(dt, delta);
       if (!this.fight.health) {

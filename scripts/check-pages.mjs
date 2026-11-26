@@ -112,6 +112,24 @@ await Promise.all(
     assert.equal(material.toString('ascii', 8, 12), 'WEBP', name);
   })
 );
+const balloons = await asset(
+  '/models/parade-balloons.glb',
+  /model\/gltf-binary|application\/octet-stream/
+);
+assert.equal(balloons.readUInt32LE(8), balloons.length);
+const paradePack = JSON.parse(
+  balloons.toString('utf8', 20, 20 + balloons.readUInt32LE(12))
+);
+assert.deepEqual(paradePack.nodes.map((n) => n.name).sort(), [
+  'CharlieBrown',
+  'Chase',
+  'Elf',
+  'Goku',
+  'Jett',
+  'Scrat',
+  'Sonic',
+  'Thomas',
+]);
 assert.equal(grasses.toString('ascii', 0, 4), 'glTF');
 assert.equal(grasses.readUInt32LE(8), grasses.length);
 const grassPack = JSON.parse(

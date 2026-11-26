@@ -170,5 +170,66 @@
       }
     ],
     "changes": "Cropped and resized oak bark, then sampled color palettes from the original maple, cottonwood and spruce images. Used those colors to draw individual leaves and needles on branching sprays. Packed the four surfaces into a texture atlas for the 3D trees. The bark strip retains its source license."
+  },
+  "/models/parade-balloons.glb": {
+    "credits": [
+      {
+        "title": "Jett from Super Wings balloon 3D model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/jett-from-super-wings-balloon-3d-model-546d687250a94bd3a4c7d03cbf24ef75",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "The Elf on the Shelf balloon 3D model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/the-elf-on-the-shelf-balloon-3d-model-ea338d6b3c0a4e14928203bf3dea5ff4",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Thomas the Tank Engine balloon 3D model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/thomas-the-tank-engine-balloon-3d-model-afffdf72f2fb4953ac7e4d395b2f2732",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "1st version Goku Balloon 3d Model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/1st-version-goku-balloon-3d-model-230175fb5b1c4ecc94d6114cf265e7ac",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "2nd Version Charlie Brown Balloon 3d Model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/2nd-version-charlie-brown-balloon-3d-model-64dc5feff3da47968e2ec9773d7282b4",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Chase from PAW Patrol Balloon 3d Model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/chase-from-paw-patrol-balloon-3d-model-8ed714cc05224869abbd2654f2848f47",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Ice Age’s Scrat and his Acorn Balloon 3d Model",
+        "author": "Macys Parade",
+        "source": "https://sketchfab.com/3d-models/ice-ages-scrat-and-his-acorn-balloon-3d-model-d6e0c6c12fef4d889096c0e21fa2b2ae",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Macy's Thanksgiving Day Parade - Sonic (1993)",
+        "author": "pika39019",
+        "source": "https://sketchfab.com/3d-models/macys-thanksgiving-day-parade-sonic-1993-00ae30dc59af40098106a2606cb28b84",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    ],
+    "changes": "Reduced mesh density, resized the original color textures and packed Sonic’s materials into one atlas. Centered and scaled each balloon for the parade and adapted its fabric material for daylight."
   }
 }

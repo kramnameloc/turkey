@@ -77,7 +77,7 @@ export class DishGuide {
       this.trackDover(hunt);
       return;
     }
-    if (hunt.house.inside || hunt.mode === 'roam') {
+    if (hunt.house.inside || hunt.untimed) {
       this.hide();
       return;
     }
