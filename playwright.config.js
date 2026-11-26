@@ -16,6 +16,8 @@ export default defineConfig({
       testIgnore: 'mobile.spec.js',
       use: {
         browserName: 'chromium',
+        // The headless shell can stall before painting the first WebGL frame on Linux.
+        channel: 'chromium',
         viewport: { width: 960, height: 640 },
         launchOptions: {
           args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
