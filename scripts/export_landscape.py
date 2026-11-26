@@ -202,7 +202,7 @@ def write_masks():
     atlas = atlas.convert('P')
     atlas.putpalette([v for i in range(4) for v in [i*85]*3])
     atlas.save(SCENERY/'grass-cover.png', bits=2, optimize=True)
-    (ROOT/'src/grass-areas.json').write_text(json.dumps(catalog, separators=(',', ':'))+'\n')
+    (ROOT/'src/world/grass-areas.json').write_text(json.dumps(catalog, separators=(',', ':'))+'\n')
 
 
 if __name__ == '__main__':

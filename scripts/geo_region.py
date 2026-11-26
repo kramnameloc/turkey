@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 
 from PIL import Image
+from asset_cache import cache_destination
 from dover_block import adjust_roads, dress_tile
 from geo_export import BASE, CITY, USGS, BUILDING_HEIGHTS, TREE_HEIGHTS, ROAD_WIDTHS, get_bytes, local, mx, my, scale, clip_line, clip_ring
 
@@ -40,7 +41,8 @@ def download(cache, name, url, params):
             raw = get_bytes(url, params)
             if raw.startswith(b'{') and 'error' in json.loads(raw):
                 raise ValueError(json.loads(raw)['error'])
-            path.write_bytes(raw)
+            with cache_destination(path) as temporary:
+                temporary.write_bytes(raw)
             return raw
         except Exception:
             if attempt == 2:

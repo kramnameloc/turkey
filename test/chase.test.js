@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Box3, Group, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { ChaseView, TURKEY_EYE } from '../src/view.js';
-import { TurkeyAvatar } from '../src/turkey-avatar.js';
-import { doverLeg } from '../src/dover-guide.js';
+import { ChaseView, TURKEY_EYE } from '../src/player/chase-camera.js';
+import { TurkeyAvatar } from '../src/player/turkey-avatar.js';
+import { doverLeg } from '../src/world/dover/guide.js';
 
 test('chase camera retracts immediately at cover, clears the terrain, and extends smoothly after the wall', () => {
   const eye = new Vector3(2, TURKEY_EYE, 1),

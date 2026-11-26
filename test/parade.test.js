@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Group, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { doverCorners, paradeRoute } from '../src/parade-route.js';
+import { doverCorners, paradeRoute } from '../src/world/parade/route.js';
 import { segmentDistanceSq, slideMove } from '../src/field.js';
-import { BODY_RADIUS } from '../src/turkey-scale.js';
-import { separateFromActors } from '../src/body-collision.js';
-import { Parade } from '../src/parade.js';
-import { TurkeyAvatar } from '../src/turkey-avatar.js';
+import { BODY_RADIUS } from '../src/player/turkey-scale.js';
+import { separateFromActors } from '../src/gameplay/body-collision.js';
+import { Parade } from '../src/world/parade/parade.js';
+import { TurkeyAvatar } from '../src/player/turkey-avatar.js';
 
 const park = JSON.parse(
   await readFile(new URL('../public/geo/broomfield.json', import.meta.url))

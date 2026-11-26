@@ -84,13 +84,39 @@ The standing turkey measures 0.90 m from its feet to its fanned tail. The first-
 
 Grass by Georgeous supplies three clumps for mown lawns, dormant meadow grass, and seed heads on mapped pond banks. Aerial vegetation and city footprints guide their placement. The western mountain skyline blends the relief and snow from *Snowy Mountain* by James Lucas (CC BY-NC 4.0) onto the high flanks of the USGS Front Range terrain. See the [Front Range sources](public/scenery/peaks-credits.json). The sky composite includes a photograph of the Flatirons taken from Broomfield. The lobby and share preview display the same illustrated poster of a Bourbon Red turkey chasing a slice of pumpkin pie below the Flatirons. Artwork credits, licenses, source links, and modifications are available through **Map & photo credits** in the game and in the [map sources](public/geo/sources.json), [cover credits](public/cover/credits.json), and [scenery credits](public/scenery/sources.json).
 
-## Build
+## Project structure
+
+`src/main.js` connects the lobby, dialogs and game session. Starting a hunt loads `src/game.js`, which coordinates the simulation loop and the Three.js world built by `src/world.js`.
+
+| Directory | What belongs here |
+| --- | --- |
+| `src/gameplay/` | Campaign courses, food fights, weapon rules, collision between actors and navigation hints |
+| `src/player/` | Input, camera, avatar, audio and browser saves |
+| `src/maps/` | Map data loading, drawing, obstacle queries and street lookup. `src/field.js` exposes the shared field API. |
+| `src/world/` | Terrain, scenery and venues, including the Dover and parade modules |
+| `src/models/` | Procedural models for dishes, projectiles and equipment |
+| `src/ui/` | Lit panel templates, icons, styles and the Pearl Street map |
+| `public/` | Assets served at stable URLs, including geography, GLBs, artwork and credits |
+| `scripts/` | Offline asset exporters and the GitHub Pages release verifier |
+| `test/`, `test/exporters/`, `e2e/` | Node tests, Python exporter tests and Playwright browser flows |
+
+## Build and test
 
 ```sh
-npm test
 npm run build
 npm run preview
 ```
+
+For the full local check, install the test browsers once after `npm ci`. The exporter tests use the Python 3 standard library.
+
+```sh
+npx playwright install chromium webkit
+npm run check
+```
+
+`npm run check` runs Oxlint, the Node suite, and the Python suite before building and verifying the production assets. Playwright then starts a dedicated loopback preview and exercises that build in desktop Chromium and mobile-emulated WebKit. Failures retain a trace in `test-results/`. For shorter iterations, use `npm test` for JavaScript and DOM tests or `npm run test:exporters` for the Python suite. Run `npm run build && npm run test:e2e` to check browser flows alone.
+
+The security review covers browser rendering, release verification, the offline importers and workflow permissions. [Security review](docs/security-review.md)
 
 The production build is written to `dist/`. The player model and its embedded color map are bundled in `public/models/bourbon-red.glb`. To regenerate them from the supplied FBX and PNG in `download-models/A_Turkey_BourbonRed/`, run `blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/export_turkey.py`. To rebuild the oak library and its crown measurements from the supplied GLB in `download-models/`, run `blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/export_oaks.py`. To rebuild the street textures from the supplied `download-models/street.glb`, run `python3 scripts/export_street.py` with Pillow and NumPy installed. With the same Python dependencies, run `python3 scripts/export_landscape.py` to rebuild the grass model and placement atlas and `python3 scripts/geo_peaks.py --cache /tmp/peaks-cache` to rebuild the mountain mesh and snow artwork. To rebuild the balloon pack from the supplied GLBs in `download-models/` and `download-models/ballons/`, run `blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/export_parade.py`. The included Python scripts regenerate the bundled geography when refreshed source data is needed. The regional exporter requires Pillow.
 
@@ -98,6 +124,6 @@ To rebuild the seven landmark models, run `python3 scripts/geo_scale.py --cache 
 
 ## GitHub Pages
 
-The Pages workflow tests pull requests to `main`, builds the Vite site with Node 24, and checks the bundled game and share-image assets. A push to `main` or a manual run on `main` deploys the verified `dist/` artifact to the `github-pages` environment. The last job confirms the deployed commit and domain using the GitHub API, then requests the public game, map, and social artwork. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. You can repeat the public check from another network using `node scripts/check-pages.mjs --live`.
+The Pages workflow lints and tests pull requests to `main`, builds the Vite site with Node 24, verifies the bundled assets and runs Playwright. A push to `main` or a manual run on `main` deploys the verified `dist/` artifact to the `github-pages` environment. The last job confirms the deployed commit and domain using the GitHub API, then requests the public game, map, and social artwork. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. You can repeat the public check from another network using `node scripts/check-pages.mjs --live`.
 
 Repository Pages settings use **GitHub Actions** and the custom domain `turkey.kramnameloc.com`. The deployment environment allows `main`. The share button sends this canonical URL. Static Open Graph tags in `index.html` identify the JPEG preview and the square Apple touch icon in `public/social/`. The public link and artwork are available to preview crawlers without running the game.

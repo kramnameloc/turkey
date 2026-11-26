@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Hunt } from '../src/game.js';
-import { overlapsBody } from '../src/body-collision.js';
+import { overlapsBody } from '../src/gameplay/body-collision.js';
 import { slideMove } from '../src/field.js';
-import { BODY_RADIUS } from '../src/turkey-scale.js';
+import { BODY_RADIUS } from '../src/player/turkey-scale.js';
 
 function jump(held, inside = false, dt = 1 / 60) {
   const hunt = Object.assign(Object.create(Hunt.prototype), {

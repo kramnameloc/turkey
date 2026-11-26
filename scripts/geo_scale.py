@@ -17,7 +17,8 @@ from affine import Affine
 from scipy.ndimage import binary_erosion
 from scipy.spatial import cKDTree
 
-from geo_export import BASE, mx, my, scale
+from asset_cache import cache_destination
+from geo_export import BASE, features, local, mx, my, scale
 
 SOURCE = 'https://usgs-lidar-public.s3.amazonaws.com/CO_DRCOG_2_2020/'
 # Each site is a bounded rectangle of local ground meters. Trees and roofs outside
@@ -29,11 +30,9 @@ SITES = [(-690, 690, -690, 690), (-437, 283, -1188, -468),
 def cached(cache, name):
     dest = cache / name
     if not dest.exists():
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        temp = dest.with_suffix('.part')
-        subprocess.run(['curl', '-fsSL', '--retry', '3', '--max-time', '45',
-                        SOURCE + name, '-o', str(temp)], check=True)
-        temp.replace(dest)
+        with cache_destination(dest) as temporary:
+            subprocess.run(['curl', '-fsSL', '--retry', '3', '--max-time', '45',
+                            SOURCE + name, '-o', str(temporary)], check=True)
     return dest
 
 
@@ -108,13 +107,7 @@ def export(cache):
     bands = {3.5: (0, 4.57), 7: (4.57, 9.15), 11.5: (9.15, 13.72), 15.5: (13.72, 34)}
     # A newer planting may occupy the same mapped location as a former mature tree.
     tree_dates = {}
-    raw = cache / 'turkey-broomfield-data-Forestry.json'
-    if not raw.exists():
-        from geo_export import features
-        features('Forestry', cache)
-    from geo_export import local
-    for feature in json.loads(raw.read_bytes())['features']:
-        geom, attrs = feature['geometry'], feature['attributes']
+    for attrs, geom in features('Forestry', cache):
         tree_dates[tuple(local([geom['x'], geom['y']]))] = attrs.get('PLANT_DATE') or 0
     mapped_roof = np.zeros(len(objects), dtype=bool)
     stats = Counter()

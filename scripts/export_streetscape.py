@@ -112,8 +112,12 @@ with TemporaryDirectory() as folder:
     with ZipFile(SOURCE / 'street-props-bench-potbox-stopsign-street-light.zip') as archive:
         archive.extract('source/streat props.rar', folder)
         wood = Path(archive.extract('textures/TexturesCom_Wood_Worn3_512_albedo.png', folder))
-    subprocess.run(['bsdtar','-xf',str(folder/'source/streat props.rar'),'-C',str(folder),'streat props.fbx'],check=True)
-    bpy.ops.import_scene.fbx(filepath=str(folder/'streat props.fbx'))
+    # Read only the FBX bytes. The nested archive never creates paths or links.
+    fbx = folder / 'streat props.fbx'
+    with fbx.open('xb') as output:
+        subprocess.run(['bsdtar', '-xOf', str(folder / 'source/streat props.rar'), fbx.name],
+                       stdout=output, check=True)
+    bpy.ops.import_scene.fbx(filepath=str(fbx))
     wood = simple('Weathered park bench slats', (.36,.21,.1), wood)
     iron = simple('Painted bench frame', (.055,.065,.06))
     pieces = []

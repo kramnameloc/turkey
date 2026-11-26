@@ -147,4 +147,4 @@ bpy.ops.export_scene.gltf(
     export_image_format='WEBP', export_image_quality=84, export_image_webp_fallback=False,
     export_copyright='Oak trees pack (17var, LODs, seasons, gameready) by LOLIPOP, CC BY 4.0',
 )
-(ROOT / 'src/oak-forms.json').write_text(json.dumps(catalog, indent=2) + '\n')
+(ROOT / 'src/world/oak-forms.json').write_text(json.dumps(catalog, indent=2) + '\n')

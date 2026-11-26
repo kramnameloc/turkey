@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { yardBarriers } from '../src/dover-yard.js';
-import { doverParking } from '../src/dover-block.js';
-import { DOVER_ROUTE } from '../src/dover-route.js';
-import { bluePod } from '../src/soccer.js';
-import { PORCH } from '../src/dover-location.js';
+import { yardBarriers } from '../src/world/dover/yard.js';
+import { doverParking } from '../src/world/dover/block.js';
+import { DOVER_ROUTE } from '../src/world/dover/route.js';
+import { bluePod } from '../src/world/soccer.js';
+import { PORCH } from '../src/world/dover/location.js';
 import { Obstacles, PARK_SIGNS, slideMove, TRAVEL } from '../src/field.js';
-import { clearTrail } from '../src/trail.js';
+import { clearTrail } from '../src/gameplay/trail.js';
 
 const readMap = (url) =>
   JSON.parse(readFileSync(new URL(`../public${url}`, import.meta.url)));

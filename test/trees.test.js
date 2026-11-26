@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TreeStand } from '../src/trees.js';
+import { TreeStand } from '../src/world/trees.js';
 import {
   Obstacles,
   PARK_SIGNS,

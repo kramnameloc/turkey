@@ -4,16 +4,16 @@ import {
   streetScenery,
   ranchHouses,
   streetSegments,
-} from './streetscape.js';
-import { FieldGrasses, loadGrasses } from './grass.js';
-import { parkFloor } from './surfaces.js';
-import { trailSign } from './trail-sign.js';
+} from './world/streetscape.js';
+import { FieldGrasses, loadGrasses } from './world/grass.js';
+import { parkFloor } from './world/surfaces.js';
+import { trailSign } from './world/trail-sign.js';
 import {
   pavement,
   streetJunctions,
   streetMaterials,
   streetDetails,
-} from './streets.js';
+} from './world/streets.js';
 import {
   Obstacles,
   plantParkSaplings,
@@ -23,9 +23,9 @@ import {
   BODY_RADIUS,
   PARK_SIGNS,
 } from './field.js';
-import { loadLandmarks } from './landmarks.js';
-import { makeTerrain } from './terrain.js';
-import { loadOaks, TreeStand } from './trees.js';
+import { loadLandmarks } from './world/landmarks.js';
+import { makeTerrain } from './world/terrain.js';
+import { loadOaks, TreeStand } from './world/trees.js';
 const loader = new T.TextureLoader();
 function texture(url, repeat = false) {
   return loader.loadAsync(url).then((t) => {

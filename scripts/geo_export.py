@@ -10,6 +10,8 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
+from asset_cache import cache_destination
+
 BASE = Path(__file__).resolve().parent.parent / 'public' / 'geo'
 CITY = 'https://services1.arcgis.com/vXSRPZbyyOmH9pek/arcgis/rest/services/'
 USGS = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer'
@@ -34,6 +36,8 @@ def inside(point):
 
 def clip_ring(points, extent=(-HALF, HALF, -HALF, HALF)):
     """Sutherland–Hodgman clipping against this scene's square boundary."""
+    if len(points) < 3:
+        return []
     points = points[:-1] if points[0] == points[-1] else points
     left, right, top, bottom = extent
     for axis, edge, sign in [(0, left, 1), (0, right, -1), (1, top, 1), (1, bottom, -1)]:
@@ -84,20 +88,39 @@ def get_bytes(url, params):
         return response.read()
 
 
+def decode_features(raw, layer):
+    data = json.loads(raw)
+    if not isinstance(data, dict) or data.get('exceededTransferLimit') or not isinstance(data.get('features'), list):
+        raise ValueError(f'Incomplete GIS response for {layer}')
+    rows = []
+    for feature in data['features']:
+        if not isinstance(feature, dict) or not isinstance(feature.get('attributes'), dict):
+            raise ValueError(f'Invalid GIS feature in {layer}')
+        geometry = feature.get('geometry')
+        if geometry is None:
+            continue
+        if not isinstance(geometry, dict):
+            raise ValueError(f'Invalid GIS geometry in {layer}')
+        rows.append((feature['attributes'], geometry))
+    return rows
+
+
 def features(layer, cache):
     cached = cache / ('turkey-broomfield-data-' + layer + '.json') if cache else None
-    if cached and cached.exists():
-        data = json.loads(cached.read_bytes())
-    else:
-        params = {'f': 'json', 'where': '1=1', 'geometry': bbox_string, 'geometryType': 'esriGeometryEnvelope', 'inSR': 3857,
-                  'spatialRel': 'esriSpatialRelIntersects', 'outFields': '*', 'outSR': 3857, 'geometryPrecision': 2,
-                  'returnGeometry': 'true'}
-        data = json.loads(get_bytes(CITY + layer + '/FeatureServer/0/query', params))
-        if cached and 'features' in data:
-            cached.write_text(json.dumps(data))
-    if data.get('exceededTransferLimit') or 'features' not in data:
-        raise ValueError(f'Incomplete GIS response for {layer}')
-    return [(f['attributes'], f['geometry']) for f in data['features']]
+    if cached and cached.is_file():
+        try:
+            return decode_features(cached.read_bytes(), layer)
+        except ValueError:
+            pass  # A truncated or partial response from a previous export can be refreshed.
+    params = {'f': 'json', 'where': '1=1', 'geometry': bbox_string, 'geometryType': 'esriGeometryEnvelope', 'inSR': 3857,
+              'spatialRel': 'esriSpatialRelIntersects', 'outFields': '*', 'outSR': 3857, 'geometryPrecision': 2,
+              'returnGeometry': 'true'}
+    raw = get_bytes(CITY + layer + '/FeatureServer/0/query', params)
+    rows = decode_features(raw, layer)
+    if cached:
+        with cache_destination(cached) as temporary:
+            temporary.write_bytes(raw)
+    return rows
 
 
 BUILDING_HEIGHTS = {'Single Family': 5.5, 'Townhome': 7.5, 'Government': 10, 'Office': 8,

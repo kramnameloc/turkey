@@ -4,13 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { Matrix4, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Obstacles, PARK_SIGNS, segmentDistanceSq } from '../src/field.js';
-import { streetJunctions } from '../src/streets.js';
-import { streetLocator } from '../src/street-location.js';
+import { streetJunctions } from '../src/world/streets.js';
+import { streetLocator } from '../src/maps/street-location.js';
 import {
   loadStreetscape,
   streetScenery,
   streetSegments,
-} from '../src/streetscape.js';
+} from '../src/world/streetscape.js';
 
 test('the street name follows the Dover road, its sidewalk and turning circle, and changes after a turn', async () => {
   const [region, courses] = await Promise.all(

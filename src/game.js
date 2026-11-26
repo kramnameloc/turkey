@@ -1,27 +1,27 @@
 import * as T from 'three';
 import { addRegion, buildWorld } from './world.js';
-import { courseMaps } from './course-maps.js';
-import { streetLocator } from './street-location.js';
-import { DOVER_ROUTE } from './dover-route.js';
-import { loadCourseSky } from './course-sky.js';
-import { loadVenue, lightDoverPorch } from './trip-venue.js';
-import { doverCorners } from './parade-route.js';
-import { doverLeg } from './dover-guide.js';
-import { ChaseView, TURKEY_EYE } from './view.js';
-import { TurkeyAvatar } from './turkey-avatar.js';
-import { BODY_RADIUS, CASTER_SCALE, TURKEY_HEIGHT } from './turkey-scale.js';
-import { overlapsBody, separateFromActors } from './body-collision.js';
-import { addPeaks } from './peaks.js';
-import { DoverCottage } from './dover.js';
-import { downstairsHeadroom } from './dover-downstairs.js';
-import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
-import { CORNUCOPIA, WEAPONS, dealDamage } from './weapons.js';
-import { EnemyHealthBars } from './enemy-health-bars.js';
-import { FoodFight } from './foodfight.js';
-import { Flurries } from './flurries.js';
-import { COURSES, COURSE_TIME, MAX_HEALTH, coursePoint, rollSnow } from './courses.js';
-import { DishGuide } from './guidance.js';
-import { foodModel, caster, animateFood } from './models.js';
+import { courseMaps } from './world/course-maps.js';
+import { streetLocator } from './maps/street-location.js';
+import { DOVER_ROUTE } from './world/dover/route.js';
+import { loadCourseSky } from './world/course-sky.js';
+import { loadVenue, lightDoverPorch } from './world/trip-venue.js';
+import { doverCorners } from './world/parade/route.js';
+import { doverLeg } from './world/dover/guide.js';
+import { ChaseView, TURKEY_EYE } from './player/chase-camera.js';
+import { TurkeyAvatar } from './player/turkey-avatar.js';
+import { BODY_RADIUS, CASTER_SCALE, TURKEY_HEIGHT } from './player/turkey-scale.js';
+import { overlapsBody, separateFromActors } from './gameplay/body-collision.js';
+import { addPeaks } from './world/peaks.js';
+import { DoverCottage } from './world/dover/cottage.js';
+import { downstairsHeadroom } from './world/dover/downstairs.js';
+import { DOVER, PORCH, RELIC, hasGrail } from './world/dover/location.js';
+import { CORNUCOPIA, WEAPONS, dealDamage } from './gameplay/weapons.js';
+import { EnemyHealthBars } from './ui/enemy-health-bars.js';
+import { FoodFight } from './gameplay/foodfight.js';
+import { Flurries } from './world/flurries.js';
+import { COURSES, COURSE_TIME, MAX_HEALTH, coursePoint, rollSnow } from './gameplay/courses.js';
+import { DishGuide } from './gameplay/guidance.js';
+import { foodModel, caster, animateFood } from './models/food.js';
 import {
   DISHES,
   SPAWN,
@@ -34,7 +34,9 @@ import {
   drawMap,
   loadMapImage,
 } from './field.js';
-import { sound } from './audio.js';
+import { bindHuntInput, lockPointer } from './player/input.js';
+import { sound } from './player/audio.js';
+import { playerStorage } from './player/storage.js';
 const $ = (s) => document.querySelector(s),
   clamp = T.MathUtils.clamp;
 const direction = new T.Vector3(),
@@ -105,10 +107,7 @@ export class Hunt {
     this.avatar = new TurkeyAvatar();
     this.scene.add(this.camera, this.avatar);
     this.house = new DoverCottage(this.scene);
-    this.thirdPerson = false;
-    try {
-      this.thirdPerson = localStorage.getItem('gobbler-chase-view') === 'on';
-    } catch {}
+    this.thirdPerson = playerStorage.chase.get();
     this.fight = new FoodFight(this);
     this.tools = {
       net: caster(),
@@ -166,7 +165,6 @@ export class Hunt {
     this.targets = [];
     this.playing = false;
     this.active = false;
-    this.subscribed = false;
   }
   async init() {
     const [data, wing] = await Promise.all([
@@ -292,12 +290,7 @@ export class Hunt {
   toggleView() {
     if (!this.playing) return;
     this.thirdPerson = !this.thirdPerson;
-    try {
-      localStorage.setItem(
-        'gobbler-chase-view',
-        this.thirdPerson ? 'on' : 'off'
-      );
-    } catch {}
+    playerStorage.chase.set(this.thirdPerson);
     this.updateViewControls();
     this.syncView(0, true);
     this.toast(this.thirdPerson ? 'Chase camera' : 'First person');
@@ -505,7 +498,7 @@ export class Hunt {
       await this.maps.prepare(regionalSpot.x, regionalSpot.z);
       if (campaign && course.parade && !this.doverParade) {
         const site = region.data.detailMaps.find((s) => s.id === 'dover');
-        const { Parade } = await import('./parade.js');
+        const { Parade } = await import('./world/parade/parade.js');
         this.doverParade = await Parade.load(
           site,
           {
@@ -623,7 +616,7 @@ export class Hunt {
     this.guide.reset(this.elapsed);
   }
   loadParade() {
-    this.paradeRequest ??= import('./parade.js')
+    this.paradeRequest ??= import('./world/parade/parade.js')
       .then(({ Parade }) =>
         Parade.load(this.data, this.world, this.avatar, this.groundShadow)
       )
@@ -680,7 +673,6 @@ export class Hunt {
     this.syncView(0, true);
   }
   stockGravy(spot) {
-    this.gravyStop = spot;
     const points =
       this.mode === 'campaign'
         ? this.course.gravy.map(([x, z]) => coursePoint(this.course, x, z))
@@ -696,6 +688,7 @@ export class Hunt {
               { x: 160, z: 19 },
             ];
     this.fight.stock(points);
+    this.gravyStop = spot;
   }
   async advance() {
     if (!this.intermission || this.level >= COURSES.length - 1) return;
@@ -707,23 +700,24 @@ export class Hunt {
   async teleport(spot) {
     await this.region.prepareAt(spot.x, spot.z);
     await this.maps.prepare(spot.x, spot.z);
-    this.arrive(spot);
+    const landing = this.openSpot(spot);
     if (this.mode === 'city') this.stockGravy(spot);
+    this.arrive(spot, landing);
     this.guide.reset(this.elapsed);
   }
   openSpot(spot) {
     let x = spot.x,
       z = spot.z;
-    for (let i = 0; this.blocked(x, z) && i < 100; i++) {
+    for (let i = 0; i < 100 && this.fieldBlocked(x, z); i++) {
       const a = i * 2.4,
         d = 3 * Math.sqrt(i + 1);
       x = spot.x + Math.cos(a) * d;
       z = spot.z + Math.sin(a) * d;
     }
-    if (this.blocked(x, z)) throw Error('No open landing near this landmark.');
+    if (this.fieldBlocked(x, z)) throw Error('No open landing near this landmark.');
     return { x, z };
   }
-  arrive(spot) {
+  arrive(spot, landing = this.openSpot(spot)) {
     this.leaveCottage();
     if (this.regional) this.region.update(spot.x, spot.z);
     this.house.porch.visible = this.regional;
@@ -736,7 +730,7 @@ export class Hunt {
       this.yaw = Math.PI / 2;
       this.pitch = 0;
     }
-    const { x, z } = this.openSpot(spot);
+    const { x, z } = landing;
     this.camera.position.set(x, this.height(x, z) + TURKEY_EYE, z);
     this.lift = this.flapTime = 0;
     this.velocityY = 0;
@@ -750,9 +744,7 @@ export class Hunt {
     this.keys.clear();
     this.canvas.focus({ preventScroll: true });
     if (lock && !document.body.classList.contains('touch-mode')) {
-      try {
-        this.canvas.requestPointerLock?.()?.catch?.(() => {});
-      } catch {}
+      lockPointer(this.canvas);
     }
   }
   pause() {
@@ -782,13 +774,18 @@ export class Hunt {
     this.active = false;
   }
   height(x, z) {
-    if (this.house.inside || this.venue) return 0;
+    return this.house.inside ? 0 : this.fieldHeight(x, z);
+  }
+  fieldHeight(x, z) {
+    if (this.venue) return 0;
     return this.regional && this.region
       ? this.region.height(x, z)
       : this.world.height(x, z);
   }
   blocked(x, z) {
-    if (this.house.inside) return this.house.blocked(x, z);
+    return this.house.inside ? this.house.blocked(x, z) : this.fieldBlocked(x, z);
+  }
+  fieldBlocked(x, z) {
     if (this.venue) return this.venue.solids.blocked(x, z);
     if (!this.regional) return this.world.solids.blocked(x, z);
     return (
@@ -840,214 +837,12 @@ export class Hunt {
     this.guide.update(this, target?.isParadeParticipant ? null : target);
   }
   bindInput() {
-    if (this.subscribed) return;
-    this.subscribed = true;
-    this.abort = new AbortController();
-    const on = (obj, name, fn, capture = false) =>
-      obj.addEventListener(name, fn, { signal: this.abort.signal, capture });
-    on(window, 'resize', () => this.resize());
-    this.viewportObserver = new ResizeObserver(() => {
-      if (this.canvas.clientWidth && this.canvas.clientHeight) this.resize();
-    });
-    this.viewportObserver.observe(this.canvas);
-    on(window, 'blur', () => {
-      if (this.playing) this.events.pause();
-    });
-    on(document, 'visibilitychange', () => {
-      if (document.hidden && this.playing) this.events.pause();
-    });
-    on(document, 'pointerlockchange', () => {
-      if (this.locked && !document.pointerLockElement && this.playing)
-        this.events.pause();
-      this.locked = document.pointerLockElement === this.canvas;
-    });
-    on(window, 'keydown', (e) => {
-      if (!this.playing) return;
-      if (
-        [
-          'KeyW',
-          'KeyA',
-          'KeyS',
-          'KeyD',
-          'ArrowUp',
-          'ArrowDown',
-          'ArrowLeft',
-          'ArrowRight',
-          'KeyQ',
-          'KeyE',
-          'ShiftLeft',
-          'ShiftRight',
-          'Space',
-          'KeyF',
-          'KeyR',
-          'KeyH',
-          'KeyV',
-          'KeyG',
-          'KeyM',
-          'Escape',
-          'KeyP',
-        ].includes(e.code)
-      )
-        e.preventDefault();
-      this.keys.add(e.code);
-      if (e.repeat) return;
-      if (e.code === 'Space') this.flap();
-      if (e.code === 'KeyF') this.cast();
-      if (e.code === 'KeyR') this.switchWeapon();
-      if (e.code === 'KeyV') this.toggleView();
-      if (e.code === 'KeyG') this.interact();
-      if (e.code === 'KeyH') this.findDish();
-      if (e.code === 'Escape' || e.code === 'KeyP') this.events.pause();
-      if (e.code === 'KeyM') this.events.map();
-    });
-    on(window, 'keyup', (e) => this.keys.delete(e.code));
-    on(document, 'mousemove', (e) => {
-      if (
-        this.playing &&
-        (document.pointerLockElement === this.canvas || this.dragging)
-      )
-        this.look(e.movementX, e.movementY);
-    });
-    const startLook = (e) => {
-      if (this.touchId != null) return;
-      this.touchId = e.pointerId;
-      this.touchLook = [e.clientX, e.clientY];
-      e.currentTarget.setPointerCapture(e.pointerId);
-    };
-    const moveLook = (e) => {
-      if (!this.playing || e.pointerId !== this.touchId) return;
-      const gain = clamp(
-        780 / Math.min(this.canvas.clientWidth, this.canvas.clientHeight),
-        1,
-        2.5
-      );
-      this.look(
-        (e.clientX - this.touchLook[0]) * gain,
-        (e.clientY - this.touchLook[1]) * gain
-      );
-      this.touchLook = [e.clientX, e.clientY];
-    };
-    on(this.canvas, 'pointerdown', (e) => {
-      if (!this.playing) return;
-      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-        startLook(e);
-        return;
-      }
-      if (e.button !== 0) return;
-      if (document.pointerLockElement !== this.canvas) {
-        this.dragging = true;
-        try {
-          this.canvas.requestPointerLock?.()?.catch?.(() => {});
-        } catch {}
-      }
-      this.cast();
-    });
-    on(this.canvas, 'pointermove', moveLook);
-    const release = (e) => {
-      this.dragging = false;
-      if (e.pointerId === this.touchId) this.touchId = null;
-    };
-    on(window, 'pointerup', release);
-    on(window, 'pointercancel', release);
-    on(this.canvas, 'lostpointercapture', release);
-    const stick = $('#stick');
-    const stickMove = (e) => {
-      if (e.pointerId !== this.stickId) return;
-      if (!e.buttons) {
-        this.resetStick();
-        return;
-      }
-      const rect = stick.getBoundingClientRect(),
-        radius = Math.max(
-          1,
-          (rect.width - stick.firstElementChild.offsetWidth) / 2
-        ),
-        dx = (e.clientX - rect.left - rect.width / 2) / radius,
-        dz = (e.clientY - rect.top - rect.height / 2) / radius,
-        m = Math.max(1, Math.hypot(dx, dz));
-      this.joy = { x: dx / m, z: dz / m };
-      stick.firstElementChild.style.transform =
-        'translate(' +
-        this.joy.x * radius +
-        'px,' +
-        this.joy.z * radius +
-        'px)';
-    };
-    on(stick, 'pointerdown', (e) => {
-      if (!this.playing || e.button !== 0) return;
-      // A fresh press can reclaim the stick after an interrupted gesture.
-      this.stickId = e.pointerId;
-      this.stickType = e.pointerType;
-      stickMove(e);
-    });
-    on(window, 'pointermove', stickMove, true);
-    const stopStick = (e) => {
-      if (e.pointerId === this.stickId) this.resetStick();
-    };
-    on(window, 'pointerup', stopStick, true);
-    on(window, 'pointercancel', stopStick, true);
-    on(stick, 'lostpointercapture', stopStick);
-    // Touch targets stay tied to where each finger landed, including when
-    // another finger is still aiming or casting and pointerup was missed.
-    const checkStickTouches = (e) => {
-      if (
-        this.stickType === 'touch' &&
-        !Array.from(e.touches).some((touch) => stick.contains(touch.target))
-      )
-        this.resetStick();
-    };
-    on(window, 'touchend', checkStickTouches, true);
-    on(window, 'touchcancel', checkStickTouches, true);
-    on($('#weapon-switch'), 'click', () => this.switchWeapon());
-    on($('#view-toggle'), 'click', () => this.toggleView());
-    on($('#interact'), 'click', () => this.interact());
-    on($('#compass'), 'click', () => this.findDish());
-    const fire = $('#touch-fire');
-    on(fire, 'pointerdown', (e) => {
-      if (!this.playing || this.castId != null) return;
-      this.castId = e.pointerId;
-      fire.setPointerCapture(e.pointerId);
-      startLook(e);
-      fire.classList.add('held');
-    });
-    on(fire, 'pointermove', moveLook);
-    const endCast = (e) => {
-      if (this.castId !== e.pointerId) return;
-      this.castId = null;
-      fire.classList.remove('held');
-      if (e.type === 'pointerup') {
-        this.syncView(0);
-        this.cast();
-      }
-    };
-    on(fire, 'pointerup', endCast);
-    on(fire, 'pointercancel', endCast);
-    on(fire, 'lostpointercapture', endCast);
-    on(fire, 'click', (e) => {
-      if (e.detail === 0) this.cast();
-    });
-    const flap = $('#touch-flap');
-    on(flap, 'pointerdown', (e) => {
-      if (!this.playing || this.flapId != null) return;
-      this.flapId = e.pointerId;
-      flap.setPointerCapture(e.pointerId);
-      flap.classList.add('held');
-      this.flap();
-    });
-    const releaseFlap = (e) => {
-      if (this.flapId !== e.pointerId) return;
-      this.flapId = null;
-      flap.classList.remove('held');
-    };
-    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'])
-      on(flap, event, releaseFlap);
-    on(flap, 'click', (e) => {
-      if (e.detail === 0) this.flap();
-    });
+    if (this.inputController) return;
+    this.inputController = new AbortController();
+    bindHuntInput(this, this.inputController.signal);
   }
   dispose() {
-    this.abort?.abort();
-    this.viewportObserver?.disconnect();
+    this.inputController?.abort();
     this.renderer.setAnimationLoop(null);
     this.weather?.dispose();
     this.sky?.dispose();

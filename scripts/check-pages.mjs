@@ -1,20 +1,13 @@
 // Run after building or with --live after a Pages deployment.
 import assert from 'node:assert/strict';
-import { readFile, appendFile } from 'node:fs/promises';
+import { appendFile } from 'node:fs/promises';
+import { canonical, fetchLiveAsset, readBuiltAsset } from './release-assets.mjs';
 
-const canonical = 'https://turkey.kramnameloc.com/';
+const dist = new URL('../dist/', import.meta.url);
 const live = process.argv.includes('--live');
 async function asset(path, type) {
-  if (!live)
-    return readFile(
-      new URL(
-        '../dist/' + (path === '/' ? 'index.html' : path.slice(1)),
-        import.meta.url
-      )
-    );
-  const response = await fetch(new URL(path, canonical), {
-    signal: AbortSignal.timeout(15000),
-  });
+  if (!live) return readBuiltAsset(dist, path);
+  const response = await fetchLiveAsset(path);
   if (path === '/' && response.status === 403) {
     console.error(
       'The public homepage refused this client (HTTP 403, server ' +
@@ -78,6 +71,7 @@ if (process.env.EXPECTED_ENTRY)
     'Waiting for the new release'
   );
 const css = attribute(tags, 'rel', 'stylesheet', 'href');
+assert.match(css || '', /^\/assets\/[\w-]+\.css$/);
 const [js, sheet, photo, badge, geo, dish, faviconImage] = await Promise.all([
   asset(entry, /javascript/),
   asset(css, /text\/css/),

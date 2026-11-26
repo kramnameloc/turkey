@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as T from 'three';
-import { FieldGrasses, grassClass } from '../src/grass.js';
-import areas from '../src/grass-areas.json' with { type: 'json' };
+import { FieldGrasses, grassClass } from '../src/world/grass.js';
+import areas from '../src/world/grass-areas.json' with { type: 'json' };
 
 test('detailed grass masks override the regional aerial, including clear ground and water', () => {
   const width = 2048;

@@ -9,7 +9,7 @@ import {
   SIGN_WIDTH,
   SIGN_DEPTH,
 } from '../src/field.js';
-import { clearTrail, relativeBearing, walkingTrail } from '../src/trail.js';
+import { clearTrail, relativeBearing, walkingTrail } from '../src/gameplay/trail.js';
 
 const bounds = { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
 const wall = {

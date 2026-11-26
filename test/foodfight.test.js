@@ -9,18 +9,18 @@ import {
   captureBonus,
   coursePoint,
   rollSnow,
-} from '../src/courses.js';
+} from '../src/gameplay/courses.js';
 import { DISHES, Obstacles } from '../src/field.js';
-import { doverParking } from '../src/dover-block.js';
-import { yardBarriers } from '../src/dover-yard.js';
-import { walkingTrail } from '../src/trail.js';
+import { doverParking } from '../src/world/dover/block.js';
+import { yardBarriers } from '../src/world/dover/yard.js';
+import { walkingTrail } from '../src/gameplay/trail.js';
 import { Hunt } from '../src/game.js';
-import { EnemyHealthBars } from '../src/enemy-health-bars.js';
-import { DoverCottage } from '../src/dover.js';
-import { hasRecipe } from '../src/dover-location.js';
-import { CORNUCOPIA, WEAPONS } from '../src/weapons.js';
-import { FoodFight } from '../src/foodfight.js';
-import { TURKEY_EYE } from '../src/turkey-scale.js';
+import { EnemyHealthBars } from '../src/ui/enemy-health-bars.js';
+import { DoverCottage } from '../src/world/dover/cottage.js';
+import { hasRecipe } from '../src/world/dover/location.js';
+import { CORNUCOPIA, WEAPONS } from '../src/gameplay/weapons.js';
+import { FoodFight } from '../src/gameplay/foodfight.js';
+import { TURKEY_EYE } from '../src/player/turkey-scale.js';
 
 test('all six days have walkable spawns, capture targets, gravy and destination prompts', () => {
   const read = (url) =>
@@ -193,6 +193,7 @@ function field(blocked = () => false) {
     scene,
     camera,
     height: () => 0,
+    fieldHeight: () => 0,
     openSpot: (p) => p,
     isBlocked: blocked,
     toast: () => {},

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as T from 'three';
-import { pavement, streetJunctions } from '../src/streets.js';
-import { makeTerrain } from '../src/terrain.js';
+import { pavement, streetJunctions } from '../src/world/streets.js';
+import { makeTerrain } from '../src/world/terrain.js';
 import { treeShape } from '../src/field.js';
 
 const read = (name) =>

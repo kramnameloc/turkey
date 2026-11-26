@@ -3,3 +3,5 @@ dist/
 .DS_Store
 __pycache__/
 download-models/*
+test-results/
+playwright-report/

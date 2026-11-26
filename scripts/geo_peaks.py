@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 from urllib.request import urlretrieve
 
 from PIL import Image
+from asset_cache import cache_destination
 from alpine_surface import fit_summits
 from geo_export import BASE, USGS, R, mx, my, scale
 
@@ -27,7 +28,8 @@ def source(cache, name, url):
     path = cache / name
     if not path.is_file():
         print(f"Downloading {name}", flush=True)
-        urlretrieve(url, path)
+        with cache_destination(path) as temporary:
+            urlretrieve(url, temporary)
     return path
 
 
