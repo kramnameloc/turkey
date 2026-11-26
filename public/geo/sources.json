@@ -19,7 +19,7 @@
     {
       "name": "City and County of Broomfield GIS",
       "url": "https://www.broomfield.org/1761/GIS-Division-Data",
-      "use": "Source of building polygons, street and trail centerlines, tree positions and species, and place names. Heights and missing widths are estimates for game rendering.",
+      "use": "Building footprints, streets, trail centerlines, tree positions and species, forestry height classes in feet, and place names. The local Web Mercator scale correction preserves ground meters. Unmeasured buildings use building-type estimates. Missing trail and street widths are estimated.",
       "terms": "Broomfield provides selected GIS datasets free of charge. Broomfield places responsibility for their use on the user; see the GIS data page for the published disclaimer.",
       "layers": {
         "BuildingFootprints": {
@@ -46,6 +46,16 @@
           "attribution": "City and County of Broomfield",
           "url": "https://services1.arcgis.com/vXSRPZbyyOmH9pek/arcgis/rest/services/PlaceNames/FeatureServer/0",
           "metadata": "https://www.arcgis.com/home/item.html?id=d672c81f746d4d228921e8bdb4fa512a"
+        },
+        "Addresses": {
+          "attribution": "City and County of Broomfield",
+          "url": "https://services1.arcgis.com/vXSRPZbyyOmH9pek/ArcGIS/rest/services/Addresses/FeatureServer/0",
+          "use": "The public address point locates the Dover collectible. The doorway, Hall of Gravy and collectible are original game scenery."
+        },
+        "ParkAmenities": {
+          "attribution": "City and County of Broomfield",
+          "url": "https://services1.arcgis.com/vXSRPZbyyOmH9pek/ArcGIS/rest/services/OpenspaceParksTrails/FeatureServer/1",
+          "use": "Named local features on the neighborhood maps, including Blue Pod at County Commons. Portable soccer equipment is representative."
         }
       }
     },
@@ -64,14 +74,36 @@
       "regionalPixels": [
         4096,
         4096
-      ]
+      ],
+      "courseImages": {
+        "sizePixels": [
+          1024,
+          1024
+        ],
+        "extentMeters": [
+          720,
+          720
+        ],
+        "files": "courses/*.jpg",
+        "mapVectors": "courses/maps.json",
+        "refresh": "scripts/geo_courses.py"
+      }
     },
     {
       "name": "USGS 3D Elevation Program",
       "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
-      "use": "Bilinear sampling of the bare-earth terrain model every 150 meters. The regional game grid measures 129 \u00d7 129 points. Each stores an elevation in meters above sea level.",
+      "use": "The regional 129 × 129 grid samples USGS bare-earth terrain every 150 meters. A 10-meter grid covers Community Park, Brunner Farmhouse, Dover Street, and County Commons. Both datasets use real vertical meters relative to the same regional origin, with a 120-meter transition band at the edge of the detailed grid.",
       "terms": "U.S. Geological Survey public-domain elevation data.",
-      "file": "region.json"
+      "file": "region.json",
+      "detailFile": "park-elevation.json",
+      "detailSource": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n40w106/USGS_13_n40w106.tif",
+      "detailSampling": "USGS 1/3 arc-second bare-earth DEM, bilinear reprojection to a 10-meter local ground grid, elevations rounded to decimeters. Rebuild with scripts/geo_terrain.py."
+    },
+    {
+      "name": "USGS 3DEP Colorado DRCOG 2 lidar, 2020",
+      "url": "https://usgs-lidar-public.s3.amazonaws.com/CO_DRCOG_2_2020/ept.json",
+      "terms": "U.S. Geological Survey public-domain elevation data.",
+      "use": "Estimated individual roof and crown heights for the Community Park, Brunner, County Commons, and Dover play areas. City footprints retain their mapped horizontal coordinates. Roof estimates use the 85th percentile of returns inside the footprint, relative to nearby ground returns. Crown estimates use the 95th percentile near the mapped trunk, restricted to the closest tree, within its reported size band where available. Trees planted after the survey retain city class estimates where dates are available. Heights and crown shapes remain approximate. Rebuild the derived height fields with scripts/geo_scale.py after refreshing city features."
     }
   ],
   "regionalExtentMeters": [

@@ -8,7 +8,7 @@ function randomSeed(seed) {
   };
 }
 // Pavement follows the surveyed centerlines. Join normals keep bends continuous.
-export function pavement(lines, height, regional = false) {
+export function pavement(lines, terrain, regional = false) {
   const random = randomSeed(954);
   const c = document.createElement('canvas');
   c.width = c.height = 256;
@@ -23,10 +23,15 @@ export function pavement(lines, height, regional = false) {
   tex.colorSpace = T.SRGBColorSpace;
   tex.wrapS = tex.wrapT = T.RepeatWrapping;
   tex.anisotropy = 8;
-  const positions = [],
-    uvs = [],
-    colors = [],
-    paint = [];
+  const chunks = new Map();
+  function chunkAt(x, z) {
+    const key = regional
+      ? Math.floor(x / 1000) + ',' + Math.floor(z / 1000)
+      : 'park';
+    if (!chunks.has(key))
+      chunks.set(key, { positions: [], uvs: [], colors: [], paint: [] });
+    return chunks.get(key);
+  }
   for (const line of lines) {
     if (/Parking Lot|Bike Lane|Cross-walk/.test(line.type)) continue;
     const trail = /Sidewalk|Path|Trail/.test(line.type);
@@ -37,12 +42,13 @@ export function pavement(lines, height, regional = false) {
           : '#b5afa1'
         : '#666761'
     );
+    const tint = [col.r, col.g, col.b].map((c) => Math.round(c * 255));
     const pts = [];
     for (let i = 0; i < line.points.length; i++) {
       const [x, z] = line.points[i];
-      if (i && regional) {
+      if (i) {
         const [ax, az] = line.points[i - 1],
-          n = Math.ceil(Math.hypot(x - ax, z - az) / 25);
+          n = Math.ceil(Math.hypot(x - ax, z - az) / 40);
         for (let j = 1; j < n; j++)
           pts.push([ax + ((x - ax) * j) / n, az + ((z - az) * j) / n]);
       }
@@ -61,84 +67,63 @@ export function pavement(lines, height, regional = false) {
       const nx = -dz / n,
         nz = dx / n,
         half = line.width * 0.49;
-      const point = (off, lift) => {
-        const a = x + nx * off,
-          b = z + nz * off;
-        return [a, height(a, b) + lift, b];
-      };
-      const row = [
-        point(-half, trail ? 0.035 : 0.008),
-        point(half, trail ? 0.035 : 0.008),
-      ];
-      const center = point(0, 0.045);
+      const point = (off) => [x + nx * off, z + nz * off];
+      const row = [point(-half), point(half)];
+      const stripe = [point(-0.075), point(0.075)];
       if (prev && !(regional && Math.abs(x) < 680 && Math.abs(z) < 680)) {
-        const step = Math.hypot(x - prev.x, z - prev.z),
-          l0 = length / 2.4,
-          l1 = (length + step) / 2.4;
-        for (const [p, u, v] of [
-          [prev.row[0], 0, l0],
-          [prev.row[1], half / 1.2, l0],
-          [row[1], half / 1.2, l1],
-          [prev.row[0], 0, l0],
-          [row[1], half / 1.2, l1],
-          [row[0], 0, l1],
-        ]) {
-          positions.push(...p);
+        const { positions, uvs, colors, paint } = chunkAt(x, z);
+        const step = Math.hypot(x - prev.x, z - prev.z);
+        const l0 = length / 2.4,
+          l1 = (length + step) / 2.4,
+          w = half / 1.2;
+        const corners = [
+          [...prev.row[0], 0, l0],
+          [...prev.row[1], w, l0],
+          [...row[1], w, l1],
+          [...row[0], 0, l1],
+        ];
+        const fill = ([a, b, u, v], h) => {
+          positions.push(a, h + (trail ? 0.035 : 0.008), b);
           uvs.push(u, v);
-          colors.push(col.r, col.g, col.b);
-        }
+          colors.push(...tint);
+        };
+        terrain.drape([corners[0], corners[1], corners[2]], fill);
+        terrain.drape([corners[0], corners[2], corners[3]], fill);
         if (line.type?.includes('Arterial')) {
-          const edgeA = [
-              center[0] + nx * 0.075,
-              center[1],
-              center[2] + nz * 0.075,
-            ],
-            edgeB = [center[0] - nx * 0.075, center[1], center[2] - nz * 0.075];
-          const a = [
-              prev.center[0] + nx * 0.075,
-              prev.center[1],
-              prev.center[2] + nz * 0.075,
-            ],
-            b = [
-              prev.center[0] - nx * 0.075,
-              prev.center[1],
-              prev.center[2] - nz * 0.075,
-            ];
-          paint.push(...a, ...b, ...edgeB, ...a, ...edgeB, ...edgeA);
+          const mark = ([a, b], h) => paint.push(a, h + 0.045, b);
+          terrain.drape([prev.stripe[0], prev.stripe[1], stripe[1]], mark);
+          terrain.drape([prev.stripe[0], stripe[1], stripe[0]], mark);
         }
         length += step;
       }
-      prev = { row, center, x, z };
+      prev = { row, stripe, x, z };
     }
   }
-  const g = new T.BufferGeometry();
-  g.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
-  g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
-  g.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
   const group = new T.Group();
-  group.add(
-    new T.Mesh(
-      g,
-      new T.MeshBasicMaterial({
-        map: tex,
-        vertexColors: true,
-        side: T.DoubleSide,
-      })
-    )
-  );
-  if (paint.length) {
-    const a = new T.BufferGeometry();
-    a.setAttribute('position', new T.Float32BufferAttribute(paint, 3));
-    group.add(
-      new T.Mesh(
-        a,
-        new T.MeshBasicMaterial({ color: '#c3ac69', side: T.DoubleSide })
-      )
-    );
+  const roadMaterial = new T.MeshBasicMaterial({
+    map: tex,
+    vertexColors: true,
+    side: T.DoubleSide,
+  });
+  const stripeMaterial = new T.MeshBasicMaterial({
+    color: '#c3ac69',
+    side: T.DoubleSide,
+  });
+  for (const { positions, colors, uvs, paint } of chunks.values()) {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
+    g.setAttribute('color', new T.Uint8BufferAttribute(colors, 3, true));
+    group.add(new T.Mesh(g, roadMaterial));
+    if (paint.length) {
+      const a = new T.BufferGeometry();
+      a.setAttribute('position', new T.Float32BufferAttribute(paint, 3));
+      group.add(new T.Mesh(a, stripeMaterial));
+    }
   }
   return group;
 }
-export function parkFloor(data, photo) {
+export function parkFloor(data, photo, height) {
   const group = new T.Group(),
     random = randomSeed(1973),
     c = document.createElement('canvas');
@@ -182,20 +167,30 @@ export function parkFloor(data, photo) {
   let count = 0;
   const leafColors = ['#a48843', '#8f632b', '#b1823f', '#c39447', '#8c7841'];
   trees.forEach((t, i) => {
-    up.rotation.set(0, 0.8, 0);
-    up.position.set(t.x - t.height * 0.13, 0.045, t.z);
-    up.scale.set(t.height * 0.83, 1, t.height * 0.45);
+    const treeHeight = t.surveyHeight || t.height;
+    const x = t.x - treeHeight * 0.13,
+      z = t.z;
+    const slope = new T.Vector3(
+      height(x - 1, z) - height(x + 1, z),
+      2,
+      height(x, z - 1) - height(x, z + 1)
+    ).normalize();
+    up.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), slope);
+    up.rotateY(0.8);
+    up.position.set(x, height(x, z) + 0.045, z);
+    up.scale.set(treeHeight * 0.83, 1, treeHeight * 0.45);
     up.updateMatrix();
     shade.setMatrixAt(i, up.matrix);
     if (t.type === 'Coniferous') return;
     for (let n = 0; n < 18; n++) {
-      const radius = Math.sqrt(random()) * t.height * 0.57,
+      const radius = Math.sqrt(random()) * treeHeight * 0.57,
         angle = random() * 6.28;
       up.position.set(
         t.x + Math.cos(angle) * radius,
         0.051,
         t.z + Math.sin(angle) * radius
       );
+      up.position.y += height(up.position.x, up.position.z);
       up.rotation.set((random() - 0.5) * 0.2, random() * 6.28, 0);
       const size = 0.09 + random() * 0.09;
       up.scale.set(size, 1 * size, size);
@@ -249,7 +244,7 @@ export function parkFloor(data, photo) {
       j = (v * 512 + u) * 4;
     const [r, g, bl] = [samples[j], samples[j + 1], samples[j + 2]];
     if (g < r * 0.98 || g < bl * 1.16 || g < 53) continue;
-    up.position.set(x, 0.012, z);
+    up.position.set(x, height(x, z) + 0.012, z);
     up.rotation.set(0, random() * 6.28, 0);
     up.scale.setScalar(0.4 + random() * 0.85);
     up.updateMatrix();

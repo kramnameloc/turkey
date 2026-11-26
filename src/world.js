@@ -9,6 +9,7 @@ import {
   SIGN_WIDTH,
   SIGN_DEPTH,
 } from './field.js';
+import { makeTerrain } from './terrain.js';
 import { TreeStand } from './trees.js';
 const loader = new T.TextureLoader();
 function texture(url, repeat = false) {
@@ -35,8 +36,8 @@ function buildings(list, photo, bounds, elev, wallMats) {
   for (const b of list) {
     if (b.points.length < 3) continue;
     const pts = b.points.map((p) => new T.Vector2(...p));
-    const base = elev(pts[0].x, pts[0].y),
-      top = base + b.height;
+    const levels = pts.map((p) => elev(p.x, p.y)).sort((a, b) => a - b);
+    const base = levels[Math.floor(levels.length / 2)];
     const kind = /Single Family|Townhome|Apartment/.test(b.type) ? 0 : 1;
     // A gable follows the footprint's longest edge. Split triangles at the
     // ridge so that rectangular footprints retain pitched roofs as well.
@@ -61,10 +62,17 @@ function buildings(list, photo, bounds, elev, wallMats) {
             normal,
             offset: (high + low) / 2,
             half,
-            rise: Math.min(2.2, half * 0.34),
+            rise: Math.min(
+              2.2,
+              half * 0.34,
+              b.roofHeight ? Math.max(0, b.roofHeight - 2.4) : Infinity
+            ),
           };
       }
     }
+    // Survey heights include the roof. The fallback estimates describe eaves.
+    const top =
+      base + (b.roofHeight ? b.roofHeight - (ridge?.rise || 0) : b.height);
     const distance = (p) => (ridge ? p.dot(ridge.normal) - ridge.offset : 0);
     const roofHeight = (p) =>
       ridge
@@ -77,18 +85,19 @@ function buildings(list, photo, bounds, elev, wallMats) {
       const first = roofHeight(a),
         last = roofHeight(d),
         u = a.distanceTo(d) / 8;
+      const lower = levels[0] - 1;
       walls[kind].push(
         a.x,
-        base - 1,
+        lower,
         a.y,
         d.x,
-        base - 1,
+        lower,
         d.y,
         d.x,
         last,
         d.y,
         a.x,
-        base - 1,
+        lower,
         a.y,
         d.x,
         last,
@@ -97,8 +106,8 @@ function buildings(list, photo, bounds, elev, wallMats) {
         first,
         a.y
       );
-      const va = (first - base + 1) / 7,
-        vb = (last - base + 1) / 7;
+      const va = (first - lower) / 7,
+        vb = (last - lower) / 7;
       wallUV[kind].push(0, 0, u, 0, u, vb, 0, 0, u, vb, 0, va);
     }
     function roofTriangle(a, d, c) {
@@ -151,12 +160,12 @@ function buildings(list, photo, bounds, elev, wallMats) {
     );
   return group;
 }
-function parkFurniture(scene, data) {
+function parkFurniture(scene, data, height) {
   const pieces = [],
     v = new T.Object3D(),
     colors = [];
   function part(x, y, z, w, h, d, col, a = 0) {
-    v.position.set(x, y, z);
+    v.position.set(x, y + height(x, z), z);
     v.rotation.set(0, a, 0);
     v.scale.set(w, h, d);
     v.updateMatrix();
@@ -243,16 +252,7 @@ function groundMaterial(photo, grass) {
   };
   return mat;
 }
-function fieldGround(data, photo, grass) {
-  const b = data.bounds,
-    w = b.maxX - b.minX,
-    h = b.maxZ - b.minZ;
-  const g = new T.PlaneGeometry(w, h);
-  g.rotateX(-Math.PI / 2);
-  g.translate((b.maxX + b.minX) / 2, -0.018, (b.maxZ + b.minZ) / 2);
-  return new T.Mesh(g, groundMaterial(photo, grass));
-}
-function parkSign({ title, x, z, angle }) {
+function parkSign({ title, x, z, angle }, height) {
   const board = document.createElement('canvas');
   board.width = 768;
   board.height = 248;
@@ -294,16 +294,20 @@ function parkSign({ title, x, z, angle }) {
     sign.rotation.y = side < 0 ? Math.PI : 0;
     g.add(sign);
   }
-  g.position.set(x, 0, z);
+  g.position.set(x, height(x, z), z);
   g.rotation.y = angle;
   return g;
 }
-function water(scene, rings) {
+function water(scene, rings, height) {
   const positions = [];
   for (const r of rings) {
     const points = r.points.map((p) => new T.Vector2(...p));
+    const center = points
+      .reduce((sum, p) => sum.add(p), new T.Vector2())
+      .divideScalar(points.length);
+    const surfaceY = height(center.x, center.y) + 0.07;
     for (const tri of T.ShapeUtils.triangulateShape(points, []))
-      for (const i of tri) positions.push(points[i].x, 0.036, points[i].y);
+      for (const i of tri) positions.push(points[i].x, surfaceY, points[i].y);
   }
   const surface = new T.MeshPhongMaterial({
     color: 0x608889,
@@ -317,14 +321,20 @@ function water(scene, rings) {
   scene.add(new T.Mesh(geometry(positions), surface));
 }
 export async function buildWorld(scene, data) {
-  const [photo, grass, sky, brick, civic, treeTexture] = await Promise.all([
-    texture(data.orthophoto.url),
-    texture('/scenery/grass.webp', true),
-    texture('/scenery/sky.webp'),
-    texture('/scenery/brick-facade.webp', true),
-    texture('/scenery/civic-facade.webp', true),
-    texture('/scenery/tree-materials.webp'),
-  ]);
+  const [photo, grass, sky, brick, civic, treeTexture, fine, regional] =
+    await Promise.all([
+      texture(data.orthophoto.url),
+      texture('/scenery/grass.webp', true),
+      texture('/scenery/sky.webp'),
+      texture('/scenery/brick-facade.webp', true),
+      texture('/scenery/civic-facade.webp', true),
+      texture('/scenery/tree-materials.webp'),
+      fetch('/geo/park-elevation.json').then((r) => {
+        if (!r.ok) throw Error('The park elevation map could not load.');
+        return r.json();
+      }),
+      regionData(),
+    ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
   scene.fog = new T.FogExp2('#b8c0ac', 0.00063);
@@ -335,30 +345,41 @@ export async function buildWorld(scene, data) {
   const walls = [brick, civic].map(
     (map) => new T.MeshLambertMaterial({ map, side: T.DoubleSide })
   );
+  const terrain = makeTerrain(fine, regional.elevation, data.bounds);
+  const { height } = terrain;
   const structures = buildings(
     data.buildings,
     photo,
     data.bounds,
-    () => 0,
+    height,
     walls
   );
   const trees = new TreeStand(scene, treeTexture);
-  trees.add('park', data.trees);
+  trees.add(
+    'park',
+    data.trees.map((t) => ({ ...t, ground: height(t.x, t.z) }))
+  );
   trees.update(SPAWN.x, SPAWN.z);
-  scene.add(fieldGround(data, photo, grass), structures);
-  const signs = PARK_SIGNS.map(parkSign);
   scene.add(
-    parkFloor(data, photo),
-    pavement([...data.roads, ...data.paths], () => 0),
+    new T.Mesh(terrain.parkGround(), groundMaterial(photo, grass)),
+    structures
+  );
+  const signs = PARK_SIGNS.map((s) => parkSign(s, height));
+  scene.add(
+    parkFloor(data, photo, height),
+    pavement([...data.roads, ...data.paths], terrain),
     ...signs
   );
-  parkFurniture(scene, data);
-  water(scene, data.water);
+  parkFurniture(scene, data, height);
+  water(scene, data.water, height);
   const solids = new Obstacles(data, PARK_SIGNS);
   return {
     walls: [...structures.children, ...signs.flatMap((sign) => sign.children)],
     solids,
     grass,
+    terrain,
+    height,
+    groundPatch: terrain.groundPatch,
     trees,
     wallMaterials: walls,
   };
@@ -368,49 +389,12 @@ export async function addRegion(scene, world) {
   const data = await regionData(),
     photo = await texture(data.orthophoto.url),
     b = data.bounds,
-    e = data.elevation;
-  function height(x, z) {
-    if (!e || Math.max(Math.abs(x), Math.abs(z)) <= 680) return 0;
-    const u = T.MathUtils.clamp(
-      ((x - e.bounds.minX) / (e.bounds.maxX - e.bounds.minX)) * (e.columns - 1),
-      0,
-      e.columns - 1
-    );
-    const v = T.MathUtils.clamp(
-      ((z - e.bounds.minZ) / (e.bounds.maxZ - e.bounds.minZ)) * (e.rows - 1),
-      0,
-      e.rows - 1
-    );
-    const i = Math.min(e.columns - 2, Math.floor(u)),
-      j = Math.min(e.rows - 2, Math.floor(v));
-    const h0 = T.MathUtils.lerp(
-      e.values[j * e.columns + i],
-      e.values[j * e.columns + i + 1],
-      u - i
-    );
-    const h1 = T.MathUtils.lerp(
-      e.values[(j + 1) * e.columns + i],
-      e.values[(j + 1) * e.columns + i + 1],
-      u - i
-    );
-    return (
-      (T.MathUtils.lerp(h0, h1, v - j) - e.originMeters) *
-      T.MathUtils.smoothstep(Math.max(Math.abs(x), Math.abs(z)), 680, 970)
-    );
-  }
-  const ground = new T.PlaneGeometry(
-    b.maxX - b.minX,
-    b.maxZ - b.minZ,
-    256,
-    256
+    height = world.height;
+  const material = groundMaterial(photo, world.grass);
+  scene.add(
+    ...world.terrain.regionGround().map((geo) => new T.Mesh(geo, material)),
+    pavement(data.roads, world.terrain, true)
   );
-  ground.rotateX(-Math.PI / 2);
-  ground.translate((b.minX + b.maxX) / 2, 0, (b.minZ + b.maxZ) / 2);
-  const a = ground.attributes.position;
-  for (let i = 0; i < a.count; i++)
-    a.setY(i, height(a.getX(i), a.getZ(i)) - 0.13);
-  const plane = new T.Mesh(ground, groundMaterial(photo, world.grass));
-  scene.add(plane, pavement(data.roads, height, true));
   const active = new Map();
   // A footprint belongs to its centroid's tile. Include features that extend
   // over a tile edge when deciding which collision data must be ready.
@@ -462,6 +446,7 @@ export async function addRegion(scene, world) {
     if (!r.ok) throw Error('Unable to load terrain at this landmark.');
     const d = await r.json();
     if (active.get(tile.url) !== entry) return;
+    entry.mapData = { ...d, url: tile.url };
     const buildingsList = d.buildings || [],
       trees = (d.trees || []).map((t) => ({
         ...t,
@@ -511,6 +496,8 @@ export async function addRegion(scene, world) {
     data,
     height,
     update,
+    mapTiles: () =>
+      Array.from(active.values(), (e) => e.mapData).filter(Boolean),
     occludes: (ray) =>
       Array.from(active.values()).some(
         (entry) =>

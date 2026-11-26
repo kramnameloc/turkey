@@ -168,8 +168,7 @@ export function treeShape(tree) {
     variety = 'bare';
   else if (seed < 6) variety = 'gold';
   const { aspect, lowBranches, crown } = TREES[variety];
-  const height =
-    (tree.height || 8) * (0.88 + 0.24 * Math.abs(Math.sin(tree.x + tree.z)));
+  const height = tree.surveyHeight || tree.height || 8;
   const width = height * aspect;
   // Intersect low boughs at turkey height. Tall, high-crowned trees only block at the trunk.
   const fullness =
@@ -309,16 +308,54 @@ export function slideMove(position, dx, dz, blocked) {
   }
 }
 const atlases = new WeakMap();
+const mapImages = new WeakMap();
+export function loadMapImage(data) {
+  if (!mapImages.has(data)) {
+    const image = new Image();
+    const ready = new Promise((resolve, reject) => {
+      image.onload = () => {
+        data.mapImage = image;
+        atlases.delete(data);
+        resolve(image);
+      };
+      image.onerror = () => {
+        mapImages.delete(data);
+        reject(Error('Unable to load map photography.'));
+      };
+    });
+    mapImages.set(data, ready);
+    image.src = data.orthophoto.url;
+  }
+  return mapImages.get(data);
+}
 function atlas(data) {
-  if (atlases.has(data)) return atlases.get(data);
+  const cached = atlases.get(data);
+  if (cached && cached.revision === data.mapRevision) return cached.image;
   const a = document.createElement('canvas'),
     b = data.bounds;
-  a.width = a.height = data.tiles ? 2600 : 1700;
+  a.width = a.height = data.tiles ? 2304 : data.id ? 1024 : 1500;
   const c = a.getContext('2d'),
     sx = a.width / (b.maxX - b.minX),
     sy = a.height / (b.maxZ - b.minZ);
   c.fillStyle = '#2b3529';
   c.fillRect(0, 0, a.width, a.height);
+  if (data.mapImage) {
+    c.globalAlpha = 0.82;
+    c.drawImage(data.mapImage, 0, 0, a.width, a.height);
+    c.globalAlpha = 1;
+  }
+  for (const t of data.trees || []) {
+    c.fillStyle = '#394b3388';
+    c.beginPath();
+    c.arc(
+      (t.x - b.minX) * sx,
+      (t.z - b.minZ) * sy,
+      Math.max(1, Math.min(5, t.height * 0.22 * sx)),
+      0,
+      Math.PI * 2
+    );
+    c.fill();
+  }
   function path(points) {
     c.beginPath();
     points.forEach(([x, z], i) =>
@@ -329,17 +366,31 @@ function atlas(data) {
   }
   for (const b of data.buildings || []) {
     path(b.points);
-    c.fillStyle = '#545b49';
+    c.fillStyle = '#a29d82aa';
     c.fill();
+    c.strokeStyle = '#504d3c';
+    c.lineWidth = 1;
+    c.stroke();
   }
   for (const p of data.water || []) {
     path(p.points);
     c.fillStyle = '#4e726d';
     c.fill();
   }
+  if (data.markings) {
+    c.beginPath();
+    for (let i = 0; i < data.markings.length; i += 6) {
+      const a = data.markings;
+      c.moveTo((a[i] - b.minX) * sx, (a[i + 2] - b.minZ) * sy);
+      c.lineTo((a[i + 3] - b.minX) * sx, (a[i + 5] - b.minZ) * sy);
+    }
+    c.strokeStyle = '#e1e3c4be';
+    c.lineWidth = 1.55;
+    c.stroke();
+  }
   for (const [lines, col] of [
-    [data.roads, '#878b72'],
-    [data.paths || [], '#797f68'],
+    [data.roads, '#d3c5a4'],
+    [data.paths || [], '#d6d2a3'],
   ]) {
     c.strokeStyle = col;
     for (const p of lines) {
@@ -348,7 +399,7 @@ function atlas(data) {
       c.stroke();
     }
   }
-  atlases.set(data, a);
+  atlases.set(data, { image: a, revision: data.mapRevision });
   return a;
 }
 export function drawMap(
@@ -365,6 +416,8 @@ export function drawMap(
     labels = false,
     places = [],
     selected = -1,
+    route = [],
+    destination = null,
   } = {}
 ) {
   const c = canvas.getContext('2d'),
@@ -375,14 +428,34 @@ export function drawMap(
     py = (b) => (b - z) * s + h / 2;
   c.fillStyle = '#262e24';
   c.fillRect(0, 0, w, h);
-  const b = data.bounds;
-  c.drawImage(
-    atlas(data),
-    px(b.minX),
-    py(b.minZ),
-    (b.maxX - b.minX) * s,
-    (b.maxZ - b.minZ) * s
-  );
+  // Crop in source pixels before drawing. Large city atlases can exceed mobile
+  // canvas limits when scaled to a 300 m neighborhood in a single draw call.
+  function layer(map) {
+    const b = map.bounds,
+      left = Math.max(b.minX, x - width / 2),
+      right = Math.min(b.maxX, x + width / 2);
+    const top = Math.max(b.minZ, z - h / (2 * s)),
+      bottom = Math.min(b.maxZ, z + h / (2 * s));
+    if (left >= right || top >= bottom) return;
+    const a = atlas(map),
+      sx = a.width / (b.maxX - b.minX),
+      sz = a.height / (b.maxZ - b.minZ);
+    c.drawImage(
+      a,
+      (left - b.minX) * sx,
+      (top - b.minZ) * sz,
+      (right - left) * sx,
+      (bottom - top) * sz,
+      px(left),
+      py(top),
+      (right - left) * s,
+      (bottom - top) * s
+    );
+  }
+  layer(data);
+  if (width < 3200) {
+    for (const site of data.detailMaps || []) if (site.mapImage) layer(site);
+  }
   c.strokeStyle = '#9ba48724';
   c.lineWidth = 1;
   const grid = (width > 3000 ? 1000 : 50) * s;
@@ -434,12 +507,81 @@ export function drawMap(
         5,
         Math.min(x + 7, w - c.measureText(name).width - 6)
       ),
-      textY = y + labelOffsets[i];
+      textY = Math.max(
+        14,
+        Math.min(h - 5, y + labelOffsets[i % labelOffsets.length])
+      );
     c.lineWidth = 3;
     c.strokeStyle = '#293327';
     c.strokeText(name, textX, textY);
     c.fillText(name, textX, textY);
   });
+  if (labels && data.detailMaps && width < 3200) {
+    const used = places.map((p) => [px(p.x), py(p.z)]);
+    c.font = '500 11px monospace';
+    c.lineWidth = 3;
+    for (const site of data.detailMaps)
+      for (const place of site.landmarks || []) {
+        let x = px(place.x),
+          y = py(place.z);
+        if (
+          x < 6 ||
+          x > w - 12 ||
+          y < 17 ||
+          y > h - 9 ||
+          used.some(([a, b]) => Math.abs(a - x) < 94 && Math.abs(b - y) < 18)
+        )
+          continue;
+        const label = place.name
+          .replace(/ public art by .*/, '')
+          .replace(/^The Field Trailhead Parking$/, 'Trailhead');
+        const labelX = Math.max(
+          3,
+          Math.min(x + 5, w - c.measureText(label).width - 4)
+        );
+        c.fillStyle = '#e5e7d6';
+        c.fillRect(x - 1.5, y - 1.5, 3, 3);
+        c.strokeStyle = '#343d31';
+        c.strokeText(label, labelX, y - 4);
+        c.fillText(label, labelX, y - 4);
+        used.push([x, y]);
+      }
+  }
+  if (route.length > 1) {
+    c.save();
+    c.beginPath();
+    route.forEach((p, i) =>
+      i ? c.lineTo(px(p.x), py(p.z)) : c.moveTo(px(p.x), py(p.z))
+    );
+    c.strokeStyle = '#342717';
+    c.lineWidth = 5;
+    c.stroke();
+    c.strokeStyle = '#ffd077';
+    c.lineWidth = 2.5;
+    c.setLineDash([6, 4]);
+    c.stroke();
+    c.restore();
+  }
+  if (destination) {
+    c.save();
+    c.translate(px(destination.x), py(destination.z));
+    c.fillStyle = '#ffd077';
+    c.strokeStyle = '#372819';
+    c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI) / 5 - Math.PI / 2,
+        r = i % 2 ? 4 : 9;
+      const dx = Math.cos(angle) * r,
+        dy = Math.sin(angle) * r;
+      if (i) c.lineTo(dx, dy);
+      else c.moveTo(dx, dy);
+    }
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
   for (const item of pickups) {
     const x = px(item.x),
       y = py(item.z);

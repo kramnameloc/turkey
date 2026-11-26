@@ -1,5 +1,13 @@
 import * as T from 'three';
 import { addRegion, buildWorld } from './world.js';
+import { courseMaps } from './course-maps.js';
+import { DOVER_ROUTE } from './dover-route.js';
+import { doverLeg } from './dover-guide.js';
+import { ChaseView, TURKEY_EYE } from './view.js';
+import { createTurkeyAvatar, animateTurkeyAvatar } from './turkey-avatar.js';
+import { addPeaks } from './peaks.js';
+import { DoverCottage } from './dover.js';
+import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
 import { FoodFight } from './foodfight.js';
 import { Flurries } from './flurries.js';
 import { COURSES, COURSE_TIME, coursePoint, rollSnow } from './courses.js';
@@ -15,6 +23,7 @@ import {
   fieldData,
   formatTime,
   drawMap,
+  loadMapImage,
 } from './field.js';
 import { sound } from './audio.js';
 const $ = (s) => document.querySelector(s),
@@ -76,7 +85,14 @@ export class Hunt {
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.camera = new T.PerspectiveCamera(63, 1, 0.045, 4100);
     this.camera.rotation.order = 'YXZ';
-    this.scene.add(this.camera);
+    this.chaseCamera = new ChaseView();
+    this.avatar = createTurkeyAvatar();
+    this.scene.add(this.camera, this.avatar);
+    this.house = new DoverCottage(this.scene);
+    this.thirdPerson = false;
+    try {
+      this.thirdPerson = localStorage.getItem('gobbler-chase-view') === 'on';
+    } catch {}
     this.fight = new FoodFight(this);
     this.standardTool = caster();
     this.wideTool = this.fight.art.upgrade('wide');
@@ -105,6 +121,8 @@ export class Hunt {
     $('#progress-pips').replaceChildren(...this.pips);
     this.guide = new DishGuide(this.scene);
     this.isBlocked = (x, z) => this.blocked(x, z);
+    this.ground = (x, z) => this.height(x, z);
+    this.updateViewControls();
     this.targets = [];
     this.playing = false;
     this.active = false;
@@ -113,6 +131,7 @@ export class Hunt {
   async init() {
     this.data = await fieldData();
     this.world = await buildWorld(this.scene, this.data);
+    await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
     const shade = new T.MeshBasicMaterial({
       map: shadowTexture(),
       transparent: true,
@@ -129,19 +148,28 @@ export class Hunt {
     });
     this.bindInput();
     this.resize();
-    this.camera.position.set(SPAWN.x, 1.62, SPAWN.z);
+    this.camera.position.set(
+      SPAWN.x,
+      this.height(SPAWN.x, SPAWN.z) + TURKEY_EYE,
+      SPAWN.z
+    );
     this.camera.rotation.y = Math.atan2(16, 4);
     await this.renderer.compileAsync(this.scene, this.camera);
     this.renderer.render(this.scene, this.camera);
     this.renderer.setAnimationLoop((time) => this.frame(time));
   }
   async ensureRegion() {
-    this.regionRequest ??= addRegion(this.scene, this.world)
-      .then((r) => (this.region = r))
-      .catch((e) => {
-        this.regionRequest = null;
-        throw e;
-      });
+    this.regionRequest ??= (async () => {
+      this.region ??= await addRegion(this.scene, this.world);
+      [this.maps] = await Promise.all([
+        courseMaps(this.scene, this.world, this.region),
+        loadMapImage(this.region.data),
+      ]);
+      return this.region;
+    })().catch((e) => {
+      this.regionRequest = null;
+      throw e;
+    });
     return this.regionRequest;
   }
   resize() {
@@ -158,8 +186,117 @@ export class Hunt {
       94
     );
     this.camera.updateProjectionMatrix();
+    this.chaseCamera.aspect = aspect;
+    this.chaseCamera.fov = this.camera.fov;
+    this.chaseCamera.updateProjectionMatrix();
     this.tool.position.x = Math.min(0.39, 0.25 * this.camera.aspect);
     this.tool.scale.setScalar(this.camera.aspect < 1 ? 0.72 : 1);
+  }
+  get mapPosition() {
+    return this.house.inside ? PORCH : this.camera.position;
+  }
+  get viewCamera() {
+    return this.thirdPerson ? this.chaseCamera : this.camera;
+  }
+  updateViewControls() {
+    const button = $('#view-toggle');
+    button.setAttribute('aria-pressed', String(this.thirdPerson));
+    button.title = this.thirdPerson
+      ? 'Switch to first person (V)'
+      : 'Switch to chase camera (V)';
+    button.setAttribute('aria-label', button.title);
+    $('#view-name').textContent = this.thirdPerson
+      ? 'Chase cam'
+      : 'First person';
+    this.wing.hidden = this.thirdPerson || this.house.inside;
+    this.tool.visible = !this.thirdPerson && !this.house.inside;
+    this.avatar.visible = this.thirdPerson;
+  }
+  toggleView() {
+    if (!this.playing) return;
+    this.thirdPerson = !this.thirdPerson;
+    try {
+      localStorage.setItem(
+        'gobbler-chase-view',
+        this.thirdPerson ? 'on' : 'off'
+      );
+    } catch {}
+    this.updateViewControls();
+    this.syncView(0, true);
+    this.toast(this.thirdPerson ? 'Chase camera' : 'First person');
+  }
+  syncView(dt, snap = false, speed = 0) {
+    const p = this.camera.position;
+    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    this.camera.updateMatrixWorld();
+    if (!this.thirdPerson) return;
+    this.chaseCamera.follow(
+      p,
+      this.yaw,
+      this.pitch,
+      dt,
+      snap,
+      this.isBlocked,
+      this.ground,
+      this.house.inside
+    );
+    // At a wall the boom can fold to the eye. Keep feathers out of the near plane.
+    this.avatar.visible = this.chaseCamera.distance > 0.9;
+    this.avatar.position.set(p.x, this.height(p.x, p.z) + this.lift, p.z);
+    this.avatar.rotation.y = this.yaw;
+    animateTurkeyAvatar(this.avatar, {
+      time: this.elapsed,
+      speed,
+      lift: this.lift,
+      cast: Math.max(0, this.netTime / 0.24),
+    });
+  }
+  leaveCottage() {
+    if (!this.house.inside) return;
+    this.house.inside = false;
+    this.scene.add(this.camera, this.avatar);
+    this.updateViewControls();
+  }
+  interact() {
+    if (
+      !this.playing ||
+      !this.house.prompt(this.camera.position, this.doverFinale)
+    )
+      return;
+    const p = this.camera.position;
+    if (!this.house.inside) {
+      this.house.enter();
+      this.house.scene.add(this.camera, this.avatar);
+      p.set(0, TURKEY_EYE, 2.5);
+      this.yaw = 0;
+      this.guide.hide();
+      this.toast('Hall of Gravy · Search the display pedestal.', 3);
+    } else if (p.z > 0) {
+      this.leaveCottage();
+      this.yaw = -Math.PI / 2;
+      p.set(
+        PORCH.x + 1.85,
+        this.height(PORCH.x + 1.85, PORCH.z) + TURKEY_EYE,
+        PORCH.z
+      );
+      this.toast('Back on Dover Street.');
+    } else {
+      this.house.collect();
+      this.trackingDover = false;
+      if (this.doverFinale) {
+        sound('win');
+        this.finish(true);
+        return;
+      }
+      sound('bonus');
+      this.toast('One of one! ' + RELIC + ' added to your field guide.', 5);
+    }
+    this.lift = this.velocityY = this.pitch = 0;
+    this.netTime = 0;
+    this.net.visible = false;
+    this.updateViewControls();
+    this.syncView(0, true);
+    this.setHUD();
   }
   get regional() {
     return (
@@ -175,6 +312,7 @@ export class Hunt {
     return COURSES[this.level];
   }
   async reset(mode = 'campaign', spot = SPAWN) {
+    this.leaveCottage();
     this.mode = mode;
     this.level = 0;
     this.bankedTime = 0;
@@ -192,8 +330,11 @@ export class Hunt {
     ) {
       const region = await this.ensureRegion();
       await region.prepareAt(spot.x, spot.z);
+      await this.maps.prepare(spot.x, spot.z);
     }
     this.level = level;
+    this.doverFinale = false;
+    this.trackingDover = false;
     this.intermission = false;
     this.active = true;
     this.elapsed = 0;
@@ -288,6 +429,7 @@ export class Hunt {
   }
   async teleport(spot) {
     await this.region.prepareAt(spot.x, spot.z);
+    await this.maps.prepare(spot.x, spot.z);
     this.arrive(spot);
     if (this.mode === 'city') this.stockGravy(spot);
     this.guide.reset(this.elapsed);
@@ -305,12 +447,22 @@ export class Hunt {
     return { x, z };
   }
   arrive(spot) {
+    this.leaveCottage();
     if (this.regional) this.region.update(spot.x, spot.z);
+    this.house.porch.visible = this.regional;
+    if (this.regional)
+      this.house.porch.position.y = this.height(PORCH.x, PORCH.z);
+    this.trackingDover = this.doverFinale || (spot === DOVER && !hasGrail());
+    if (spot === DOVER) {
+      this.yaw = Math.PI / 2;
+      this.pitch = 0;
+    }
     const { x, z } = this.openSpot(spot);
-    this.camera.position.set(x, this.height(x, z) + 1.62, z);
+    this.camera.position.set(x, this.height(x, z) + TURKEY_EYE, z);
     this.lift = 0;
     this.velocityY = 0;
     this.tileTime = 1;
+    this.syncView(0, true);
   }
   resume(lock = true) {
     if (!this.active || this.intermission) return;
@@ -344,11 +496,20 @@ export class Hunt {
     this.active = false;
   }
   height(x, z) {
-    return this.regional && this.region ? this.region.height(x, z) : 0;
+    if (this.house.inside) return 0;
+    return this.regional && this.region
+      ? this.region.height(x, z)
+      : this.world.height(x, z);
   }
   blocked(x, z) {
+    if (this.house.inside) return this.house.blocked(x, z);
     if (!this.regional) return this.world.solids.blocked(x, z);
-    return this.world.solids.occupied(x, z) || this.region.blocked(x, z);
+    return (
+      this.world.solids.occupied(x, z) ||
+      this.region.blocked(x, z) ||
+      this.maps.blocked(x, z) ||
+      this.house.hitsPorchPost(x, z)
+    );
   }
   look(dx, dy) {
     this.yaw -= dx * 0.0025;
@@ -366,7 +527,7 @@ export class Hunt {
     this.noticeTime = n;
   }
   findDish() {
-    if (!this.playing || this.mode === 'roam') return;
+    if (!this.playing || this.house.inside || this.mode === 'roam') return;
     this.guide.toggle(this.elapsed);
     this.guide.update(this, this.aim());
   }
@@ -411,6 +572,8 @@ export class Hunt {
           'Space',
           'KeyF',
           'KeyH',
+          'KeyV',
+          'KeyG',
           'KeyM',
           'Escape',
           'KeyP',
@@ -421,6 +584,8 @@ export class Hunt {
       if (e.repeat) return;
       if (e.code === 'Space') this.flap();
       if (e.code === 'KeyF') this.cast();
+      if (e.code === 'KeyV') this.toggleView();
+      if (e.code === 'KeyG') this.interact();
       if (e.code === 'KeyH') this.findDish();
       if (e.code === 'Escape' || e.code === 'KeyP') this.events.pause();
       if (e.code === 'KeyM') this.events.map();
@@ -511,6 +676,8 @@ export class Hunt {
     on(stick, 'pointerup', stopStick);
     on(stick, 'pointercancel', stopStick);
     on(stick, 'lostpointercapture', stopStick);
+    on($('#view-toggle'), 'click', () => this.toggleView());
+    on($('#interact'), 'click', () => this.interact());
     on($('#compass'), 'click', () => this.findDish());
     const fire = $('#touch-fire');
     on(fire, 'pointerdown', (e) => {
@@ -526,8 +693,7 @@ export class Hunt {
       this.castId = null;
       fire.classList.remove('held');
       if (e.type === 'pointerup') {
-        this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-        this.camera.updateMatrixWorld();
+        this.syncView(0);
         this.cast();
       }
     };
@@ -548,16 +714,19 @@ export class Hunt {
     this.renderer.dispose();
   }
   aim() {
-    if (this.mode === 'roam') return null;
-    const p = this.camera.position;
-    this.camera.getWorldDirection(direction);
+    if (this.mode === 'roam' || this.house.inside) return null;
+    const p = this.camera.position,
+      view = this.viewCamera;
+    view.getWorldDirection(direction);
+    const range = this.fight.wide ? 52 : 35;
     let best = null,
-      bestDepth = this.fight.wide ? 52 : 35;
+      bestDepth = Infinity;
     for (const t of this.targets) {
       if (t.caught) continue;
       toward.copy(t.model.position);
       toward.y += t.model.userData.aimHeight;
-      toward.sub(p);
+      if (toward.distanceToSquared(p) > range * range) continue;
+      toward.sub(view.position);
       const depth = toward.dot(direction);
       if (
         depth <= 0 ||
@@ -568,6 +737,18 @@ export class Hunt {
             2
       )
         continue;
+      // Both the reticle and the turkey must have a clear shot around corners.
+      ray.far = toward.length();
+      ray.set(view.position, toward.normalize());
+      if (
+        this.thirdPerson &&
+        (ray.intersectObjects(this.world.walls, false).length ||
+          this.region?.occludes(ray))
+      )
+        continue;
+      toward.copy(t.model.position);
+      toward.y += t.model.userData.aimHeight;
+      toward.sub(p);
       ray.far = toward.length();
       ray.set(p, toward.normalize());
       if (
@@ -581,7 +762,7 @@ export class Hunt {
     return best;
   }
   cast() {
-    if (!this.playing || this.cooldown > 0) return;
+    if (!this.playing || this.house.inside || this.cooldown > 0) return;
     const t = this.aim();
     this.shots++;
     this.wideCast = this.fight.wide > 0;
@@ -589,14 +770,14 @@ export class Hunt {
     this.net.material.color.setHex(this.wideCast ? 0x8bffe0 : 0xffdc91);
     this.cooldown = this.wideCast ? 0.3 : 0.58;
     this.netTime = 0.24;
-    this.camera.getWorldDirection(direction);
+    this.viewCamera.getWorldDirection(direction);
     this.netStart.set(0.19, -0.15, -0.63).applyMatrix4(this.camera.matrixWorld);
-    this.netEnd.copy(this.camera.position).addScaledVector(direction, 28);
+    this.netEnd.copy(this.viewCamera.position).addScaledVector(direction, 28);
     if (t) {
       this.netEnd.copy(t.model.position);
       this.netEnd.y += t.model.userData.aimHeight;
     }
-    this.net.quaternion.copy(this.camera.quaternion);
+    this.net.quaternion.copy(this.viewCamera.quaternion);
     this.net.visible = true;
     sound('cast');
     if (t) {
@@ -617,6 +798,17 @@ export class Hunt {
           this.bankedCount += this.count;
           this.saved = { ...this.fight.checkpoint(), shots: this.shots };
           this.events.courseClear(bonus);
+        } else if (this.mode === 'campaign') {
+          this.doverFinale = this.trackingDover = true;
+          this.finaleAt = this.elapsed;
+          this.fight.clearField();
+          this.guide.reset(this.elapsed);
+          this.setHUD();
+          this.toast(
+            'Supper is safe! Follow the gold trail to 735 Dover St.',
+            5
+          );
+          this.guide.update(this, null);
         } else this.finish(true);
       }
     }
@@ -627,7 +819,7 @@ export class Hunt {
     this.events.end({
       won,
       reason,
-      time: this.bankedTime + this.elapsed,
+      time: this.bankedTime + (this.doverFinale ? this.finaleAt : this.elapsed),
       shots: this.shots,
       count: this.bankedCount + this.count,
     });
@@ -692,7 +884,7 @@ export class Hunt {
     ].filter(Boolean);
     $('#boosts').textContent = bonuses.join(' · ');
     $('#boosts').hidden = !bonuses.length || roam;
-    const warning = roam ? '' : this.fight.warning();
+    const warning = roam || this.house.inside ? '' : this.fight.warning();
     $('#incoming').textContent = warning;
     $('#incoming').hidden = !warning;
     $('#counter').previousElementSibling.textContent = roam
@@ -717,12 +909,29 @@ export class Hunt {
       '  ' +
       String(Math.round(bearing) % 360).padStart(3, '0') +
       '°';
-    const p = this.camera.position,
-      far = this.regional && Math.max(Math.abs(p.x), Math.abs(p.z)) > 610;
+    const p = this.camera.position;
+    const prompt = this.house.prompt(p, this.doverFinale);
+    $('#interact').hidden = !prompt;
+    $('#interact-name').textContent = prompt;
+    $('#compass').disabled = this.trackingDover || this.house.inside || roam;
+    if (this.doverFinale) {
+      $('#time').previousElementSibling.textContent = 'SUPPER CLOCK';
+      $('#time').textContent = 'Held';
+      $('#counter').previousElementSibling.textContent = 'BONUS TRAIL';
+      $('#counter').textContent = 'Dover St';
+    }
+    if (this.house.inside) {
+      this.house.drawRadar($('#radar'), p, this.yaw);
+      return;
+    }
+    const far = this.regional && Math.max(Math.abs(p.x), Math.abs(p.z)) > 610;
+    const route = this.trackingDover ? doverLeg(p, DOVER_ROUTE).points : [];
     drawMap($('#radar'), far && this.region ? this.region.data : this.data, {
       x: p.x,
       z: p.z,
-      width: far ? 900 : 240,
+      width: far ? 285 : 240,
+      route,
+      destination: this.trackingDover ? PORCH : null,
       targets: roam ? [] : this.targets,
       player: p,
       yaw: this.yaw,
@@ -755,7 +964,11 @@ export class Hunt {
       }
     }
     this.elapsed += delta;
-    if (this.mode !== 'roam' && this.elapsed >= this.timeLimit) {
+    if (
+      !this.doverFinale &&
+      this.mode !== 'roam' &&
+      this.elapsed >= this.timeLimit
+    ) {
       this.elapsed = this.timeLimit;
       this.finish(false);
       return;
@@ -780,14 +993,19 @@ export class Hunt {
       k.has('ShiftLeft') ||
       k.has('ShiftRight') ||
       Math.hypot(this.joy.x, this.joy.z) > 0.85;
-    const speed =
-        this.mode === 'roam'
+    const speed = this.house.inside
+        ? sprint
+          ? 4.2
+          : 2.9
+        : this.mode === 'roam'
           ? sprint
             ? 33
             : 13
           : (sprint ? 13 : 7.2) * (this.fight.speed > 0 ? 1.65 : 1),
       sn = Math.sin(this.yaw),
       cs = Math.cos(this.yaw);
+    const oldX = this.camera.position.x,
+      oldZ = this.camera.position.z;
     slideMove(
       this.camera.position,
       (strafe * cs - forward * sn) * speed * dt,
@@ -797,13 +1015,19 @@ export class Hunt {
     this.steps += dt * Math.hypot(strafe, forward) * (sprint ? 13 : 9);
     this.velocityY -= 18 * dt;
     this.lift = Math.max(0, this.lift + this.velocityY * dt);
+    if (this.house.inside && this.lift > 2.15) {
+      this.lift = 2.15;
+      this.velocityY = Math.min(0, this.velocityY);
+    }
     if (!this.lift) this.velocityY = 0;
     const p = this.camera.position;
     p.y =
-      this.height(p.x, p.z) + 1.62 + this.lift + Math.sin(this.steps) * 0.038;
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    this.camera.updateMatrixWorld();
-    if (this.mode !== 'roam') {
+      this.height(p.x, p.z) +
+      TURKEY_EYE +
+      this.lift +
+      Math.sin(this.steps) * 0.027;
+    this.syncView(dt, false, dt ? Math.hypot(p.x - oldX, p.z - oldZ) / dt : 0);
+    if (!this.house.inside && !this.doverFinale && this.mode !== 'roam') {
       this.moveTargets(dt);
       this.fight.update(dt, delta);
       if (!this.fight.health) {
@@ -812,14 +1036,24 @@ export class Hunt {
         return;
       }
     }
+    if (this.house.inside || this.doverFinale) {
+      this.fight.speed = Math.max(0, this.fight.speed - delta);
+      this.fight.hitFlash = Math.max(0, this.fight.hitFlash - dt * 2.6);
+    }
     $('#hit-flash').style.opacity = String(this.fight.hitFlash * 0.72);
     if (this.elapsed >= this.weatherAt) {
       this.weather.setSnowing(rollSnow());
       this.weatherAt = this.elapsed + 50 + Math.random() * 45;
     }
-    this.weather.update(dt, this.camera);
-    if (this.regional && this.region && (this.tileTime += dt) > 0.5) {
+    if (!this.house.inside) this.weather.update(dt, this.viewCamera);
+    if (
+      !this.house.inside &&
+      this.regional &&
+      this.region &&
+      (this.tileTime += dt) > 0.5
+    ) {
       this.region.update(p.x, p.z);
+      this.maps.prepare(p.x, p.z).catch(() => {});
       if (this.mode === 'city') {
         const next = TRAVEL.find(
           (s) => s !== this.gravyStop && Math.hypot(p.x - s.x, p.z - s.z) < 85
@@ -859,7 +1093,7 @@ export class Hunt {
       if (target) {
         projected.copy(target.model.position);
         projected.y += target.model.userData.labelHeight;
-        projected.project(this.camera);
+        projected.project(this.viewCamera);
         label.style.left = (projected.x * 0.5 + 0.5) * 100 + '%';
         label.style.top = clamp((0.5 - projected.y * 0.5) * 100, 15, 85) + '%';
         label.textContent =
@@ -871,7 +1105,11 @@ export class Hunt {
       this.guide.update(this, target);
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
-    this.world.trees.update(p.x, p.z, this.camera);
-    this.renderer.render(this.scene, this.camera);
+    if (this.house.inside) this.house.animate(this.elapsed);
+    else this.world.trees.update(p.x, p.z, this.viewCamera);
+    this.renderer.render(
+      this.house.inside ? this.house.scene : this.scene,
+      this.viewCamera
+    );
   }
 }

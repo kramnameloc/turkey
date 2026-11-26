@@ -1,6 +1,6 @@
 # Turkey Takeover
 
-Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A first-person Three.js game set in Broomfield, Colorado. Play as a wild turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
+Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set in Broomfield, Colorado. Play as a wild turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
 
 ## Play locally
 
@@ -15,7 +15,7 @@ Open the local URL printed by Vite in a WebGL 2 browser. The game bundles its ge
 
 To play on a phone or tablet, connect it to the same Wi-Fi as the computer. Run `npm run build` followed by `npm run play:lan` on the computer, then open the printed **Network** URL on the device. The controls adapt when you rotate the screen.
 
-- **Start hunt** opens a three-course campaign. Capture four dishes in two minutes at Community Park, then play Brunner Farmhouse and County Commons. Health and bonuses carry between courses. If you run out of health or time, retry the current course from its starting checkpoint.
+- **Start hunt** opens a three-course campaign. Capture four dishes in two minutes at Community Park, then play Brunner Farmhouse and County Commons. Health and bonuses carry between courses. After the fourth capture at County Commons, the supper clock stops. Follow the gold trail to 735 Dover St or use **Travel to Dover St** on the course map. Enter the game’s cottage and inspect the pedestal to finish the campaign. The collectible stays in your field guide on this browser. If you run out of health or time, retry the current course from its starting checkpoint.
 - **Hunt map → Park time trial** keeps the original twelve-dish, five-minute park challenge. Orange diamonds mark dishes. Get within 35 meters, aim until the reticle turns amber, and cast.
 - **Hunt map → Greater Broomfield → Citywide hunt** places one side and one dessert at each of six landmarks. Open the map during play to travel between them.
 - **Explore freely** opens the full regional map without a timer. Walk between neighborhoods or use a landmark travel stop.
@@ -38,6 +38,8 @@ The November forecast rolls a 35% chance of flurries at each course start and on
 | Sprint | Hold Shift while moving | Full stick |
 | Jump / flap | Space | Feather button |
 | Find next dish | H or compass | Compass |
+| Switch first person / chase camera | V | Camera button below or beside the minimap |
+| Enter, leave or inspect a display | G at a prompt | Tap the prompt |
 | Map | M or minimap | Minimap |
 | Pause | Escape or P | Pause button |
 
@@ -45,9 +47,10 @@ The arrow keys also move forward/back and turn. Q and E tilt the view. Pausing o
 
 ## Map and photography
 
-The detailed park map spans 1.36 × 1.36 km. The regional map spans 19.2 × 19.2 km around Broomfield, including surrounding communities. Building footprints, streets, paths, trees, and landmarks come from city GIS. USGS/USDA aerial photography covers the ground and rooftops. Regional terrain uses USGS elevation samples at 150-meter intervals. Surveyed trees have three-dimensional trunks and canopies. Buildings use estimated heights and representative photographed façades. The central park course has level ground for play.
+The detailed park map spans 1.36 × 1.36 km. The regional map spans 19.2 × 19.2 km around Broomfield, including surrounding communities. Building footprints, streets, paths, trees, and landmarks come from city GIS. USGS/USDA aerial photography covers the ground and rooftops. USGS elevation sampled on a 10-meter grid covers Community Park, Brunner Farmhouse, County Commons and the Dover area, transitioning to 150-meter regional coverage. Roof and tree heights use 2020 USGS lidar where supported. Other buildings and trees use estimates. Six neighborhood maps combine detailed aerial imagery, surveyed trails, streets, named amenities, building footprints and tree locations. The same aerials and trails appear underfoot. The portable soccer goals represent the Commons Blue Pod playing fields. The Dover cottage has an original game interior.
 
-The title and sky composites include a photograph of the Flatirons taken from Broomfield. Photography credits, licenses, source links, and modifications are available through **Map & photo credits** in the game and in the [map sources](public/geo/sources.json), [cover and wing credits](public/cover/credits.json), and [scenery credits](public/scenery/sources.json).
+
+The western mountain skyline uses a separate USGS elevation mesh, aerial imagery, seasonal snow artwork and emphasized distant relief. See the [Front Range sources](public/scenery/peaks-credits.json). The title and sky composites include a photograph of the Flatirons taken from Broomfield. Photography credits, licenses, source links, and modifications are available through **Map & photo credits** in the game and in the [map sources](public/geo/sources.json), [cover and wing credits](public/cover/credits.json), and [scenery credits](public/scenery/sources.json).
 
 ## Build
 

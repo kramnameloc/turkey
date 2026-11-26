@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { TURKEY_EYE } from './view.js';
 import { createFoodFightArt } from './foodfight-art.js';
 import {
   captureBonus,
@@ -223,7 +224,7 @@ export class FoodFight {
         }
         if (
           Math.hypot(point.x - p.x, point.z - p.z) < 0.92 &&
-          point.y > p.y - 1.54 &&
+          point.y > p.y - TURKEY_EYE + 0.035 &&
           point.y < p.y + 0.32
         ) {
           done = true;

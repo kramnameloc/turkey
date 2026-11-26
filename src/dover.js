@@ -1,0 +1,252 @@
+import * as T from 'three';
+import { BODY_RADIUS } from './field.js';
+import { PORCH, RELIC, hasGrail, collectGrail } from './dover-location.js';
+
+const crate = new T.BoxGeometry(1, 1, 1);
+const paint = (color, props = {}) =>
+  new T.MeshStandardMaterial({ color, ...props });
+const colors = {
+  timber: paint('#533424'),
+  oak: paint('#ac7446'),
+  trim: paint('#e7cfa4'),
+  blue: paint('#32655f'),
+  dark: paint('#153b38'),
+  red: paint('#a8472d'),
+  tile: paint('#d4b996'),
+  metal: paint('#d69b39', { metalness: 0.52, roughness: 0.28 }),
+  pane: paint('#93c3c8', { emissive: '#779fa2', emissiveIntensity: 0.5 }),
+  lamp: paint('#ffe3a5', { emissive: '#ffb94d', emissiveIntensity: 0.9 }),
+};
+function mesh(parent, geo, mat, x, y, z) {
+  const m = new T.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+function box(p, mat, x, y, z, w, h, d) {
+  const m = mesh(p, crate, mat, x, y, z);
+  m.scale.set(w, h, d);
+  return m;
+}
+function plaque(p, lines, x, y, z, w, h) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = Math.round((768 * h) / w);
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#273d33';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.strokeStyle = '#d6af6b';
+  g.lineWidth = 6;
+  g.strokeRect(8, 8, 752, canvas.height - 16);
+  g.fillStyle = '#fff0c7';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  lines.forEach((line, i) => {
+    g.font =
+      'bold ' +
+      Math.floor((canvas.height / (lines.length + 1)) * 0.84) +
+      'px Georgia';
+    g.fillText(line, 384, ((i + 0.5) * canvas.height) / lines.length, 710);
+  });
+  const map = new T.CanvasTexture(canvas);
+  map.colorSpace = T.SRGBColorSpace;
+  return mesh(
+    p,
+    new T.PlaneGeometry(w, h),
+    new T.MeshBasicMaterial({ map }),
+    x,
+    y,
+    z
+  );
+}
+function door(parent) {
+  const { trim, blue, dark, metal } = colors;
+  box(parent, trim, 0, 1.17, 0, 1.52, 2.34, 0.18);
+  box(parent, blue, 0, 1.11, 0.12, 1.28, 2.18, 0.1);
+  for (const y of [0.54, 1.52])
+    box(parent, dark, 0, y, 0.18, 0.94, 0.61, 0.045);
+  mesh(parent, new T.SphereGeometry(0.065, 10, 8), metal, 0.46, 1, 0.24);
+}
+function makePorch() {
+  const group = new T.Group();
+  group.position.set(PORCH.x, 0, PORCH.z);
+  group.rotation.y = Math.PI / 2;
+  door(group);
+  box(group, colors.timber, 0, 2.76, 0.48, 3.2, 0.15, 1.38);
+  box(group, colors.blue, 0, 2.9, 0.48, 3.38, 0.16, 1.5);
+  for (const x of [-1.26, 1.26]) {
+    box(group, colors.trim, x, 1.36, 0.94, 0.14, 2.73, 0.14);
+    box(group, colors.lamp, x * 0.72, 1.87, 0.22, 0.18, 0.29, 0.15);
+  }
+  plaque(group, ['735 DOVER'], 0, 2.53, 0.23, 1.37, 0.32);
+  box(group, colors.red, 0, 0.045, 0.86, 1.38, 0.06, 0.66);
+  return group;
+}
+function makeRoom() {
+  const scene = new T.Scene(),
+    c = colors;
+  scene.background = new T.Color('#30231c');
+  scene.add(new T.HemisphereLight('#fff1cf', '#b9987a', 1.95));
+  const sun = new T.DirectionalLight('#fff1cf', 2.15);
+  sun.position.set(3, 6, 4);
+  scene.add(sun);
+  box(scene, c.timber, 0, -0.09, 0, 8.6, 0.18, 10.6);
+  for (let i = 0; i < 19; i++) {
+    const mat = paint(
+      i % 3 === 0 ? '#ac8058' : i % 3 === 1 ? '#986c49' : '#b78c65'
+    );
+    box(scene, mat, -4.05 + i * 0.45, -0.012, 0, 0.435, 0.024, 10.5);
+  }
+  for (const side of [-1, 1]) {
+    box(scene, c.tile, 4.2 * side, 1.82, 0, 0.18, 3.64, 10.6);
+    box(scene, c.blue, 4.08 * side, 0.6, 0, 0.12, 1.2, 10.6);
+    box(scene, c.trim, 3.99 * side, 1.2, 0, 0.12, 0.09, 10.6);
+    box(scene, c.tile, 0, 1.82, 5.2 * side, 8.45, 3.64, 0.18);
+  }
+  box(scene, c.trim, 0, 3.7, 0, 8.5, 0.16, 10.6);
+  for (const z of [-3.6, 0, 3.6])
+    box(scene, c.timber, 0, 3.52, z, 8.45, 0.19, 0.18);
+  const exit = new T.Group();
+  exit.position.z = 5.05;
+  exit.rotation.y = Math.PI;
+  scene.add(exit);
+  door(exit);
+  plaque(exit, ['DOVER ST'], 0, 2.56, 0.14, 1.3, 0.35);
+  for (const x of [-2.86, 2.86]) {
+    box(scene, c.trim, x, 2.05, -5.05, 1.8, 1.52, 0.12);
+    box(scene, c.pane, x, 2.05, -4.96, 1.57, 1.28, 0.08);
+    box(scene, c.trim, x, 2.05, -4.9, 0.065, 1.28, 0.06);
+    box(scene, c.trim, x, 2.05, -4.9, 1.6, 0.08, 0.06);
+    box(scene, c.blue, x, 0.48, -4.69, 2.42, 0.96, 0.85);
+    box(scene, c.oak, x, 1, -4.69, 2.55, 0.12, 0.95);
+    for (const dx of [-0.57, 0.57]) {
+      box(scene, c.dark, x + dx, 0.48, -4.23, 0.96, 0.75, 0.04);
+      box(scene, c.metal, x + dx, 0.68, -4.17, 0.24, 0.045, 0.06);
+    }
+  }
+  plaque(scene, ['THANKSGIVING', 'HALL OF GRAVY'], 0, 2.15, -5.02, 2.72, 1.04);
+  box(scene, c.red, 0, 0.015, 0.64, 2.54, 0.024, 5.46);
+  for (const x of [-1.13, 1.13])
+    box(scene, c.trim, x, 0.032, 0.64, 0.035, 0.012, 5.3);
+  box(scene, c.timber, 0, 0.49, -2.75, 1.12, 0.96, 1.12);
+  box(scene, c.metal, 0, 1.02, -2.75, 1.31, 0.11, 1.31);
+  plaque(scene, ['GOLDEN GRAVY GRAIL'], 0, 0.64, -2.175, 0.94, 0.24);
+  const grail = new T.Group();
+  const profile = [
+    [0.01, 0],
+    [0.29, 0],
+    [0.31, 0.04],
+    [0.12, 0.11],
+    [0.075, 0.23],
+    [0.17, 0.26],
+    [0.29, 0.32],
+    [0.38, 0.49],
+    [0.39, 0.58],
+    [0.34, 0.59],
+    [0.31, 0.5],
+    [0.21, 0.4],
+    [0.01, 0.35],
+  ];
+  mesh(
+    grail,
+    new T.LatheGeometry(
+      profile.map(([r, y]) => new T.Vector2(r, y)),
+      36
+    ),
+    c.metal,
+    0,
+    0,
+    0
+  );
+  for (const side of [-1, 1]) {
+    const handle = mesh(
+      grail,
+      new T.TorusGeometry(0.135, 0.032, 8, 20),
+      c.metal,
+      side * 0.37,
+      0.44,
+      0
+    );
+    handle.scale.y = 1.36;
+  }
+  grail.position.set(0, 1.21, -2.75);
+  scene.add(grail);
+  const lamp = new T.PointLight('#ffcf7a', 9, 5);
+  lamp.position.set(0, 2.45, -2.6);
+  scene.add(lamp);
+  return { scene, grail };
+}
+export class DoverCottage {
+  constructor(outdoors) {
+    this.porch = makePorch();
+    this.porch.visible = false;
+    outdoors.add(this.porch);
+    this.inside = false;
+  }
+  hitsPorchPost(x, z) {
+    const dx = x - (PORCH.x + 0.94),
+      dz = Math.abs(z - PORCH.z) - 1.26;
+    return dx * dx + dz * dz < (BODY_RADIUS + 0.09) ** 2;
+  }
+  nearPorch(p) {
+    return p.x >= PORCH.x && Math.hypot(p.x - PORCH.x, p.z - PORCH.z) < 3.1;
+  }
+  prompt(p, finale = false) {
+    if (!this.inside)
+      return this.porch.visible && this.nearPorch(p)
+        ? 'Enter 735 Dover St'
+        : '';
+    if (Math.hypot(p.x, p.z - 4.75) < 2.0) return 'Return to Dover St';
+    if ((finale || !hasGrail()) && Math.hypot(p.x, p.z + 2.75) < 2.05) {
+      return hasGrail() ? 'Inspect your Grail engraving' : 'Take the ' + RELIC;
+    }
+    return '';
+  }
+  enter() {
+    if (!this.scene) Object.assign(this, makeRoom());
+    this.inside = true;
+    this.grail.visible = !hasGrail();
+  }
+  collect() {
+    collectGrail();
+    this.grail.visible = false;
+  }
+  blocked(x, z) {
+    return (
+      Math.abs(x) > 3.66 ||
+      Math.abs(z) > 4.66 ||
+      (Math.abs(x) < 1.04 && Math.abs(z + 2.75) < 1.06) ||
+      (Math.abs(x) > 1.13 && z < -3.77)
+    );
+  }
+  drawRadar(canvas, p, yaw) {
+    const c = canvas.getContext('2d'),
+      w = canvas.width,
+      h = canvas.height;
+    const scale = Math.min((w - 18) / 8.4, (h - 14) / 10.4);
+    c.save();
+    c.fillStyle = '#202820';
+    c.fillRect(0, 0, w, h);
+    c.translate(w / 2, h / 2);
+    c.scale(scale, scale);
+    c.fillStyle = '#526051';
+    c.fillRect(-4.2, -5.2, 8.4, 10.4);
+    c.fillStyle = '#c5d6b7';
+    c.fillRect(-0.72, 4.82, 1.44, 0.38);
+    c.fillStyle = this.grail.visible ? '#ffb852' : '#a7885b';
+    c.fillRect(-0.5, -3.25, 1, 1);
+    c.translate(p.x, p.z);
+    c.rotate(-yaw);
+    c.fillStyle = '#fff2cd';
+    c.beginPath();
+    c.moveTo(0, -0.52);
+    c.lineTo(0.31, 0.38);
+    c.lineTo(-0.31, 0.38);
+    c.fill();
+    c.restore();
+  }
+  animate(time) {
+    this.grail.rotation.y = time * 0.86;
+    this.grail.position.y = 1.2 + Math.sin(time * 2.2) * 0.07;
+  }
+}

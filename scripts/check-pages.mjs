@@ -83,6 +83,26 @@ assert.equal(badge.toString('ascii', 1, 4), 'PNG');
 assert.equal(badge.readUInt32BE(16), 180);
 assert.equal(badge.readUInt32BE(20), 180);
 assert.equal(dish.toString('ascii', 8, 12), 'WEBP');
+const [maps, mountains, dem] = await Promise.all([
+  asset('/geo/courses/maps.json', /json/),
+  asset('/scenery/front-range.webp', /image\/webp/),
+  asset('/geo/park-elevation.json', /json/),
+]);
+const sites = JSON.parse(maps);
+assert.equal(sites.length, 6);
+for (const site of sites)
+  assert.ok(site.paths.length, site.id + ' needs mapped trails');
+assert.equal(mountains.toString('ascii', 8, 12), 'WEBP');
+assert.ok(JSON.parse(dem).values.length);
+await Promise.all(
+  sites.map(async (site) => {
+    const aerial = await asset(
+      '/geo/courses/' + site.id + '.jpg',
+      /image\/jpeg/
+    );
+    assert.equal(aerial.readUInt16BE(0), 0xffd8, site.id);
+  })
+);
 if (!live && process.env.GITHUB_OUTPUT)
   await appendFile(process.env.GITHUB_OUTPUT, 'entry=' + entry + '\n');
 console.log(

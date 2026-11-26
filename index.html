@@ -162,7 +162,7 @@
         </button>
       </footer>
     </main>
-    <section id="arena" hidden aria-label="First-person capture hunt">
+    <section id="arena" hidden aria-label="Turkey capture hunt">
       <canvas
         id="scene"
         tabindex="-1"
@@ -213,16 +213,29 @@
         <div id="in-world-label" hidden></div>
         <div id="incoming" hidden></div>
         <div id="notice" role="status"></div>
+        <button id="interact" hidden>
+          <i data-i="door"></i><span id="interact-name"></span><kbd>G</kbd>
+        </button>
         <div class="hud-bottom">
-          <button
-            class="radar"
-            data-action="map"
-            title="Open hunt map"
-            aria-label="Open hunt map"
-          >
-            <canvas id="radar" width="200" height="160"></canvas
-            ><span><i data-i="map"></i> HUNT MAP <kbd>M</kbd></span>
-          </button>
+          <div class="map-controls">
+            <button
+              class="radar"
+              data-action="map"
+              title="Open hunt map"
+              aria-label="Open hunt map"
+            >
+              <canvas id="radar" width="200" height="160"></canvas
+              ><span><i data-i="map"></i> HUNT MAP <kbd>M</kbd></span>
+            </button>
+            <button
+              id="view-toggle"
+              aria-pressed="false"
+              title="Switch camera (V)"
+            >
+              <i data-i="camera"></i><span id="view-name">First person</span
+              ><kbd>V</kbd>
+            </button>
+          </div>
           <div class="equipment">
             <small>CAPTURE TOOL</small
             ><strong

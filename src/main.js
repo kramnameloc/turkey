@@ -1,4 +1,7 @@
 import './style.css';
+import { DOVER_ROUTE } from './dover-route.js';
+import { doverLeg } from './dover-guide.js';
+import { DOVER, RELIC, hasGrail } from './dover-location.js';
 import { COURSES } from './courses.js';
 import { fillIcons, icon } from './icons.js';
 import {
@@ -9,9 +12,11 @@ import {
   drawMap,
   fieldData,
   regionData,
+  loadMapImage,
   formatTime,
 } from './field.js';
 import { isMuted, toggleAudio, wakeAudio } from './audio.js';
+const destinations = [...TRAVEL, DOVER];
 const $ = (q) => document.querySelector(q),
   panel = $('#panel'),
   content = $('#panel-content');
@@ -175,6 +180,8 @@ function guide(tab = 'dishes') {
         ['Aim and cast', 'Drag Cast, then release'],
         ['Flap jump', 'Tap Flap'],
         ['Find next dish', 'Tap the compass'],
+        ['Camera view', 'Tap the camera button'],
+        ['Use door or display', 'Tap the prompt'],
         ['Hunt map', 'Tap the minimap'],
         ['Pause', 'Tap pause'],
       ]
@@ -185,6 +192,8 @@ function guide(tab = 'dishes') {
         ['Sprint', 'Shift'],
         ['Flap jump', 'Space'],
         ['Find next dish', 'H'],
+        ['Camera view', 'V'],
+        ['Use door or display', 'G'],
         ['Hunt map', 'M'],
         ['Pause', 'Esc / P'],
       ];
@@ -216,7 +225,15 @@ function guide(tab = 'dishes') {
       (isControls
         ? controls +
           '<div class="field-note"><strong>Food fight rules</strong><p>Captures can give 20 seconds of buttered boots or four long-range, wide casts from the wishbone slinger. Both equip automatically. Walk into a green gravy boat for up to 35 health. If a sprout starts tooting, move.</p></div>'
-        : '<div class="targets">' + list + '</div>') +
+        : '<div class="targets">' +
+          list +
+          '</div><div class="field-note"><strong>' +
+          (hasGrail() ? 'Collected · ' + RELIC : 'Rare find · Dover Street') +
+          '</strong><p>' +
+          (hasGrail()
+            ? 'One of one. Your turkey found the prize in the Hall of Gravy.'
+            : 'The last course reveals a trail to 735 Dover St. You can also visit the cottage from the Greater Broomfield map.') +
+          '</p></div>') +
       '<div class="panel-actions">' +
       (game?.active
         ? button('Back to hunt', 'resume', true, 'focus')
@@ -252,16 +269,18 @@ async function map(level) {
     '</div>';
   let acts = '';
   if (city) {
-    const options = TRAVEL.map(
-      (t, i) =>
-        '<option value="' +
-        i +
-        '" ' +
-        (i === selectedSpot ? 'selected' : '') +
-        '>' +
-        t.name +
-        '</option>'
-    ).join('');
+    const options = destinations
+      .map(
+        (t, i) =>
+          '<option value="' +
+          i +
+          '" ' +
+          (i === selectedSpot ? 'selected' : '') +
+          '>' +
+          t.name +
+          '</option>'
+      )
+      .join('');
     if (!active || game.mode === 'roam' || game.mode === 'city')
       acts =
         '<label class="travel-label">TRAVEL DESTINATION<select id="travel-spot">' +
@@ -294,7 +313,7 @@ async function map(level) {
         : '<span><b></b> Runaway dish</span>') +
       '</div><p class="panel-text">' +
       (city
-        ? 'Each of the six Broomfield landmarks has a side dish and a dessert.' +
+        ? 'Each of the six hunt stops has a side dish and a dessert. Visit 735 Dover St for the rare find.' +
           (best('city')
             ? ' Your best city run is ' + formatTime(best('city')) + '.'
             : '')
@@ -310,6 +329,7 @@ async function map(level) {
     });
   try {
     const d = city ? await regionData() : await fieldData();
+    await loadMapImage(d);
     if (!canvas.isConnected) return;
     const targets = active
       ? game.targets
@@ -317,9 +337,9 @@ async function map(level) {
         ? DISHES.map((d) => dishSpawn(d, 'city'))
         : DISHES;
     const player = active
-      ? game.camera.position
+      ? game.mapPosition
       : city
-        ? TRAVEL[selectedSpot]
+        ? destinations[selectedSpot]
         : SPAWN;
     const centerX = city ? -1240 : 16,
       centerZ = city ? -1100 : -5;
@@ -336,13 +356,13 @@ async function map(level) {
       yaw: active ? game.yaw : Math.PI / 2,
       targets: active && game.mode === 'roam' ? [] : targets,
       labels: true,
-      places: city ? TRAVEL : [],
+      places: city ? destinations : [],
       pickups: active ? game.fight.pickups : [],
     };
     const render = () =>
       drawMap(canvas, d, {
         ...settings,
-        player: active || !city ? player : TRAVEL[selectedSpot],
+        player: active || !city ? player : destinations[selectedSpot],
         selected: city ? selectedSpot : -1,
       });
     render();
@@ -358,7 +378,7 @@ async function map(level) {
           centerZ;
         let nearest = -1,
           closest = (width / rect.width) * 22;
-        TRAVEL.forEach((spot, i) => {
+        destinations.forEach((spot, i) => {
           const distance = Math.hypot(x - spot.x, z - spot.z);
           if (distance < closest) {
             nearest = i;
@@ -386,7 +406,7 @@ function credits() {
   show(
     'credits',
     heading('FIELD ARCHIVE', 'Map & photo credits') +
-      '<div class="credits"><h3>Broomfield geography</h3><p>Buildings, streets, paths, landmarks, and surveyed trees come from the City and County of Broomfield. Ground photography and regional elevation come from USGS and USDA. Building heights and façades are approximations. ' +
+      '<div class="credits"><h3>Broomfield geography</h3><p>Buildings, streets, paths, landmarks, and surveyed trees come from the City and County of Broomfield. USGS elevation follows the local slopes. USGS lidar supplies many roof and tree heights, with estimates elsewhere. Building façades and the Dover cottage interior are game artwork. ' +
       links('/geo/sources.json', 'Map sources and coverage') +
       '</p><h3>Cover photography</h3><p>Wild turkey by Frank Schulenburg, Flatirons by Kpsudeep, and Rocky Flats prairie by Zach Schiff / USFWS. The cropped and color-graded composite is licensed under ' +
       links('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0') +
@@ -394,6 +414,8 @@ function credits() {
       links('/cover/credits.json', 'Original photographs') +
       '. The first-person wing uses an adapted photograph by P. Hughes (CC BY-SA 4.0).</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
+      '. The western skyline uses USGS elevation and aerial imagery with illustrated November snow and emphasized distant relief. ' +
+      links('/scenery/peaks-credits.json', 'Front Range sources') +
       '</p></div>'
   );
 }
@@ -424,29 +446,63 @@ function pause() {
 function courseMap() {
   const course = game.course,
     origin = TRAVEL[course.stop],
-    p = game.camera.position;
+    p = game.mapPosition;
+  const finale = game.doverFinale;
+  const route = finale ? doverLeg(p, DOVER_ROUTE).points : [];
+  const bounds = [
+    p,
+    ...(finale
+      ? route
+      : [
+          origin,
+          ...game.targets.map((t) => t.model.position),
+          ...game.fight.pickups,
+        ]),
+  ];
+  const xs = bounds.map((v) => v.x),
+    zs = bounds.map((v) => v.z);
+  const left = Math.min(...xs),
+    right = Math.max(...xs),
+    top = Math.min(...zs),
+    bottom = Math.max(...zs);
   show(
     'map',
     heading(
       'COURSE ' + (game.level + 1) + ' OF ' + COURSES.length,
-      course.name
+      finale ? 'The Dover Street surprise' : course.name
     ) +
-      '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Map of the current course"></canvas><div class="map-key"><span><b class="start-marker"></b> You</span><span><b></b> Runaway dish</span><span class="gravy-key">✚ Emergency gravy</span></div><div class="panel-actions">' +
+      '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Map of the current course"></canvas>' +
+      '<div class="map-key"><span><b class="start-marker"></b> You</span>' +
+      (finale
+        ? '<span class="dover-key">★ Cottage · gold trail</span>'
+        : '<span><b></b> Runaway dish</span><span class="gravy-key">✚ Emergency gravy</span>') +
+      '</div>' +
+      (finale
+        ? '<p class="panel-text">Follow the trail from County Commons to 735 Dover St. Enter the cottage and inspect the display. The supper clock is held.</p>'
+        : '') +
+      '<div class="panel-actions">' +
       button('Return to field', 'resume', true, 'focus') +
+      (finale && !game.house.inside
+        ? button('Travel to Dover St', 'travel', false, 'map')
+        : '') +
       '</div>'
   );
   drawMap($('#zone-map'), game.regional ? game.region.data : game.data, {
-    x: origin.x,
-    z: origin.z,
+    x: (left + right) / 2,
+    z: (top + bottom) / 2,
     width: Math.max(
-      300,
-      Math.abs(p.x - origin.x) * 2.2,
-      Math.abs(p.z - origin.z) * 4.1
+      game.regional && !finale ? 610 : 255,
+      right - left + 75,
+      ((bottom - top + 64) * 660) / 356
     ),
     targets: game.targets,
-    pickups: game.fight.pickups,
+    pickups: finale ? [] : game.fight.pickups,
     player: p,
     yaw: game.yaw,
+    labels: true,
+    route,
+    destination: finale ? DOVER_ROUTE.at(-1) : null,
+    places: finale ? [DOVER] : [origin],
   });
 }
 function courseClear(bonus) {
@@ -523,9 +579,14 @@ function end({ won, time, shots, count, reason }) {
     ) +
       '<p class="panel-text">' +
       (won
-        ? record
-          ? 'The full Thanksgiving menu is at the table. New personal best!'
-          : 'The full Thanksgiving menu is at the table.'
+        ? game.doverFinale
+          ? 'You brought home the ' +
+            RELIC +
+            ' from 735 Dover St.' +
+            (record ? ' New personal best!' : '')
+          : record
+            ? 'The full Thanksgiving menu is at the table. New personal best!'
+            : 'The full Thanksgiving menu is at the table.'
         : reason === 'health'
           ? 'The side dishes won the food fight. Watch for the windup and grab an Emergency Gravy Boat when your health dips.'
           : 'Supper started with ' +
@@ -593,7 +654,9 @@ async function start(mode = 'campaign') {
     $('#arena').hidden = false;
     await game.reset(
       mode,
-      mode === 'hunt' || mode === 'campaign' ? SPAWN : TRAVEL[selectedSpot]
+      mode === 'hunt' || mode === 'campaign'
+        ? SPAWN
+        : destinations[selectedSpot]
     );
     loading = false;
     resume();
@@ -662,9 +725,13 @@ const actions = {
   pause,
   credits,
   travel: async () => {
-    if (loading || !game?.active || !['city', 'roam'].includes(game.mode))
+    if (
+      loading ||
+      !game?.active ||
+      (!game.doverFinale && !['city', 'roam'].includes(game.mode))
+    )
       return;
-    const spot = TRAVEL[selectedSpot];
+    const spot = game.doverFinale ? DOVER : destinations[selectedSpot];
     loading = true;
     show(
       'loading',
@@ -678,7 +745,7 @@ const actions = {
       resume();
       game.toast(spot.name);
     } catch {
-      game.region.update(game.camera.position.x, game.camera.position.z);
+      game.region.update(game.mapPosition.x, game.mapPosition.z);
       show(
         'travel-error',
         heading('HUNT MAP', 'Travel interrupted') +

@@ -1,4 +1,7 @@
 const shapes = {
+  camera:
+    '<path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="3.5"/>',
+  door: '<path d="M4 21h16M6 20V3h12v17M14 12h1"/>',
   share: '<path d="M12 15V3m-4 4 4-4 4 4M6 10H4v11h16V10h-2"/>',
   volume:
     '<path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',

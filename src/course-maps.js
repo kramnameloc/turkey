@@ -1,0 +1,116 @@
+import * as T from 'three';
+import { pavement } from './surfaces.js';
+import { bluePod } from './soccer.js';
+import { Obstacles, loadMapImage } from './field.js';
+
+function intersects(a, b) {
+  return (
+    a.maxX >= b.minX && a.minX <= b.maxX && a.maxZ >= b.minZ && a.minZ <= b.maxZ
+  );
+}
+function touchesSite(points, b) {
+  let x0 = Infinity,
+    x1 = -Infinity,
+    z0 = Infinity,
+    z1 = -Infinity;
+  for (const [x, z] of points) {
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+    z0 = Math.min(z0, z);
+    z1 = Math.max(z1, z);
+  }
+  return x0 < b.maxX && x1 > b.minX && z0 < b.maxZ && z1 > b.minZ;
+}
+export async function courseMaps(scene, world, region) {
+  const response = await fetch('/geo/courses/maps.json');
+  if (!response.ok) throw Error('Unable to load the regional course maps.');
+  const sites = await response.json();
+  region.data.detailMaps = sites;
+  for (const site of sites) {
+    site.orthophoto = { url: '/geo/courses/' + site.id + '.jpg' };
+    site.roads = region.data.roads.filter((r) =>
+      touchesSite(r.points, site.bounds)
+    );
+    site.trees = [];
+    site.buildings = [];
+  }
+  function detailsAt(x, z) {
+    const bounds = {
+      minX: x - 140,
+      maxX: x + 140,
+      minZ: z - 140,
+      maxZ: z + 140,
+    };
+    return sites.filter((site) => intersects(bounds, site.bounds));
+  }
+  const updateMapTiles = (site, tiles) => {
+    const fresh = tiles.filter((t) => !site.seen.has(t.url));
+    for (const tile of fresh) {
+      site.seen.add(tile.url);
+      site.buildings.push(
+        ...tile.buildings.filter((b) => touchesSite(b.points, site.bounds))
+      );
+      site.trees.push(
+        ...tile.trees.filter(
+          (t) =>
+            t.x >= site.bounds.minX &&
+            t.x <= site.bounds.maxX &&
+            t.z >= site.bounds.minZ &&
+            t.z <= site.bounds.maxZ
+        )
+      );
+    }
+    if (fresh.length) site.mapRevision = (site.mapRevision || 0) + 1;
+  };
+  for (const site of sites) site.seen = new Set();
+  async function prepare(x, z) {
+    const tiles = region.mapTiles();
+    await Promise.all(
+      detailsAt(x, z).map(async (site) => {
+        updateMapTiles(site, tiles);
+        if (site.mesh) return;
+        if (!site.pending)
+          site.pending = (async () => {
+            const image = await loadMapImage(site);
+            const texture = new T.Texture(image);
+            texture.colorSpace = T.SRGBColorSpace;
+            texture.anisotropy = 4;
+            texture.needsUpdate = true;
+            const material = new T.MeshBasicMaterial({
+              map: texture,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -1,
+            });
+            const mesh = new T.Group();
+            mesh.add(
+              new T.Mesh(world.groundPatch(site.bounds), material),
+              pavement(site.paths, world.terrain, true)
+            );
+            if (site.id === 'commons') {
+              const pitch = bluePod(site, world.height);
+              if (pitch) {
+                mesh.add(pitch.group);
+                site.markings = pitch.markings;
+                site.mapRevision = (site.mapRevision || 0) + 1;
+                site.solids = new Obstacles({
+                  buildings: pitch.barriers,
+                  water: [],
+                  bounds: site.bounds,
+                });
+              }
+            }
+            scene.add(mesh);
+            site.mesh = mesh;
+          })().finally(() => {
+            site.pending = null;
+          });
+        await site.pending;
+      })
+    );
+  }
+  return {
+    prepare,
+    blocked: (x, z) => sites.some((s) => s.solids?.occupied(x, z)),
+  };
+}

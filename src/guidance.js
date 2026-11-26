@@ -1,4 +1,6 @@
 import * as T from 'three';
+import { doverLeg } from './dover-guide.js';
+import { DOVER_ROUTE } from './dover-route.js';
 import { TRAVEL } from './field.js';
 import {
   clearTrail,
@@ -71,7 +73,11 @@ export class DishGuide {
     if (!this.manual) this.hide();
   }
   update(hunt, aimedTarget) {
-    if (hunt.mode === 'roam') {
+    if (hunt.trackingDover) {
+      this.trackDover(hunt);
+      return;
+    }
+    if (hunt.house.inside || hunt.mode === 'roam') {
       this.hide();
       return;
     }
@@ -90,7 +96,7 @@ export class DishGuide {
       if (seen || distance > 35) continue;
       this.view.copy(q);
       this.view.y += dish.model.userData.aimHeight;
-      this.view.project(hunt.camera);
+      this.view.project(hunt.viewCamera);
       if (
         this.view.z > 0 &&
         this.view.z < 1 &&
@@ -142,6 +148,36 @@ export class DishGuide {
       ? meters + ' · Map to ' + TRAVEL[nearest.stop].name
       : meters + (this.route.length ? ' · Follow arrows' : ' · Check hunt map');
     this.placeArrows(hunt, p, this.route);
+  }
+  trackDover(hunt) {
+    const p = hunt.camera.position,
+      inside = hunt.house.inside;
+    const leg = inside
+      ? { next: { x: 0, z: -1.45 }, distance: Math.hypot(p.x, p.z + 2.75) }
+      : doverLeg(p, DOVER_ROUTE);
+    if (hunt.elapsed >= this.nextRoute || inside !== this.wasInside) {
+      this.route = walkingTrail(p, leg.next, hunt.isBlocked);
+      this.nextRoute = hunt.elapsed + 0.85;
+      this.wasInside = inside;
+    }
+    while (
+      this.route.length > 1 &&
+      Math.hypot(this.route[0].x - p.x, this.route[0].z - p.z) < 2
+    )
+      this.route.shift();
+    const bearing = relativeBearing(p, this.route[0] || leg.next, hunt.yaw);
+    this.panel.hidden = false;
+    this.name.textContent = inside ? 'The display pedestal' : '735 Dover St';
+    this.detail.textContent = inside
+      ? 'Inspect the prize'
+      : leg.distance < 4
+        ? 'Use the cottage door'
+        : (leg.distance > 999
+            ? (leg.distance / 1000).toFixed(1) + ' km'
+            : Math.round(leg.distance) + ' m') + ' · Follow the gold trail';
+    this.needle.style.transform = 'rotate(' + bearing + 'rad)';
+    if (inside) this.arrows.count = 0;
+    else this.placeArrows(hunt, p, this.route);
   }
   placeArrows(hunt, player, route) {
     let from = player,
