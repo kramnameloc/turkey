@@ -41,72 +41,6 @@ function mountainGeometry(buffer) {
   return g;
 }
 
-// Reconstruct clear sky across the previous photographic horizon only in the
-// western sector. Above the ridges the same photographed sky blends back in.
-function horizon(scene) {
-  const positions = [], indices = [];
-  for (let i = 0; i <= 42; i++) {
-    const angle = (i / 42 - 0.5) * Math.PI;
-    for (const y of [-0.16, 0.30]) {
-      positions.push(-Math.cos(angle), y, Math.sin(angle));
-    }
-    if (i) indices.push(2*i-2, 2*i-1, 2*i, 2*i-1, 2*i+1, 2*i);
-  }
-  const g = new T.BufferGeometry();
-  g.setIndex(indices);
-  g.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
-  const m = new T.ShaderMaterial({
-    name: 'Western horizon sky',
-    uniforms: {
-      panorama: { value: scene.background },
-      skyIntensity: { value: 1 },
-      horizonTint: { value: new T.Color('#c1c3c4') },
-    },
-    vertexShader: `
-      varying vec3 direction;
-      void main() {
-        direction = position;
-        gl_Position = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0);
-        gl_Position.z = gl_Position.w;
-      }`,
-    fragmentShader: `
-      #include <common>
-      uniform sampler2D panorama;
-      uniform float skyIntensity;
-      uniform vec3 horizonTint;
-      varying vec3 direction;
-      vec3 sampleSky(vec2 uv) {
-        // atan wraps from 1 to 0 at due west. Repair the derivative used
-        // for mip selection across that seam so it does not draw a line.
-        vec2 dx = dFdx(uv), dy = dFdy(uv);
-        dx.x -= round(dx.x);
-        dy.x -= round(dy.x);
-        return textureGrad(panorama, uv, dx, dy).rgb;
-      }
-      void main() {
-        vec3 d = normalize(direction);
-        vec2 uv = equirectUv(d);
-        vec3 sky = sampleSky(uv);
-        vec3 clearSky = sampleSky(vec2(uv.x, max(uv.y, 0.568)));
-        clearSky = mix(clearSky, horizonTint, 0.50 * (1.0 - smoothstep(-0.02, 0.20, d.y)));
-        float west = smoothstep(0.025, 0.35, -d.x);
-        float band = smoothstep(-0.14, -0.03, d.y) * (1.0 - smoothstep(0.15, 0.245, d.y));
-        gl_FragColor = vec4(mix(sky, clearSky, west * band) * skyIntensity, 1.0);
-        #include <colorspace_fragment>
-      }`,
-    side: T.DoubleSide,
-    depthWrite: false,
-    depthTest: false,
-    fog: false,
-  });
-  const strip = new T.Mesh(g, m);
-  strip.name = 'Clear sky over the Front Range';
-  strip.frustumCulled = false;
-  strip.renderOrder = -10001;
-  strip.onBeforeRender = () => { m.uniforms.skyIntensity.value = scene.backgroundIntensity; };
-  return strip;
-}
-
 let assets;
 function peakAssets() {
   assets ??= Promise.all([
@@ -202,7 +136,6 @@ export async function addPeaks(scene, viewpoint = new T.Vector3()) {
     range.geometry.setDrawRange(0, eastward ? 0 : triangleIndices);
     m.uniforms.weather.value = T.MathUtils.clamp((clearIntensity - scene.backgroundIntensity) / 0.13, 0, 1);
   };
-  // The background and these two draws precede every local opaque object.
   range.onAfterRender = (renderer) => renderer.clearDepth();
-  scene.add(horizon(scene), range);
+  scene.add(range);
 }

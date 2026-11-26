@@ -3,6 +3,7 @@ import { addRegion, buildWorld } from './world.js';
 import { courseMaps } from './course-maps.js';
 import { streetLocator } from './street-location.js';
 import { DOVER_ROUTE } from './dover-route.js';
+import { loadCourseSky } from './course-sky.js';
 import { loadVenue, lightDoverPorch } from './trip-venue.js';
 import { doverCorners } from './parade-route.js';
 import { doverLeg } from './dover-guide.js';
@@ -175,8 +176,14 @@ export class Hunt {
     this.parkStreetAt = streetLocator(data);
     this.tool.add(wing);
     this.world = await buildWorld(this.scene, this.data);
-    await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
     this.daySky = this.scene.background;
+    [this.sky] = await Promise.all([
+      loadCourseSky(this.daySky),
+      addPeaks(this.scene),
+      loadMapImage(this.data),
+    ]);
+    this.scene.background = null;
+    this.sky.show(this.scene, 'park');
     this.groundShadow = shadowTexture();
     const shade = new T.MeshBasicMaterial({
       map: this.groundShadow,
@@ -187,7 +194,7 @@ export class Hunt {
     shadowPlane.rotateX(-Math.PI / 2);
     this.weather = new Flurries(this.scene);
     this.allTargets = DISHES.map((d, i) => {
-      const model = foodModel(d.id, this.scene.background),
+      const model = foodModel(d.id, this.daySky),
         shadow = new T.Mesh(shadowPlane, shade);
       this.scene.add(model, shadow);
       return {
@@ -338,6 +345,7 @@ export class Hunt {
         this.useVenue(null);
         this.arrivalAtDover = true;
         this.restoreDaylight = lightDoverPorch(this.scene, this.ground);
+        this.sky.show(this.scene, 'night');
         this.arrive({ x: 1160, z: -1015 });
         this.yaw = Math.atan2(
           this.camera.position.x - PORCH.x,
@@ -522,6 +530,8 @@ export class Hunt {
     this.restoreDaylight?.();
     this.restoreDaylight = null;
     this.useVenue(venue);
+    const sky = campaign ? course.sky : this.mode === 'parade' ? 'parade' : 'park';
+    this.sky.show(venue?.scene ?? this.scene, sky);
     this.level = level;
     this.arrivalAtDover = false;
     this.pendingDestination = null;
@@ -1039,6 +1049,7 @@ export class Hunt {
     this.viewportObserver?.disconnect();
     this.renderer.setAnimationLoop(null);
     this.weather?.dispose();
+    this.sky?.dispose();
     this.healthBars.dispose();
     this.fight.dispose();
     this.renderer.dispose();
@@ -1583,7 +1594,10 @@ export class Hunt {
       this.weather.setSnowing(rollSnow());
       this.weatherAt = this.elapsed + 50 + Math.random() * 45;
     }
-    if (!this.house.inside) this.weather.update(dt, this.viewCamera);
+    if (!this.house.inside) {
+      this.weather.update(dt, this.viewCamera);
+      this.sky.update(this.elapsed, this.weather.snowing);
+    }
     if (
       !this.house.inside &&
       this.regional &&

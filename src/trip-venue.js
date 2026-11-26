@@ -1,40 +1,8 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Obstacles, treeShape, randomSeed } from './field.js';
+import { Obstacles, treeShape } from './field.js';
 import { PORCH, PORCH_LANTERN } from './dover-location.js';
 import { addPeaks } from './peaks.js';
-
-let nightPanorama;
-function eveningSky() {
-  if (nightPanorama) return nightPanorama;
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 512;
-  const c = canvas.getContext('2d');
-  const dusk = c.createLinearGradient(0, 0, 0, 310);
-  dusk.addColorStop(0, '#090e22');
-  dusk.addColorStop(0.68, '#1e304e');
-  dusk.addColorStop(0.86, '#46506a');
-  dusk.addColorStop(1, '#222b42');
-  c.fillStyle = dusk;
-  c.fillRect(0, 0, 1024, 512);
-  const random = randomSeed(735);
-  for (let i = 0; i < 700; i++) {
-    const x = random() * 1024,
-      y = random() * 237;
-    c.fillStyle =
-      'rgba(222,231,252,' + (0.22 + 0.62 * random()) * (1 - y / 290) + ')';
-    c.fillRect(x, y, 1.2, 1.2);
-  }
-  c.fillStyle = '#ece8cf';
-  c.beginPath();
-  c.arc(862, 183, 5, 0, Math.PI * 2);
-  c.fill();
-  nightPanorama = new T.CanvasTexture(canvas);
-  nightPanorama.mapping = T.EquirectangularReflectionMapping;
-  nightPanorama.colorSpace = T.SRGBColorSpace;
-  return nightPanorama;
-}
 
 function poolSteam() {
   const canvas = document.createElement('canvas');
@@ -98,31 +66,23 @@ function venueTrees(sites, library) {
 }
 
 export async function loadVenue(id, world, sky) {
-  const { scene: model } = await new GLTFLoader().loadAsync(
-    '/models/trip-' + id + '.glb'
-  );
-  const { plan: data, furniture = [] } = model.children[0].userData;
-  data.id = id;
-  const scene = new T.Scene();
   const ice = id === 'ice',
     airport = id === 'airport';
-  scene.background = ice
-    ? new T.Color('#15172d')
-    : airport
-      ? eveningSky()
-      : sky;
+  const scene = new T.Scene();
+  if (ice) scene.background = new T.Color('#15172d');
   scene.fog = new T.FogExp2(
-    ice ? '#393654' : airport ? '#273449' : '#bbcccb',
+    ice ? '#393654' : airport ? '#786f80' : '#bbcccb',
     ice ? 0.012 : 0.008
   );
-  scene.add(
-    model,
-    new T.HemisphereLight(ice ? '#c5eaff' : '#fff1da', '#958782', 1.6)
-  );
+  const ambient = new T.HemisphereLight(ice ? '#c5eaff' : '#fff1da', '#958782', 1.6);
   const light = new T.DirectionalLight(
-    ice ? '#b5a2ff' : airport ? '#cdddfc' : '#ffdeac',
+    ice ? '#b5a2ff' : '#ffdeac',
     1.9
   );
+  const { scene: model } = await new GLTFLoader().loadAsync('/models/trip-' + id + '.glb');
+  const { plan: data, furniture = [] } = model.children[0].userData;
+  data.id = id;
+  scene.add(model, ambient);
   light.position.set(-18, 30, 14);
   if (!ice) {
     light.castShadow = true;
@@ -164,8 +124,10 @@ export async function loadVenue(id, world, sky) {
       mat.name.endsWith(' ice blocks')
     ) {
       mat.roughness = 0.18;
-      mat.envMap = sky;
-      mat.envMapIntensity = ice ? 0.42 : 0.7;
+      if (!ice) {
+        mat.envMap = sky;
+        mat.envMapIntensity = 0.7;
+      }
     }
     if (mat.name === 'Greenhouse' || mat.name === 'Teahouse glass') {
       mat.transparent = true;
@@ -231,19 +193,9 @@ export async function loadVenue(id, world, sky) {
 
 // Keep the regional ground photography and buildings in place for the late arrival.
 export function lightDoverPorch(scene, height) {
-  const previousFog = scene.fog,
-    previousSky = scene.background;
-  const skyline = [
-    'Colorado Front Range',
-    'Clear sky over the Front Range',
-  ].map((name) => scene.getObjectByName(name));
-  const lights = scene.children.filter(
-    (m) => m.isDirectionalLight || m.isHemisphereLight
-  );
-  const daylight = lights.map((m) => m.intensity);
-  for (const obj of skyline) obj.visible = false;
-  for (const light of lights) light.intensity *= 0.3;
-  scene.background = eveningSky();
+  const previousFog = scene.fog;
+  const peaks = scene.getObjectByName('Colorado Front Range');
+  peaks.visible = false;
   scene.fog = new T.Fog('#15223c', -13, 67);
   const lamp = new T.PointLight('#ffc577', 24, 21);
   lamp.position.set(
@@ -255,11 +207,7 @@ export function lightDoverPorch(scene, height) {
   return () => {
     lamp.removeFromParent();
     lamp.dispose();
-    scene.background = previousSky;
     scene.fog = previousFog;
-    lights.forEach((m, i) => {
-      m.intensity = daylight[i];
-    });
-    for (const obj of skyline) obj.visible = true;
+    peaks.visible = true;
   };
 }

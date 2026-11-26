@@ -5,6 +5,7 @@ export const COURSES = [
   {
     venue: 'airport',
     name: 'Denver airport to Dover',
+    sky: 'airport',
     menu: 'Arrive at Jeppesen Terminal. Catch the dishes, board the shuttle and reach 735 Dover St after dark.',
     spawn: { x: 0, z: 21 },
     yaw: 0.64,
@@ -45,6 +46,7 @@ export const COURSES = [
   },
   {
     name: 'Around 735 Dover St',
+    sky: 'morning',
     menu: 'Search the driveways and the turning circle on Dover Street.',
     spawn: DOVER,
     hunts: [
@@ -77,6 +79,7 @@ export const COURSES = [
   },
   {
     name: 'Thanksgiving on Dover',
+    sky: 'parade',
     menu: 'Catch Thanksgiving dinner while the balloon crews march past 735 Dover St.',
     spawn: { x: 1148, z: -984 },
     yaw: -0.91,
@@ -113,6 +116,7 @@ export const COURSES = [
   {
     venue: 'ice',
     name: 'Black Friday at Gaylord Rockies',
+    sky: 'indoor',
     menu: 'Hunt inside ICE! featuring The Nightmare Before Christmas, from Halloween Town to Christmas Town.',
     spawn: { x: 0, z: 22 },
     hunts: [
@@ -146,6 +150,7 @@ export const COURSES = [
   {
     venue: 'springs',
     name: 'Indian Hot Springs',
+    sky: 'springs',
     menu: 'Follow the steam through the mineral pool gardens in Idaho Springs.',
     spawn: { x: 2, z: 2 },
     yaw: 0.16,
@@ -181,6 +186,7 @@ export const COURSES = [
   {
     venue: 'pearl',
     name: 'Pearl Street & the teahouse',
+    sky: 'pearl',
     menu: 'Hunt the Pearl Street shops and courthouse lawn. Follow 13th Street south to the rose garden and meet for tea beside the fountain.',
     spawn: { x: -37, z: 0 },
     yaw: -Math.PI / 2,

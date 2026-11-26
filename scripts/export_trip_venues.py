@@ -350,6 +350,8 @@ def arrivals_drive(s):
 
 
 def airport():
+    from airport_airfield import airfield, pickup_curb, twilight
+
     s = Venue("airport", (-13, 16, -30, 27))
     s.paint("Road", "street-asphalt.webp")
     s.paint("Paving", "street-concrete.webp", ("#414957", "#b4b9c0"))
@@ -358,6 +360,9 @@ def airport():
         s.extras["furniture"].append(["Bench", -11.7, z, pi / 2])
         s.barrier(-11.7, z, 0.9, 2)
     arrivals_drive(s)
+    airfield(s)
+    pickup_curb(s)
+    twilight(PUBLIC / "scenery")
     s.pad("Paving", -3, 0, 22, 62, 0.015)
     s.way([[0, 24], [0, -20], [7.6, -19]], 6)
     # West terminal curtain wall, a bank of sliding doors and scalloped tent bays.
