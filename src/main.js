@@ -412,7 +412,7 @@ function credits() {
       links('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0') +
       '. ' +
       links('/cover/credits.json', 'Original photographs') +
-      '. The first-person wing uses an adapted photograph by P. Hughes (CC BY-SA 4.0).</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
+      '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
       '. The western skyline uses USGS elevation and aerial imagery with illustrated November snow and emphasized distant relief. ' +
       links('/scenery/peaks-credits.json', 'Front Range sources') +
@@ -671,7 +671,7 @@ async function start(mode = 'campaign') {
         '<p class="panel-text">' +
         (/WebGL|context/i.test(error.message)
           ? 'The field needs WebGL 2. Enable graphics acceleration in your browser and try again.'
-          : 'A map or photograph could not load. Check your connection to the game and retry.') +
+          : 'A game asset could not load. Check your connection and retry.') +
         '</p><div class="panel-actions">' +
         button('Retry', startAction(mode), true) +
         button('Back to lobby', 'home') +

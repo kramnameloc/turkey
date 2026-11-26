@@ -1110,18 +1110,6 @@ body.touch-mode .touch {
   }
 }
 
-#wing {
-  position: absolute;
-  right: -5.5vw;
-  bottom: -5.2vw;
-  width: 36vw;
-  min-width: 190px;
-  max-width: 720px;
-  height: auto;
-  pointer-events: none;
-  transform-origin: bottom right;
-  filter: brightness(0.92) saturate(0.87);
-}
 #progress-pips {
   display: flex;
   gap: 3px;
@@ -1146,13 +1134,6 @@ body.touch-mode .touch {
     #c2c2a6 0 1px,
     transparent 1px 11px
   );
-}
-@media (max-width: 620px) {
-  #wing {
-    width: 50vw;
-    right: -11vw;
-    bottom: -3vw;
-  }
 }
 
 .target-row {
@@ -1442,12 +1423,6 @@ body.touch-mode .touch {
   .touch-mode #notice {
     bottom: var(--thumb-bottom);
     max-width: 40%;
-  }
-  .touch-mode #wing {
-    width: clamp(135px, 26vw, 300px);
-    min-width: 0;
-    right: -3vw;
-    bottom: -2.5vw;
   }
   .touch-mode .hud-box {
     padding: 5px 10px;

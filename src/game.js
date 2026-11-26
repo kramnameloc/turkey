@@ -4,7 +4,7 @@ import { courseMaps } from './course-maps.js';
 import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
 import { ChaseView, TURKEY_EYE } from './view.js';
-import { createTurkeyAvatar, animateTurkeyAvatar } from './turkey-avatar.js';
+import { TurkeyAvatar } from './turkey-avatar.js';
 import { addPeaks } from './peaks.js';
 import { DoverCottage } from './dover.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
@@ -86,7 +86,7 @@ export class Hunt {
     this.camera = new T.PerspectiveCamera(63, 1, 0.045, 4100);
     this.camera.rotation.order = 'YXZ';
     this.chaseCamera = new ChaseView();
-    this.avatar = createTurkeyAvatar();
+    this.avatar = new TurkeyAvatar();
     this.scene.add(this.camera, this.avatar);
     this.house = new DoverCottage(this.scene);
     this.thirdPerson = false;
@@ -116,7 +116,6 @@ export class Hunt {
     this.netEnd = new T.Vector3();
     this.keys = new Set();
     this.joy = { x: 0, z: 0 };
-    this.wing = $('#wing');
     this.pips = DISHES.map(() => document.createElement('b'));
     $('#progress-pips').replaceChildren(...this.pips);
     this.guide = new DishGuide(this.scene);
@@ -129,7 +128,12 @@ export class Hunt {
     this.subscribed = false;
   }
   async init() {
-    this.data = await fieldData();
+    const [data, wing] = await Promise.all([
+      fieldData(),
+      this.avatar.load(this.standardTool.clone(), this.wideTool.clone()),
+    ]);
+    this.data = data;
+    this.tool.add(wing);
     this.world = await buildWorld(this.scene, this.data);
     await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
     const shade = new T.MeshBasicMaterial({
@@ -208,7 +212,6 @@ export class Hunt {
     $('#view-name').textContent = this.thirdPerson
       ? 'Chase cam'
       : 'First person';
-    this.wing.hidden = this.thirdPerson || this.house.inside;
     this.tool.visible = !this.thirdPerson && !this.house.inside;
     this.avatar.visible = this.thirdPerson;
   }
@@ -244,12 +247,7 @@ export class Hunt {
     this.avatar.visible = this.chaseCamera.distance > 0.9;
     this.avatar.position.set(p.x, this.height(p.x, p.z) + this.lift, p.z);
     this.avatar.rotation.y = this.yaw;
-    animateTurkeyAvatar(this.avatar, {
-      time: this.elapsed,
-      speed,
-      lift: this.lift,
-      cast: Math.max(0, this.netTime / 0.24),
-    });
+    this.avatar.animate(dt, speed, this.lift);
   }
   leaveCottage() {
     if (!this.house.inside) return;
@@ -770,6 +768,7 @@ export class Hunt {
     this.net.material.color.setHex(this.wideCast ? 0x8bffe0 : 0xffdc91);
     this.cooldown = this.wideCast ? 0.3 : 0.58;
     this.netTime = 0.24;
+    if (this.thirdPerson) this.avatar.cast();
     this.viewCamera.getWorldDirection(direction);
     this.netStart.set(0.19, -0.15, -0.63).applyMatrix4(this.camera.matrixWorld);
     this.netEnd.copy(this.viewCamera.position).addScaledVector(direction, 28);
@@ -872,6 +871,7 @@ export class Hunt {
     });
     this.standardTool.visible = !this.fight.wide;
     this.wideTool.visible = !!this.fight.wide;
+    this.avatar.showWishbone(!!this.fight.wide);
     $('#gear-name').textContent = this.fight.wide
       ? 'Wishbone slinger'
       : 'Net caster';
@@ -1065,12 +1065,6 @@ export class Hunt {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.tool.position.y = -0.29 + Math.sin(this.steps) * 0.009;
     this.tool.position.z = -0.46 + Math.pow(this.cooldown / 0.58, 3) * 0.105;
-    this.wing.style.transform =
-      'translateY(' +
-      (-Math.sin(this.steps) * 4 + this.cooldown * 10 - this.lift * 3) +
-      'px) rotate(' +
-      -this.lift * 2 +
-      'deg)';
     if (this.netTime > 0) {
       this.netTime -= dt;
       const progress = 1 - Math.max(0, this.netTime) / 0.24;

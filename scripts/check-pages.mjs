@@ -83,11 +83,35 @@ assert.equal(badge.toString('ascii', 1, 4), 'PNG');
 assert.equal(badge.readUInt32BE(16), 180);
 assert.equal(badge.readUInt32BE(20), 180);
 assert.equal(dish.toString('ascii', 8, 12), 'WEBP');
-const [maps, mountains, dem] = await Promise.all([
+const [maps, mountains, dem, turkey] = await Promise.all([
   asset('/geo/courses/maps.json', /json/),
   asset('/scenery/front-range.webp', /image\/webp/),
   asset('/geo/park-elevation.json', /json/),
+  asset(
+    '/models/bourbon-red.glb',
+    /model\/gltf-binary|application\/octet-stream/
+  ),
 ]);
+// This model is required before a hunt starts. Check that the release contains
+// the rig, both player views, the texture, and every action the mixer expects.
+assert.equal(turkey.toString('ascii', 0, 4), 'glTF');
+assert.equal(turkey.readUInt32LE(8), turkey.length);
+const gltf = JSON.parse(
+  turkey.toString('utf8', 20, 20 + turkey.readUInt32LE(12))
+);
+assert.ok(gltf.skins[0].joints.length);
+assert.ok(gltf.nodes.some((n) => n.name === 'FirstPersonWing'));
+assert.deepEqual(gltf.animations.map((a) => a.name).sort(), [
+  'Attack',
+  'Jump',
+  'Run',
+  'Stand',
+  'Walk',
+]);
+const baseColor = gltf.materials[0].pbrMetallicRoughness.baseColorTexture.index;
+assert.ok(
+  Number.isInteger(gltf.images[gltf.textures[baseColor].source].bufferView)
+);
 const sites = JSON.parse(maps);
 assert.equal(sites.length, 6);
 for (const site of sites)

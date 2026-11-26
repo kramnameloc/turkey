@@ -1,6 +1,6 @@
 # Turkey Takeover
 
-Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set in Broomfield, Colorado. Play as a wild turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
+Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set in Broomfield, Colorado. Play as a Bourbon Red turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
 
 ## Play locally
 
@@ -50,7 +50,7 @@ The arrow keys also move forward/back and turn. Q and E tilt the view. Pausing o
 The detailed park map spans 1.36 × 1.36 km. The regional map spans 19.2 × 19.2 km around Broomfield, including surrounding communities. Building footprints, streets, paths, trees, and landmarks come from city GIS. USGS/USDA aerial photography covers the ground and rooftops. USGS elevation sampled on a 10-meter grid covers Community Park, Brunner Farmhouse, County Commons and the Dover area, transitioning to 150-meter regional coverage. Roof and tree heights use 2020 USGS lidar where supported. Other buildings and trees use estimates. Six neighborhood maps combine detailed aerial imagery, surveyed trails, streets, named amenities, building footprints and tree locations. The same aerials and trails appear underfoot. The portable soccer goals represent the Commons Blue Pod playing fields. The Dover cottage has an original game interior.
 
 
-The western mountain skyline uses a separate USGS elevation mesh, aerial imagery, seasonal snow artwork and emphasized distant relief. See the [Front Range sources](public/scenery/peaks-credits.json). The title and sky composites include a photograph of the Flatirons taken from Broomfield. Photography credits, licenses, source links, and modifications are available through **Map & photo credits** in the game and in the [map sources](public/geo/sources.json), [cover and wing credits](public/cover/credits.json), and [scenery credits](public/scenery/sources.json).
+The western mountain skyline uses a separate USGS elevation mesh, aerial imagery, seasonal snow artwork and emphasized distant relief. See the [Front Range sources](public/scenery/peaks-credits.json). The title and sky composites include a photograph of the Flatirons taken from Broomfield. Photography credits, licenses, source links, and modifications are available through **Map & photo credits** in the game and in the [map sources](public/geo/sources.json), [cover photography credits](public/cover/credits.json), and [scenery credits](public/scenery/sources.json).
 
 ## Build
 
@@ -60,7 +60,7 @@ npm run build
 npm run preview
 ```
 
-The production build is written to `dist/`. The included Python scripts regenerate the bundled geography when refreshed source data is needed. The regional exporter requires Pillow.
+The production build is written to `dist/`. The player model and its embedded color map are bundled in `public/models/bourbon-red.glb`. To regenerate them from the supplied FBX and PNG in `download-models/A_Turkey_BourbonRed/`, run `blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/export_turkey.py`. The included Python scripts regenerate the bundled geography when refreshed source data is needed. The regional exporter requires Pillow.
 
 ## GitHub Pages
 
