@@ -163,7 +163,12 @@ def export(cache):
             if max(2.0, lower) <= h < upper:
                 tree['surveyHeight'] = round(float(h), 1)
                 stats['trees'] += 1
+    from dover_block import measure_roofs
+    dover = points[(points[:,0] > 1110) & (points[:,0] < 1220) &
+                   (points[:,1] > -1150) & (points[:,1] < -875)]
     for p, data in docs.items():
+        if p.name in ('8-11.json', '8-12.json'):
+            measure_roofs(data['buildings'], dover)
         output = json.dumps(data, separators=(',', ':')) + '\n'
         if output != p.read_text():
             p.write_text(output)

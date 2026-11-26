@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { addRegion, buildWorld } from './world.js';
 import { courseMaps } from './course-maps.js';
+import { streetLocator } from './street-location.js';
 import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
 import { ChaseView, TURKEY_EYE } from './view.js';
@@ -75,6 +76,8 @@ export class Hunt {
     this.events = events;
     this.timerEnabled = true;
     this.canvas = $('#scene');
+    this.streetLabel = $('#current-street');
+    this.streetText = this.streetLabel.querySelector('span');
     this.scene = new T.Scene();
     this.renderer = new T.WebGLRenderer({
       canvas: this.canvas,
@@ -146,6 +149,7 @@ export class Hunt {
       this.avatar.load(this.standardTool.clone(), this.wideTool.clone()),
     ]);
     this.data = data;
+    this.parkStreetAt = streetLocator(data);
     this.tool.add(wing);
     this.world = await buildWorld(this.scene, this.data);
     await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
@@ -193,6 +197,7 @@ export class Hunt {
         courseMaps(this.scene, this.world, this.region),
         loadMapImage(this.region.data),
       ]);
+      this.regionStreetAt = streetLocator(this.region.data);
       return this.region;
     })().catch((e) => {
       this.regionRequest = null;
@@ -622,8 +627,7 @@ export class Hunt {
     return (
       this.world.solids.occupied(x, z) ||
       this.region.blocked(x, z) ||
-      this.maps.blocked(x, z) ||
-      this.house.hitsPorchPost(x, z)
+      this.maps.blocked(x, z)
     );
   }
   look(dx, dy) {
@@ -1117,6 +1121,21 @@ export class Hunt {
       String(Math.round(bearing) % 360).padStart(3, '0') +
       '°';
     const p = this.camera.position;
+    const bounds = this.data.bounds;
+    const inPark =
+      p.x >= bounds.minX &&
+      p.x <= bounds.maxX &&
+      p.z >= bounds.minZ &&
+      p.z <= bounds.maxZ;
+    const streetAt =
+      this.regional && !inPark ? this.regionStreetAt : this.parkStreetAt;
+    const street = this.house.inside
+      ? ''
+      : streetAt(p.x, p.z, this.streetText.textContent);
+    if (this.streetText.textContent !== street) {
+      this.streetText.textContent = street;
+      this.streetLabel.hidden = !street;
+    }
     const prompt = this.house.prompt(p, this.doverFinale);
     $('#interact').hidden = !prompt;
     $('#interact-name').textContent = prompt;

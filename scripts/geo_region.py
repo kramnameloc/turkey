@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 
 from PIL import Image
+from dover_block import adjust_roads, dress_tile
 from geo_export import BASE, CITY, USGS, BUILDING_HEIGHTS, TREE_HEIGHTS, ROAD_WIDTHS, get_bytes, local, mx, my, scale, clip_line, clip_ring
 
 MIN_X, MAX_X, MIN_Z, MAX_Z = -8600, 10600, -15400, 3800
@@ -176,6 +177,7 @@ def regional_roads(features):
                 if attrs.get('ONE_WAY') in ('FT', 'TF'):
                     road['oneWay'] = True
                 roads.append(road)
+    adjust_roads(roads)
     return roads
 
 
@@ -212,6 +214,8 @@ def convert(cache):
     for (col, row), data in sorted(tiles.items()):
         x, z = MIN_X + col*TILE, MIN_Z + row*TILE
         name = f'{col}-{row}.json'
+        if (col, row) in ((8,11),(8,12)):
+            dress_tile(data, dict(minX=x,maxX=x+TILE,minZ=z,maxZ=z+TILE))
         save(tile_dir / name, data)
         region['tiles'].append({'bounds':{'minX':x, 'maxX':x+TILE, 'minZ':z, 'maxZ':z+TILE}, 'url':'/geo/region/'+name})
     save(BASE/'region.json', region)

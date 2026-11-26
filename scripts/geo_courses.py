@@ -3,6 +3,7 @@ import concurrent.futures
 import json
 from pathlib import Path
 
+from dover_block import course_paths, TURN
 from geo_export import BASE, CITY, USGS, PATH_WIDTHS, clip_line, get_bytes, local, mx, my, scale
 
 SITES = [
@@ -11,14 +12,23 @@ SITES = [
 ]
 OUT = BASE / 'courses'
 
-def export_site(site):
-    name, x, z = site
-    left, right, top, bottom = x - 360, x + 360, z - 360, z + 360
-    bbox = ','.join(str(v) for v in (mx + left/scale, my - bottom/scale, mx + right/scale, my - top/scale))
+def export_imagery(name, bbox):
     image = get_bytes(USGS + '/export', dict(bbox=bbox, bboxSR=3857, imageSR=3857,
                       size='1024,1024', format='jpg', f='image'))
     if image[:2] != b'\xff\xd8':
         raise ValueError('Missing orthophoto for ' + name)
+    (OUT / (name + '.jpg')).write_bytes(image)
+
+
+def export_site(site):
+    name, x, z = site
+    left, right, top, bottom = x - 360, x + 360, z - 360, z + 360
+    bbox = ','.join(str(v) for v in (mx + left/scale, my - bottom/scale, mx + right/scale, my - top/scale))
+    if name == 'dover':
+        from geo_dover import export
+        export(dict(minX=left, maxX=right, minZ=top, maxZ=bottom))
+    else:
+        export_imagery(name, bbox)
     attrs = 'STATUS,TRAIL_TYPE,WIDTH,SITE_NAME,ALTERNATE_NAME'
     query = dict(f='json', where="STATUS='EXISTING'", geometry=bbox,
                  geometryType='esriGeometryEnvelope', inSR=3857, outSR=3857,
@@ -43,8 +53,12 @@ def export_site(site):
         px, pz = local((geometry['x'], geometry['y']))
         if a['SPECIFIC_NAME'] and left < px < right and top < pz < bottom:
             landmarks.append(dict(x=px,z=pz,type=a['AMENITY_TYPE'],name=a['SPECIFIC_NAME']))
-    (OUT / (name + '.jpg')).write_bytes(image)
-    return dict(id=name, bounds=dict(minX=left,maxX=right,minZ=top,maxZ=bottom), paths=paths, landmarks=landmarks)
+    site = dict(id=name, bounds=dict(minX=left,maxX=right,minZ=top,maxZ=bottom), paths=paths, landmarks=landmarks)
+
+    if name == 'dover':
+        site['paths'].extend(course_paths())
+        site['turningHead'] = TURN
+    return site
 
 if __name__ == '__main__':
     OUT.mkdir(parents=True, exist_ok=True)

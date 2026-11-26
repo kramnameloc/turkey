@@ -221,6 +221,92 @@ function oakLibrary(scene) {
   return levels;
 }
 
+// Leaf-on crowns keep the oak model's trunk and outer branches. The smaller
+// interior sprays use leafy islands of the original atlas, folded about a midrib.
+function leafOnGeometry(base, detail, seed) {
+  const random = randomSeed(seed);
+  const positions = [],
+    normals = [],
+    colors = [],
+    uvs = [];
+  const lobes = Array.from({ length: 29 }, (_, i) => {
+    const angle = i * 2.39996,
+      tier = (i + 0.5) / 29;
+    const radius = 0.34 * Math.sqrt(1 - (tier * 2 - 1) ** 2);
+    return [
+      radius * Math.cos(angle),
+      0.34 + 0.55 * tier,
+      radius * Math.sin(angle),
+    ];
+  });
+  const stride = [1, 3, 9][detail],
+    scale = [1, 1.26, 1.83][detail];
+  for (let i = 0; i < 1050; i++) {
+    const center = lobes[i % lobes.length];
+    const azimuth = random() * TAU,
+      vertical = random() * 2 - 1;
+    const r = Math.cbrt(random()) * 0.18,
+      radial = Math.sqrt(1 - vertical * vertical);
+    const x = center[0] + Math.cos(azimuth) * radial * r;
+    const y = center[1] + vertical * r * 0.76;
+    const z = center[2] + Math.sin(azimuth) * radial * r;
+    const yaw = random() * TAU,
+      roll = (random() - 0.5) * 1.2;
+    const w = (0.083 + random() * 0.083) * scale,
+      h = w * (0.62 + random() * 0.19);
+    if (i % stride) continue;
+    const dx = Math.cos(yaw),
+      dz = Math.sin(yaw);
+    const light =
+      0.55 + 0.76 * y + 0.75 * Math.max(0, x - z) + 0.5 * radial * r;
+    for (const [u, v] of [
+      [0, 0],
+      [0.5, 0],
+      [0.5, 1],
+      [0, 0],
+      [0.5, 1],
+      [0, 1],
+      [0.5, 0],
+      [1, 0],
+      [1, 1],
+      [0.5, 0],
+      [1, 1],
+      [0.5, 1],
+    ]) {
+      const across = (u - 0.5) * w * 2;
+      const fold = (u === 0.5 ? 0.035 : 0) * scale;
+      positions.push(
+        x + dx * across - dz * fold,
+        y + (v - 0.5) * h * 2 + roll * across,
+        z + dz * across + dx * fold
+      );
+      normals.push(-dz * 0.45, 0.82, dx * 0.45);
+      colors.push(light * 0.97, light, light * 0.94);
+      uvs.push(u, 1 - v);
+    }
+  }
+  const spray = new T.BufferGeometry();
+  spray.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+  spray.setAttribute('normal', new T.Float32BufferAttribute(normals, 3));
+  spray.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
+  spray.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+  const branches = base.index ? base.toNonIndexed() : base.clone();
+  branches.setAttribute(
+    'color',
+    new T.BufferAttribute(
+      new Float32Array(branches.attributes.position.count * 3).fill(1),
+      3
+    )
+  );
+  const full = mergeGeometries([branches, spray]);
+  for (const { start, count, materialIndex } of base.groups)
+    full.addGroup(start, count, materialIndex);
+  full.addGroup(branches.attributes.position.count, positions.length / 3, 2);
+  full.computeBoundingBox();
+  full.computeBoundingSphere();
+  return full;
+}
+
 // One set of geometry and materials serves both the park and streamed GIS tiles.
 export class TreeStand {
   constructor(scene, texture, oaks) {
@@ -254,6 +340,58 @@ export class TreeStand {
     this.z = Infinity;
     this.dirty = true;
   }
+  async prepare(trees) {
+    const forms = new Set(
+      trees.filter((t) => t.fullLeaf).map((t) => treeShape(t).variety)
+    );
+    if (!forms.size) return;
+    this.fullLeafMaps ??= Promise.all(
+      ['dover-leaves', 'dover-spray'].map(async (name) => {
+        const texture = await new T.TextureLoader().loadAsync(
+          '/scenery/' + name + '.webp'
+        );
+        texture.colorSpace = T.SRGBColorSpace;
+        texture.flipY = false;
+        texture.anisotropy = 8;
+        return texture;
+      })
+    ).catch((error) => {
+      this.fullLeafMaps = null;
+      throw error;
+    });
+    const [map, sprigs] = await this.fullLeafMaps;
+    for (const form of forms) {
+      const key = form + '_full';
+      if (this.levels.has(key)) continue;
+      const levels = this.levels
+        .get(form)
+        .map(({ name, geometry, material }, detail) => {
+          const leaves = material[1].clone();
+          leaves.map = map;
+          return {
+            name: name + '_full',
+            geometry: leafOnGeometry(
+              geometry,
+              detail,
+              735 + form.charCodeAt(form.length - 1)
+            ),
+            material: [
+              material[0],
+              leaves,
+              new T.MeshBasicMaterial({
+                map: sprigs,
+                alphaTest: [0.32, 0.22, 0.14][detail],
+                vertexColors: true,
+                side: T.DoubleSide,
+              }),
+            ],
+            transforms: [],
+          };
+        });
+      this.levels.set(key, levels);
+      this.batches.push(...levels);
+    }
+  }
   add(key, trees) {
     const dummy = new T.Object3D();
     this.tiles.set(
@@ -269,7 +407,7 @@ export class TreeStand {
           height: s.height,
           ground: t.ground || 0,
           z: t.z,
-          levels: this.levels.get(s.variety),
+          levels: this.levels.get(t.fullLeaf ? s.variety + '_full' : s.variety),
           matrix: dummy.matrix.clone(),
           color: new T.Color().setRGB(s.shade, s.shade, s.shade),
         };

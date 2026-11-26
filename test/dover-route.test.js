@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { yardBarriers } from '../src/dover-yard.js';
+import { doverParking } from '../src/dover-block.js';
 import { DOVER_ROUTE } from '../src/dover-route.js';
 import { bluePod } from '../src/soccer.js';
 import { PORCH } from '../src/dover-location.js';
@@ -33,6 +35,8 @@ test('every Commons-to-Dover waypoint can be walked with the live map collision 
     buildings: [
       ...relevantTiles.flatMap((tile) => tile.buildings),
       ...goals.barriers,
+      ...doverParking,
+      ...yardBarriers,
     ],
     trees: relevantTiles.flatMap((tile) => tile.trees),
     water: [],

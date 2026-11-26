@@ -341,6 +341,7 @@ export function streetScenery(
         z = (az + bz) / 2;
       if (
         !owns(x, z) ||
+        (data.id === 'dover' && Math.hypot(x - 1160, z + 901) < 32) ||
         furniture.some((p) => Math.hypot(x - p.x, z - p.z) < 44)
       )
         continue;

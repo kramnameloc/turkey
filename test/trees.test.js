@@ -98,6 +98,41 @@ test('branches above the turkey leave the ground clear up to the trunk', () => {
   assert.ok(radius < width * 0.08);
 });
 
+test('Dover summer trees keep their branch and leaf materials at every viewing distance', async () => {
+  const stand = new TreeStand(new T.Scene(), null, oaks);
+  const atlas = new T.Texture(),
+    sprigs = new T.Texture();
+  stand.fullLeafMaps = Promise.resolve([atlas, sprigs]);
+  const { trees } = JSON.parse(
+    await readFile(new URL('../public/geo/region/8-12.json', import.meta.url))
+  );
+  const tree = trees.find((t) => t.fullLeaf);
+  const form = treeShape(tree).variety;
+  await Promise.all([stand.prepare([tree]), stand.prepare([tree])]);
+  assert.equal(stand.batches.filter((b) => b.name.endsWith('_full')).length, 3);
+  stand.add('dover', [tree]);
+  const counts = [];
+  for (const [lod, distance] of [0, 80, 300].entries()) {
+    stand.update(tree.x, tree.z + distance);
+    const visible = stand.group.children.filter((m) => m.visible);
+    assert.equal(visible.length, 1);
+    const [{ name, material, geometry }] = visible;
+    assert.equal(name, form + '_' + lod + '_full');
+    assert.deepEqual(
+      geometry.groups.map((g) => g.materialIndex),
+      [0, 1, 2]
+    );
+    assert.equal(material[1].map, atlas);
+    assert.equal(material[2].map, sprigs);
+    assert.equal(
+      geometry.attributes.color.count,
+      geometry.attributes.position.count
+    );
+    counts.push(geometry.groups[2].count);
+  }
+  assert.ok(counts[0] > counts[1] && counts[1] > counts[2]);
+});
+
 test('scattered park saplings have repeatable positions, clear ground and matching collisions', () => {
   const surveyed = new Obstacles(park, PARK_SIGNS);
   const planted = new Obstacles(park, PARK_SIGNS);

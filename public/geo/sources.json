@@ -84,7 +84,7 @@
           720,
           720
         ],
-        "files": "courses/*.jpg",
+        "files": "brunner, commons, flatiron, northmoor and derda JPEGs in courses/",
         "mapVectors": "courses/maps.json",
         "refresh": "scripts/geo_courses.py"
       }
@@ -104,6 +104,31 @@
       "url": "https://usgs-lidar-public.s3.amazonaws.com/CO_DRCOG_2_2020/ept.json",
       "terms": "U.S. Geological Survey public-domain elevation data.",
       "use": "Estimated individual roof and crown heights for the Community Park, Brunner, County Commons, and Dover play areas. City footprints retain their mapped horizontal coordinates. Roof estimates use the 85th percentile of returns inside the footprint, relative to nearby ground returns. Crown estimates use the 95th percentile near the mapped trunk, restricted to the closest tree, within its reported size band where available. Trees planted after the survey retain city class estimates where dates are available. Heights and crown shapes remain approximate. Rebuild the derived height fields with scripts/geo_scale.py after refreshing city features."
+    },
+    {
+      "name": "State of Colorado Imagery, Denver Regional Aerial Photography Project (DRAPP), 2020",
+      "url": "https://registry.opendata.aws/colorado-imagery/",
+      "accessed": "2026-11-26",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "tiles": [
+        "N2W176b",
+        "N2W177a",
+        "N2W166d",
+        "N2W167c"
+      ],
+      "tileRoot": "https://colorado-public-imagery.s3.us-west-2.amazonaws.com/DRAPP/DRAPP2020/Imagery/",
+      "file": "courses/dover.jpg",
+      "pixels": [
+        3072,
+        3072
+      ],
+      "extentMeters": [
+        720,
+        720
+      ],
+      "use": "Public orthophotography registered to the Dover course, including rooftops and the asphalt sample. The block’s turning circle, sidewalk edges, driveway aprons and approximate crown centers were traced from the aerial. Fifteen residential roof surfaces and the approximate crown heights use the 2020 USGS laser survey. The two houses at the game cottage have custom models. Their front elevations and yard scenery approximate the supplied July 2026 street view.",
+      "refresh": "scripts/geo_dover.py"
     }
   ],
   "regionalExtentMeters": [

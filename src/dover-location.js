@@ -1,6 +1,6 @@
-// The city address point falls inside the mapped footprint. The game entrance
-// is placed on an arbitrary face of that polygon. All room geometry is invented.
-export const DOVER = { name: '735 Dover St', x: 1154, z: -986.5 };
+// Fast travel faces the game cottage from the street. Its interaction point
+// and Hall of Gravy are authored for the hunt.
+export const DOVER = { name: '735 Dover St', x: 1159, z: -985.1 };
 export const PORCH = { x: 1144.15, z: -986.5 };
 export const RELIC = 'Golden Gravy Grail';
 const key = 'gobbler-dover-grail-v1';

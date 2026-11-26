@@ -374,5 +374,149 @@
       "source": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.91645,-105.07167&heading=175",
       "use": "Visual reference for ranch proportions, brick colors, planting, and signal masts."
     }
+  },
+  "/models/broomfield-landmarks.glb": {
+    "title": "Broomfield civic buildings and Brunner Farmhouse",
+    "changes": "Original game models registered to city building footprints. The civic roof surfaces use 2020 USGS lidar and north-up USDA/USGS aerial photography. The library masonry, windows, entrance lettering and gable surrounds use cropped, resized and color-adjusted local photographs. The farmhouse uses original siding, shingles and modeled porch details. Window bays, porch details and roof planes are approximations.",
+    "credits": [
+      {
+        "title": "Entrance to the Broomfield Library and Auditorium",
+        "author": "HonjuTheCat",
+        "source": "https://commons.wikimedia.org/wiki/File:Entrance_to_the_Broomfield_Library_and_Auditorium.jpg",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      },
+      {
+        "title": "The back of the Broomfield Library and Auditorium building",
+        "author": "HonjuTheCat",
+        "source": "https://commons.wikimedia.org/wiki/File:The_back_of_the_Broomfield_Library_and_Auditorium_building.jpg",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      },
+      {
+        "title": "Free Urban Textures: Buildings, Apartments, Shop Fronts — building_office12.png",
+        "author": "Scouser",
+        "source": "https://opengameart.org/content/free-urban-textures-buildings-apartments-shop-fronts",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "changes": "Selected the photographed exterior from the archive, cropped for use on repeated exterior walls and encoded in WebP."
+      }
+    ],
+    "reference": {
+      "title": "Brunner Farmhouse exterior, City and County of Broomfield",
+      "source": "https://www.broomfield.org/images/InfoAdvanced/69/brunnerhouse2648.jpg",
+      "use": "Visual reference for yellow clapboard, sash windows, roof silhouette, capped chimneys and white porch with diagonal rails."
+    },
+    "gardenReference": {
+      "title": "Broomfield Open Space, Parks, Recreation and Trails Plan, Brunner Farmhouse and Gardens",
+      "source": "https://www.broomfield.org/DocumentCenter/View/46060/Open-Space-Parks-Recreation-and-Trails-Plan-2024",
+      "use": "Reference for the white pergola beside the farmhouse. Its garden footprint follows the course aerial. Post spacing and overhead slats are approximate."
+    },
+    "geography": "/geo/sources.json"
+  },
+  "trail-gravel.webp": {
+    "title": "Gravel Ground 01",
+    "author": "Rob Tuytel",
+    "source": "https://polyhaven.com/a/gravel_ground_01",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "changes": "Color-matched the diffuse scan to sampled USDA/USGS aerial pixels along mapped Broomfield soft-surface trails. Resized to 768 pixels and encoded as a three-meter repeating WebP tile."
+  },
+  "dover-houses.webp": {
+    "title": "Dover residential siding, glazing and garage doors",
+    "credits": [
+      {
+        "title": "Street",
+        "author": "Pasha",
+        "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Free Urban Textures: Buildings, Apartments, Shop Fronts — building_office12.png",
+        "author": "Scouser",
+        "source": "https://opengameart.org/content/free-urban-textures-buildings-apartments-shop-fronts",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    ],
+    "changes": "Original lap siding, trim and garage panels combined with adapted masonry and glazing from the credited residential atlas. Fitted to mapped driveway frontages.",
+    "streetReferences": [
+      "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.92683,-105.05519&heading=160&pitch=0&fov=85",
+      "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.92748,-105.05521&heading=0&pitch=0&fov=85",
+      "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.92820,-105.05521&heading=180&pitch=0&fov=85",
+      "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=39.92860,-105.05521&heading=0&pitch=0&fov=85"
+    ]
+  },
+  "dover-asphalt.webp": {
+    "title": "Dover Street asphalt",
+    "author": "State of Colorado Imagery, DRAPP 2020",
+    "source": "https://registry.opendata.aws/colorado-imagery/",
+    "license": "CC0 1.0",
+    "changes": "Sampled an open section of roadway between the East 7th Avenue Circle junctions and mirrored both edges for tiling at street scale."
+  },
+  "/models/dover-sedan.glb": {
+    "title": "Car Kit, sedan",
+    "author": "Kenney",
+    "source": "https://kenney.nl/assets/car-kit",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "download": "https://raw.githubusercontent.com/Papyszoo/CC0-Public-Domain-Models/main/packs/kenney-car-kit/models/sedan/sedan.glb",
+    "changes": "Original GLB fitted to street scale, parked in representative curb and apron positions and recolored in the game."
+  },
+  "/models/dover-suv.glb": {
+    "title": "Car Kit, suv",
+    "author": "Kenney",
+    "source": "https://kenney.nl/assets/car-kit",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "download": "https://raw.githubusercontent.com/Papyszoo/CC0-Public-Domain-Models/main/packs/kenney-car-kit/models/suv/suv.glb",
+    "changes": "Original GLB fitted to street scale, parked in representative curb and apron positions and recolored in the game."
+  },
+  "/models/dover-exteriors.glb": {
+    "title": "Dover gable and half-timbered house exteriors",
+    "reference": "The supplied July 2026 Google Street View image of 735 Dover St, Broomfield, informed the front elevations, finishes and relative placement. The game models use city building footprints and approximate dimensions.",
+    "credits": [
+      {
+        "title": "Street",
+        "author": "Pasha",
+        "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    ],
+    "changes": "Original geometry, shingle, clapboard, garage panel and glazing artwork. The russet and buff brick use recolored masonry from the Street atlas."
+  },
+  "dover-leaves.webp": {
+    "title": "Dover summer oak foliage",
+    "author": "LOLIPOP",
+    "source": "https://sketchfab.com/3d-models/oak-trees-pack-17var-lods-seasons-gameready-a5e4e64f9f1d4089bdcc6170a9333393",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Resized and color-adjusted the full-leaf atlas to fit the existing oak models."
+  },
+  "dover-spray.webp": {
+    "title": "Dover oak leaf clusters",
+    "author": "LOLIPOP",
+    "source": "https://sketchfab.com/3d-models/oak-trees-pack-17var-lods-seasons-gameready-a5e4e64f9f1d4089bdcc6170a9333393",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Selected and layered leafy tips from the full-leaf atlas into an irregular cluster for the outer canopy."
+  },
+  "dover-hedge.webp": {
+    "title": "Dover clipped hedge",
+    "author": "LOLIPOP",
+    "source": "https://sketchfab.com/3d-models/oak-trees-pack-17var-lods-seasons-gameready-a5e4e64f9f1d4089bdcc6170a9333393",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Tiled and shaded leafy tips from the full-leaf atlas to form a continuous clipped hedge surface."
+  },
+  "dover-lawn.webp": {
+    "title": "Dover front lawns and canopy shade",
+    "author": "Charlotte Baglioni",
+    "source": "https://polyhaven.com/a/withered_grass",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "changes": "Sampled the diffuse grass texture, varied the color from turf to dry patches, and added an original canopy-shadow mask in the alpha channel."
   }
 }

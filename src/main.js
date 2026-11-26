@@ -471,7 +471,7 @@ function credits() {
   show(
     'credits',
     heading('FIELD ARCHIVE', 'Map & photo credits') +
-      '<div class="credits"><h3>Broomfield geography</h3><p>Buildings, streets, paths, landmarks, and surveyed trees come from the City and County of Broomfield. USGS elevation follows the local slopes. USGS lidar supplies many roof and tree heights, with estimates elsewhere. Building façades and the Dover cottage interior are game artwork. ' +
+      '<div class="credits"><h3>Broomfield geography</h3><p>Buildings, streets, paths, landmarks, and surveyed trees come from the City and County of Broomfield. USGS elevation follows the local slopes. USGS lidar supplies many roof and tree heights, with estimates elsewhere. The Dover aerial comes from Colorado’s 2020 Denver Regional Aerial Photography Project (CC0). Fifteen Dover roofs follow the laser survey. The two houses at 735 Dover and next door use modeled exteriors based on a July 2026 street view. Five civic roof models follow the lidar survey. The Library and Auditorium exterior uses local photographs by HonjuTheCat (CC0). Brunner Farmhouse was modeled from the city’s exterior photograph and footprint. ' +
       links('/geo/sources.json', 'Map sources and coverage') +
       '</p><h3>Cover photography</h3><p>Wild turkey by Frank Schulenburg, Flatirons by Kpsudeep, and Rocky Flats prairie by Zach Schiff / USFWS. The cropped and color-graded composite is licensed under ' +
       links('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0') +
@@ -479,10 +479,10 @@ function credits() {
       links('/cover/credits.json', 'Original photographs') +
       '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
       'The grass clumps and seed heads are adapted from grass by Georgeous (Sketchfab Standard). ' +
-      'Road surfaces, ironwork, and residential masonry are adapted from Street by Pasha (CC BY 4.0). ' +
+      'Parked vehicles on Dover use Kenney’s Car Kit (CC0). Soft-surface trails use Gravel Ground 01 by Rob Tuytel (CC0). Road surfaces, ironwork, and residential masonry are adapted from Street by Pasha (CC BY 4.0). ' +
       'Street furniture and controls are adapted from AndrewPunchak and pixelsquare, posed spectators from PolyOne Studio, ranch houses from Designed By Jonathan, and shrubs from LOLIPOP (CC BY 4.0). ' +
       'The balloon models are by Macys Parade and the 1993 Sonic model is by pika39019 (CC BY 4.0). ' +
-      'The oak models and November foliage are adapted from the Oak trees pack by LOLIPOP (CC BY 4.0). ' +
+      'The oak models and their autumn and summer foliage are adapted from the Oak trees pack by LOLIPOP (CC BY 4.0). ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
       '. The western skyline combines USGS terrain with sculpted relief and snow from Snowy Mountain by James Lucas (CC BY-NC 4.0). ' +
       links('/scenery/peaks-credits.json', 'Front Range sources') +

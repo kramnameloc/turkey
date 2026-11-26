@@ -1,5 +1,4 @@
 import * as T from 'three';
-import { BODY_RADIUS } from './field.js';
 import { PORCH, RELIC, hasGrail, collectGrail } from './dover-location.js';
 
 const crate = new T.BoxGeometry(1, 1, 1);
@@ -67,19 +66,13 @@ function door(parent) {
     box(parent, dark, 0, y, 0.18, 0.94, 0.61, 0.045);
   mesh(parent, new T.SphereGeometry(0.065, 10, 8), metal, 0.46, 1, 0.24);
 }
-function makePorch() {
+// The collectible uses a small game emblem at the garage. The visible exterior
+// comes from the regional building model, which also supplies the wall collision.
+function makeQuestEmblem() {
   const group = new T.Group();
   group.position.set(PORCH.x, 0, PORCH.z);
   group.rotation.y = Math.PI / 2;
-  door(group);
-  box(group, colors.timber, 0, 2.76, 0.48, 3.2, 0.15, 1.38);
-  box(group, colors.blue, 0, 2.9, 0.48, 3.38, 0.16, 1.5);
-  for (const x of [-1.26, 1.26]) {
-    box(group, colors.trim, x, 1.36, 0.94, 0.14, 2.73, 0.14);
-    box(group, colors.lamp, x * 0.72, 1.87, 0.22, 0.18, 0.29, 0.15);
-  }
-  plaque(group, ['735 DOVER'], 0, 2.53, 0.23, 1.37, 0.32);
-  box(group, colors.red, 0, 0.045, 0.86, 1.38, 0.06, 0.66);
+  plaque(group, ['735', '✦'], -1.5, 1.45, .065, .22, .43);
   return group;
 }
 function makeRoom() {
@@ -178,15 +171,10 @@ function makeRoom() {
 }
 export class DoverCottage {
   constructor(outdoors) {
-    this.porch = makePorch();
+    this.porch = makeQuestEmblem();
     this.porch.visible = false;
     outdoors.add(this.porch);
     this.inside = false;
-  }
-  hitsPorchPost(x, z) {
-    const dx = x - (PORCH.x + 0.94),
-      dz = Math.abs(z - PORCH.z) - 1.26;
-    return dx * dx + dz * dz < (BODY_RADIUS + 0.09) ** 2;
   }
   nearPorch(p) {
     return p.x >= PORCH.x && Math.hypot(p.x - PORCH.x, p.z - PORCH.z) < 3.1;

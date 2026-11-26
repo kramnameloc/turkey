@@ -1541,9 +1541,34 @@ body.touch-mode .touch {
 }
 
 .map-controls {
+  position: relative;
   display: grid;
   width: 150px;
   gap: 5px;
+}
+#current-street {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(240px, 58vw);
+  padding: 5px 9px;
+  background: #171c16ed;
+  border: 1px solid #98977989;
+  color: var(--cream);
+  font: 600 0.95rem/1.15 var(--cond);
+}
+#current-street i {
+  width: 14px;
+  height: 14px;
+  color: var(--amber);
+}
+.touch-mode #current-street {
+  top: calc(100% + 5px);
+  bottom: auto;
 }
 .hud .map-controls .radar {
   width: 100%;

@@ -15,16 +15,16 @@ import {
 } from './streets.js';
 import {
   Obstacles,
-  contains,
   plantParkSaplings,
   regionData,
+  loadMapImage,
   SPAWN,
   BODY_RADIUS,
   PARK_SIGNS,
   SIGN_WIDTH,
   SIGN_DEPTH,
 } from './field.js';
-import { DOVER } from './dover-location.js';
+import { loadLandmarks } from './landmarks.js';
 import { makeTerrain } from './terrain.js';
 import { loadOaks, TreeStand } from './trees.js';
 const loader = new T.TextureLoader();
@@ -43,8 +43,10 @@ function geometry(positions, uvs) {
   g.computeVertexNormals();
   return g;
 }
-function houseMaterial(map) {
+function houseMaterial(map, dover = false) {
   const material = new T.MeshLambertMaterial({ map, side: T.DoubleSide });
+  material.customProgramCacheKey = () =>
+    dover ? 'dover-siding' : 'house-masonry';
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -56,7 +58,24 @@ function houseMaterial(map) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vHouse;')
       .replace(
         '#include <map_fragment>',
-        `
+        dover
+          ? `
+        float eave = max(vHouse.x, 1.);
+        float floors = eave > 4.05 ? 2. : 1.;
+        vec2 bay = vec2(vMapUv.x, vMapUv.y * floors / eave);
+        bool openings = vHouse.z >= 0. && vMapUv.y < eave && vMapUv.y > 0.;
+        float row = openings ? 1. : 0.;
+        if (openings && (floors > 1. ? bay.y < 1. : vMapUv.y < .72)) row = 2.;
+        bool garageBay = vHouse.z > 1.5 && bay.x >= 0. && bay.x <= 1.;
+        if (garageBay && (floors == 1. || bay.y < 1.)) row = 0.;
+        if (garageBay && vMapUv.y >= -.15 && vMapUv.y < 2.36) {
+          row = 3.;
+          bay.y = clamp((vMapUv.y + .15) / 2.51, .004, .996);
+        }
+        vec2 uv = vec2(bay.x, 1. - (vHouse.y * 4. + row + 1. - clamp(fract(bay.y), .003, .997)) / 8.);
+        vec2 scale = vec2(1., 1./8.);
+        diffuseColor.rgb *= textureGrad(map, uv, dFdx(bay)*scale, dFdy(bay)*scale).rgb;`
+          : `
         // Six atlas rows: plain masonry, windows and a door bay for each finish.
         float eave = max(vHouse.x, 1.0);
         float storeys = max(1.0, floor(eave / 2.9 + .5));
@@ -73,26 +92,50 @@ function houseMaterial(map) {
   return material;
 }
 
-function buildings(list, photo, bounds, elev, wallMats) {
+// Share the same decoded image and GPU texture between the course ground and roofs.
+export function coursePhoto(site) {
+  site.photoTexture ??= loadMapImage(site)
+    .then((image) => {
+      const map = new T.Texture(image);
+      map.colorSpace = T.SRGBColorSpace;
+      map.anisotropy = 8;
+      map.needsUpdate = true;
+      return map;
+    })
+    .catch((error) => {
+      delete site.photoTexture;
+      throw error;
+    });
+  return site.photoTexture;
+}
+
+function buildings(list, imagery, elev, wallMats, landmarks) {
   const group = new T.Group(),
     walls = wallMats.map(() => []),
     wallUV = wallMats.map(() => []),
-    houseStyles = [],
-    roofs = [],
-    roofUV = [];
+    houseStyles = wallMats.map(() => []),
+    roofLayers = imagery.map((layer) => ({ ...layer, roofs: [], roofUV: [] }));
   for (const b of list) {
     if (b.points.length < 3) continue;
     const pts = b.points.map((p) => new T.Vector2(...p));
     const levels = pts.map((p) => elev(p.x, p.y)).sort((a, b) => a - b);
     const base = levels[Math.floor(levels.length / 2)];
+    if (landmarks.place(group, b, base)) continue;
+    const { bounds, roofs, roofUV } =
+      roofLayers.find(({ bounds: box }) =>
+        b.points.every(
+          ([x, z]) =>
+            x >= box.minX && x <= box.maxX && z >= box.minZ && z <= box.maxZ
+        )
+      ) ?? roofLayers.at(-1);
     const house = b.type === 'Single Family' || b.type === 'Townhome';
-    const kind = house ? 2 : b.type === 'Apartment' ? 0 : 1;
+    const kind = b.doverFacade ? 3 : house ? 2 : b.type === 'Apartment' ? 0 : 1;
     const finish = (Math.round(pts[0].x * 3) ^ Math.round(pts[0].y * 7)) & 1;
     let entranceEdge = 0;
     // A gable follows the footprint's longest edge. Split triangles at the
     // ridge so that rectangular footprints retain pitched roofs as well.
     let ridge = null;
-    if (house) {
+    if (house && !b.doverRoof) {
       let longest = 0,
         normal;
       for (let i = 0; i < pts.length; i++) {
@@ -123,12 +166,15 @@ function buildings(list, photo, bounds, elev, wallMats) {
     }
     // Survey heights include the roof. The fallback estimates describe eaves.
     const top =
-      base + (b.roofHeight ? b.roofHeight - (ridge?.rise || 0) : b.height);
+      base +
+      (b.doverRoof?.eave ??
+        (b.roofHeight ? b.roofHeight - (ridge?.rise || 0) : b.height));
     const distance = (p) => (ridge ? p.dot(ridge.normal) - ridge.offset : 0);
     const roofHeight = (p) =>
-      ridge
+      p.roofY ??
+      (ridge
         ? top + ridge.rise * Math.max(0, 1 - Math.abs(distance(p)) / ridge.half)
-        : top;
+        : top);
     function crossing(a, d) {
       return a.clone().lerp(d, distance(a) / (distance(a) - distance(d)));
     }
@@ -161,8 +207,15 @@ function buildings(list, photo, bounds, elev, wallMats) {
         const origin = pts[edge],
           edgeLength = origin.distanceTo(pts[(edge + 1) % pts.length]);
         const bays = Math.max(1, Math.round(edgeLength / 5.6));
-        const u0 = (origin.distanceTo(a) / (edgeLength || 1)) * bays;
-        const u1 = (origin.distanceTo(d) / (edgeLength || 1)) * bays;
+        const garage = edge === b.doverFacade?.edge;
+        const wallU = (point) =>
+          garage
+            ? 0.5 +
+              (origin.distanceTo(point) - b.doverFacade.center * edgeLength) /
+                b.doverFacade.width
+            : (origin.distanceTo(point) / (edgeLength || 1)) * bays;
+        const u0 = wallU(a),
+          u1 = wallU(d);
         const bottom = lower - base;
         wallUV[kind].push(
           u0,
@@ -178,9 +231,13 @@ function buildings(list, photo, bounds, elev, wallMats) {
           u0,
           first - base
         );
-        const openings = edgeLength < 2.8 ? -1 : Number(edge === entranceEdge);
+        const openings = garage
+          ? 2
+          : edgeLength < 2.8
+            ? -1
+            : Number(edge === entranceEdge);
         for (let i = 0; i < 6; i++)
-          houseStyles.push(top - base, finish, openings);
+          houseStyles[kind].push(top - base, finish, openings);
         return;
       }
       const va = (first - lower) / 7,
@@ -195,6 +252,52 @@ function buildings(list, photo, bounds, elev, wallMats) {
           (bounds.maxZ - p.y) / (bounds.maxZ - bounds.minZ)
         );
       }
+    }
+    if (b.doverRoof) {
+      const { vertices, faces, edges } = b.doverRoof;
+      const measured = vertices.map(([x, z, h]) => {
+        const point = new T.Vector2(x, z);
+        point.roofY = base + h;
+        return point;
+      });
+      const normals = pts.map((point, i) => {
+        const d = pts[(i + 1) % pts.length].clone().sub(point).normalize();
+        return new T.Vector2(d.y, -d.x);
+      });
+      const rim = measured.map((point, i) => {
+        if (i >= edges.length) return point;
+        const n = normals[edges[i]];
+        const prev = normals[edges[(i + edges.length - 1) % edges.length]];
+        const edge = point
+          .clone()
+          .addScaledVector(
+            n.clone().add(prev),
+            0.33 / Math.max(0.62, 1 + n.dot(prev))
+          );
+        edge.roofY = point.roofY;
+        return edge;
+      });
+      for (const [a, d, c] of faces) roofTriangle(rim[c], rim[d], rim[a]);
+      for (const [i, id] of edges.entries()) {
+        const j = (i + 1) % edges.length;
+        wall(measured[i], measured[j], id);
+        // The shadow board runs under the projecting roof, returning to the wall.
+        const a = rim[i],
+          d = rim[j],
+          inner = measured[i],
+          next = measured[j];
+        const quad = [
+          [a.x, a.roofY, a.y],
+          [d.x, d.roofY, d.y],
+          [d.x, d.roofY - 0.16, d.y],
+          [a.x, a.roofY - 0.16, a.y],
+          [next.x, next.roofY - 0.16, next.y],
+          [inner.x, inner.roofY - 0.16, inner.y],
+        ];
+        for (const k of [0, 1, 2, 0, 2, 3, 3, 2, 4, 3, 4, 5])
+          walls[4].push(...quad[k]);
+      }
+      continue;
     }
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i],
@@ -228,17 +331,22 @@ function buildings(list, photo, bounds, elev, wallMats) {
   for (let i = 0; i < walls.length; i++) {
     if (!walls[i].length) continue;
     const geo = geometry(walls[i], wallUV[i]);
-    if (i === 2)
-      geo.setAttribute('house', new T.Float32BufferAttribute(houseStyles, 3));
+    if (houseStyles[i].length)
+      geo.setAttribute(
+        'house',
+        new T.Float32BufferAttribute(houseStyles[i], 3)
+      );
     group.add(new T.Mesh(geo, wallMats[i]));
   }
-  if (roofs.length)
+  for (const { roofs, roofUV, photo } of roofLayers) {
+    if (!roofs.length) continue;
     group.add(
       new T.Mesh(
         geometry(roofs, roofUV),
         new T.MeshBasicMaterial({ map: photo, side: T.DoubleSide })
       )
     );
+  }
   return group;
 }
 export function groundMaterial(photo, grass, options = {}) {
@@ -346,8 +454,10 @@ export async function buildWorld(scene, data) {
     regional,
     streets,
     houses,
+    doverHouses,
     grassModels,
     streetModels,
+    landmarks,
   ] = await Promise.all([
     texture(data.orthophoto.url),
     texture('/scenery/grass.webp', true),
@@ -363,8 +473,10 @@ export async function buildWorld(scene, data) {
     regionData(),
     streetMaterials(texture),
     texture('/scenery/street-houses.webp', true),
+    texture('/scenery/dover-houses.webp', true),
     loadGrasses(),
     loadStreetscape(),
+    loadLandmarks(),
   ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
@@ -376,7 +488,10 @@ export async function buildWorld(scene, data) {
   const walls = [brick, civic].map(
     (map) => new T.MeshLambertMaterial({ map, side: T.DoubleSide })
   );
-  walls.push(houseMaterial(houses));
+  walls.push(houseMaterial(houses), houseMaterial(doverHouses, true));
+  walls.push(
+    new T.MeshLambertMaterial({ color: '#80776a', side: T.DoubleSide })
+  );
   const terrain = makeTerrain(fine, regional.elevation, data.bounds);
   const { height } = terrain;
   const solids = new Obstacles(data, PARK_SIGNS);
@@ -384,10 +499,10 @@ export async function buildWorld(scene, data) {
   const scenery = streetScenery(data, junctions, streetModels, height, solids);
   const structures = buildings(
     data.buildings.filter((b) => !scenery.houses.has(b)),
-    photo,
-    data.bounds,
+    [{ photo, bounds: data.bounds }],
     height,
-    walls
+    walls,
+    landmarks
   );
   const plantings = [...data.trees, ...plantParkSaplings(data, solids)];
   const grasses = new FieldGrasses(scene, grassModels, height);
@@ -421,6 +536,7 @@ export async function buildWorld(scene, data) {
   water(scene, data.water, height);
   return {
     streetModels,
+    landmarks,
     updateSignals: scenery.updateSignals,
     paradeSignal: scenery.signalCrossing,
     frontWalks: scenery.frontWalks,
@@ -512,7 +628,7 @@ export async function addRegion(scene, world) {
         ground: height(t.x, t.z),
       }));
     // Only detail homes around the playable landmarks. Keep the quest cottage's
-    // surveyed wall and attached entrance together at Dover.
+    // reference exteriors in the footprint renderer at Dover.
     const sites = (data.detailMaps ?? []).filter(
       ({ bounds }) =>
         bounds.minX <= tile.bounds.maxX &&
@@ -520,11 +636,22 @@ export async function addRegion(scene, world) {
         bounds.minZ <= tile.bounds.maxZ &&
         bounds.maxZ >= tile.bounds.minZ
     );
+    const [imagery] = await Promise.all([
+      Promise.all(
+        sites.map(async (site) => ({
+          bounds: site.bounds,
+          photo: await coursePhoto(site).catch(() => null),
+        }))
+      ),
+      world.landmarks.prepare(buildingsList),
+      world.trees.prepare(trees),
+    ]);
+    if (active.get(tile.url) !== entry) return;
     const localHomes = buildingsList.filter(
       (h) =>
         h.type === 'Single Family' &&
-        sites.some((s) => covers(s, ...h.points[0], 0)) &&
-        !contains(h.points, DOVER.x, DOVER.z)
+        !h.doverFacade &&
+        sites.some((s) => covers(s, ...h.points[0], 0))
     );
     const roads = streetSegments(
       [...new Set(sites.flatMap((s) => s.roads))].filter(
@@ -539,13 +666,13 @@ export async function addRegion(scene, world) {
     );
     const cluster = buildings(
       buildingsList.filter((h) => !houses.has(h)),
-      photo,
-      b,
+      [...imagery.filter((layer) => layer.photo), { photo, bounds: b }],
       height,
-      world.wallMaterials
+      world.wallMaterials,
+      world.landmarks
     );
     entry.solids = new Obstacles({
-      buildings: buildingsList,
+      buildings: world.landmarks.collisionFootprints(buildingsList),
       trees,
       water: [],
       bounds: b,
@@ -568,7 +695,7 @@ export async function addRegion(scene, world) {
           scene.remove(old.mesh);
           old.mesh.traverse((m) => {
             if (m.isInstancedMesh) m.dispose();
-            else if (m.isMesh) {
+            else if (m.isMesh && !world.landmarks.geometries.has(m.geometry)) {
               m.geometry.dispose();
               if (!world.wallMaterials.includes(m.material))
                 m.material.dispose();

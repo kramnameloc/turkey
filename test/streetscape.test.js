@@ -5,11 +5,60 @@ import { Matrix4, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Obstacles, PARK_SIGNS, segmentDistanceSq } from '../src/field.js';
 import { streetJunctions } from '../src/streets.js';
+import { streetLocator } from '../src/street-location.js';
 import {
   loadStreetscape,
   streetScenery,
   streetSegments,
 } from '../src/streetscape.js';
+
+test('the street name follows the Dover road, its sidewalk and turning circle, and changes after a turn', async () => {
+  const [region, courses] = await Promise.all(
+    ['region.json', 'courses/maps.json'].map(async (file) =>
+      JSON.parse(
+        await readFile(new URL('../public/geo/' + file, import.meta.url))
+      )
+    )
+  );
+  const nameAt = streetLocator({ ...region, detailMaps: courses });
+  assert.equal(nameAt(1159, -985.1), 'Dover St');
+  assert.equal(nameAt(1152.2, -985), 'Dover St'); // sidewalk
+  assert.equal(nameAt(1174, -914), 'Dover St'); // turning circle
+  assert.equal(nameAt(1160, -1140, 'Dover St'), 'Dover St'); // junction
+  assert.equal(nameAt(1180, -1139, 'Dover St'), 'E 9th Ave');
+  assert.equal(nameAt(1144, -985, 'Dover St'), ''); // driveway
+  assert.equal(nameAt(1130, -910), ''); // greenbelt
+});
+
+test('the park HUD can identify a local street and leaves unnamed pavement unlabeled', async () => {
+  const park = JSON.parse(
+    await readFile(new URL('../public/geo/broomfield.json', import.meta.url))
+  );
+  const nameAt = streetLocator(park);
+  assert.equal(nameAt(-257.6, 400), 'Main St');
+  const unnamed = streetLocator({
+    roads: [
+      {
+        name: 'Unnamed Street',
+        width: 6,
+        points: [
+          [0, 0],
+          [100, 0],
+        ],
+      },
+      {
+        name: 'Main St',
+        width: 8,
+        points: [
+          [0, 8],
+          [100, 8],
+        ],
+      },
+    ],
+  });
+  assert.equal(unnamed(60, 0, 'Main St'), '');
+  assert.equal(unnamed(60, 14, 'Main St'), ''); // grass beside the road
+});
 
 test('the street library fits the surveyed block and leaves sidewalks and crossings clear', async (t) => {
   t.mock.method(GLTFLoader.prototype, 'loadAsync', async function (url) {

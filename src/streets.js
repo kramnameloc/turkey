@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { streetDisplayName } from './street-location.js';
 
 const SIDEWALK = 1,
   TRAIL = 2,
@@ -7,12 +8,16 @@ const SIDEWALK = 1,
 const LOCAL = 5,
   TWO_WAY = 6,
   DIVIDED = 7,
-  UNMARKED = 8;
+  UNMARKED = 8,
+  APRON = 9,
+  DOVER_ASPHALT = 10;
 const inPark = (x, z) => Math.abs(x) < 680 && Math.abs(z) < 680;
 const nodeKey = ([x, z]) => Math.round(x) + ',' + Math.round(z);
 
 function surfaceType(line) {
+  if (line.surface === 'Dover asphalt') return DOVER_ASPHALT;
   if (line.type.includes('Sidewalk')) return SIDEWALK;
+  if (line.type === 'Concrete Apron') return APRON;
   if (line.type.includes('Soft Surface')) return TRAIL;
   if (line.type.includes('Path')) return PATH;
   if (line.type === 'Cross-walk') return CROSSWALK;
@@ -53,14 +58,18 @@ export function streetJunctions(roads) {
 }
 
 export async function streetMaterials(texture) {
-  const [asphalt, concrete, iron] = await Promise.all([
+  const [asphalt, concrete, iron, gravel, doverAsphalt] = await Promise.all([
     texture('/scenery/street-asphalt.webp', true),
     texture('/scenery/street-concrete.webp', true),
     texture('/scenery/street-ironwork.webp'),
+    texture('/scenery/trail-gravel.webp', true),
+    texture('/scenery/dover-asphalt.webp', true),
   ]);
   const surface = new T.MeshBasicMaterial({ map: asphalt, side: T.DoubleSide });
   surface.onBeforeCompile = (shader) => {
     shader.uniforms.concreteMap = { value: concrete };
+    shader.uniforms.gravelMap = { value: gravel };
+    shader.uniforms.doverMap = { value: doverAsphalt };
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -82,6 +91,8 @@ export async function streetMaterials(texture) {
         '#include <common>',
         `#include <common>
         uniform sampler2D concreteMap;
+        uniform sampler2D gravelMap;
+        uniform sampler2D doverMap;
         varying vec4 vStreet;
         varying vec2 vGround;
         float band(float distanceToCenter, float halfWidth, float aa) {
@@ -97,6 +108,9 @@ export async function streetMaterials(texture) {
         vec3 slab = texture2D(concreteMap, vGround * .51).rgb;
         float patina = texture2D(map, vGround * .073).r;
         bitumen *= .82 + patina * 2.2;
+        if (kind == ${DOVER_ASPHALT}.)
+          bitumen = texture2D(doverMap, vGround / vec2(16.,36.)).rgb *
+            (.79 + 2.3 * texture2D(map, vGround * 1.9).r);
         float aa = clamp(fwidth(road.x)*.5, .001, .2);
         float ay = clamp(fwidth(road.y)*.5, .001, .2);
         float wear = clamp(.63 + bitumen.r * 2.0, .62, .93);
@@ -105,8 +119,15 @@ export async function streetMaterials(texture) {
           float joint = band(abs(fract(road.y / 1.6 + .5)-.5)*1.6, .009, ay);
           color = slab * (1.0 - .52 * joint);
           color *= mix(.68, 1.0, smoothstep(.015,.065,halfWidth-abs(road.x)));
+        } else if (kind == ${APRON}.) {
+          vec2 joint = abs(fract(road / 3. + .5) - .5) * 3.;
+          vec3 driveway = mix(slab,vec3(.63,.61,.58),.70)
+            * (.96 + .5 * texture2D(map,vGround*1.8).r);
+          color = driveway * (1.03 - .42 * max(band(joint.x,.012,aa), band(joint.y,.012,ay)));
         } else if (kind == ${TRAIL}.) {
-          color = slab * vec3(.92,.73,.50) * (.77 + 2.8 * bitumen.r);
+          vec3 gravel = texture2D(gravelMap, vGround / 3.).rgb;
+          float shoulder = smoothstep(.64, 1., abs(road.x) / halfWidth);
+          color = gravel * mix(1.04, .85, shoulder);
         } else if (kind == ${PATH}.) {
           color = bitumen * 1.28;
         } else if (kind == ${CROSSWALK}.) {
@@ -114,7 +135,7 @@ export async function streetMaterials(texture) {
         } else {
           float beforeCorner = min(road.y-vStreet.z,vStreet.w-road.y);
           float clear = smoothstep(0.,.35,beforeCorner);
-          if (kind != ${UNMARKED}.) {
+          if (kind != ${UNMARKED}. && halfWidth > 0.) {
             float edge = halfWidth - abs(road.x);
             float gutter = 1.0-smoothstep(.32-aa,.32+aa,edge);
             float seam = band(abs(edge-.33),.018,aa);
@@ -229,7 +250,7 @@ export function pavement(
   terrain,
   materials,
   junctions,
-  { regional = false, crossingRoads = [] } = {}
+  { regional = false, crossingRoads = [], turningHead = [] } = {}
 ) {
   const intersections = new Set();
   const chunks = new Map(),
@@ -273,7 +294,7 @@ export function pavement(
       half = line.width * 0.49;
     const first = junctions.get(nodeKey(line.points[0])),
       last = junctions.get(nodeKey(line.points.at(-1)));
-    if (kind >= LOCAL) {
+    if (kind >= LOCAL && kind !== APRON) {
       if (first?.radius) intersections.add(first);
       if (last?.radius) intersections.add(last);
     }
@@ -325,7 +346,8 @@ export function pavement(
         strip(a, b, -half + 0.065, half - 0.065, 0.077, 0.077);
         strip(a, b, half - 0.065, half, 0.077, 0.012);
       } else {
-        const lift = kind === PATH || kind === TRAIL ? 0.034 : 0.013;
+        const lift =
+          kind === PATH || kind === TRAIL || kind === APRON ? 0.034 : 0.013;
         strip(a, b, -half, half, lift, lift);
       }
     }
@@ -334,6 +356,9 @@ export function pavement(
   // a continuous asphalt apron while preserving the markings on each approach.
   for (const { point, arms, radius } of intersections) {
     const [x, z] = point;
+    const fill = arms.some(({ line }) => line.surface === 'Dover asphalt')
+      ? DOVER_ASPHALT
+      : UNMARKED;
     const rim = arms.flatMap(({ line, dx, dz }) =>
       [-0.49, 0.49].map((side) => [
         x + dx * radius - dz * side * line.width,
@@ -350,7 +375,22 @@ export function pavement(
         ([px, pz], h) => {
           target.positions.push(px, h + 0.009, pz);
           target.uvs.push(0, 0);
-          target.styles.push(UNMARKED, 0, 0, 0);
+          target.styles.push(fill, 0, 0, 0);
+        }
+      );
+    }
+  }
+  // A centerline ribbon misses the asymmetric shape where Dover ends.
+  if (turningHead.length) {
+    const target = chunk(...turningHead[0]);
+    const contour = turningHead.map(([x, z]) => new T.Vector2(x, z));
+    for (const face of T.ShapeUtils.triangulateShape(contour, [])) {
+      terrain.drape(
+        face.map((i) => turningHead[i]),
+        ([x, z], h) => {
+          target.positions.push(x, h + 0.027, z);
+          target.uvs.push(x, z);
+          target.styles.push(DOVER_ASPHALT, 0, 0, 0);
         }
       );
     }
@@ -398,7 +438,7 @@ function signCorners(junctions, contains) {
   return signs;
 }
 
-function streetSigns(signs, height) {
+function streetSigns(signs, height, blue = false) {
   const group = new T.Group();
   if (!signs.length) return group;
   const names = [
@@ -418,15 +458,12 @@ function streetSigns(signs, height) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   names.forEach((raw, i) => {
-    const name = raw.replace(
-      /(\d)(St|Nd|Rd|Th)\b/g,
-      (_, n, s) => n + s.toLowerCase()
-    );
+    const name = streetDisplayName(raw);
     const x = (i % cols) * cellW + 3,
       y = Math.floor(i / cols) * cellH + 3,
       h = cellH - 6;
     const w = Math.min(cellW - 6, Math.ceil(ctx.measureText(name).width) + 30);
-    ctx.fillStyle = '#1b5140';
+    ctx.fillStyle = blue ? '#265582' : '#1b5140';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#d3e2d6';
     ctx.lineWidth = 2;
@@ -451,12 +488,16 @@ function streetSigns(signs, height) {
       signs.length
     );
   const matrix = new T.Matrix4();
-  signs.forEach(({ x, z, arms }, i) => {
+  signs.forEach(({ x, z, arms, stop }, i) => {
     const y = height(x, z);
-    posts.setMatrixAt(i, matrix.makeTranslation(x, y + 2.19 / 2, z));
+    const postHeight = stop ? 2.7 : 2.19;
+    matrix
+      .makeScale(1, postHeight / 2.19, 1)
+      .setPosition(x, y + postHeight / 2, z);
+    posts.setMatrixAt(i, matrix);
     arms.forEach(({ line, dx, dz }, j) => {
       const l = labels.get(line.name),
-        bottom = y + 2.18 + j * 0.235;
+        bottom = y + postHeight - 0.01 + j * 0.235;
       for (const side of [-1, 1]) {
         const points = [
           [-1, 0, l.u0, l.v0],
@@ -494,10 +535,16 @@ export function streetDetails(
   junctions,
   terrain,
   materials,
-  contains = () => true
+  contains = () => true,
+  placedSigns = []
 ) {
-  const group = streetSigns(signCorners(junctions, contains), terrain.height),
+  const generic = signCorners(junctions, contains).filter(
+    ({ x, z }) => !placedSigns.some((s) => Math.hypot(s.x - x, s.z - z) < 25)
+  );
+  const group = streetSigns(generic, terrain.height),
     iron = buffer();
+  if (placedSigns.length)
+    group.add(streetSigns(placedSigns, terrain.height, true));
   for (const line of roads) {
     if (!/Local|Connector|Minor Arterial/.test(line.type) || !line.name)
       continue;

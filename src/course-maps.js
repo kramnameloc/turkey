@@ -1,9 +1,16 @@
 import * as T from 'three';
 import { streetScenery } from './streetscape.js';
 import { pavement, streetDetails } from './streets.js';
-import { groundMaterial } from './world.js';
+import { coursePhoto, groundMaterial } from './world.js';
+import { doverYard, yardBarriers } from './dover-yard.js';
 import { bluePod } from './soccer.js';
-import { Obstacles, loadMapImage } from './field.js';
+import { Obstacles } from './field.js';
+import {
+  doverParking,
+  doverFurniture,
+  doverSigns,
+  doverVehicles,
+} from './dover-block.js';
 
 function intersects(a, b) {
   return (
@@ -73,11 +80,7 @@ export async function courseMaps(scene, world, region) {
         if (site.mesh) return;
         if (!site.pending)
           site.pending = (async () => {
-            const image = await loadMapImage(site);
-            const texture = new T.Texture(image);
-            texture.colorSpace = T.SRGBColorSpace;
-            texture.anisotropy = 4;
-            texture.needsUpdate = true;
+            const texture = await coursePhoto(site);
             const material = groundMaterial(texture, world.grass, {
               polygonOffset: true,
               // Only break the depth tie with the underlying terrain. A slope
@@ -100,17 +103,23 @@ export async function courseMaps(scene, world, region) {
                 world.terrain,
                 world.streets,
                 region.junctions,
-                { regional: true, crossingRoads: site.roads }
+                {
+                  regional: true,
+                  crossingRoads: site.roads,
+                  turningHead: site.turningHead,
+                }
               ),
               streetDetails(
                 site.roads,
                 region.junctions,
                 world.terrain,
                 world.streets,
-                contains
+                contains,
+                site.id === 'dover' ? doverSigns : []
               )
             );
-            let barriers = [];
+            let barriers =
+              site.id === 'dover' ? [...doverParking, ...yardBarriers] : [];
             if (site.id === 'commons') {
               const pitch = bluePod(site, world.height);
               if (pitch) {
@@ -121,11 +130,28 @@ export async function courseMaps(scene, world, region) {
               }
             }
             site.solids = new Obstacles({
-              buildings: [...site.buildings, ...barriers],
+              buildings: [
+                ...world.landmarks.collisionFootprints(site.buildings),
+                ...barriers,
+              ],
               trees: site.trees,
               water: [],
               bounds: site.bounds,
             });
+            if (site.id === 'dover') {
+              mesh.add(
+                doverFurniture(
+                  world.streetModels,
+                  world.height,
+                  site.solids,
+                  site.paths
+                )
+              );
+              mesh.add(
+                await doverYard(world.streetModels, world.terrain, site.solids)
+              );
+              mesh.add(await doverVehicles(world.height));
+            }
             const scenery = streetScenery(
               { ...site, buildings: [] },
               region.junctions,

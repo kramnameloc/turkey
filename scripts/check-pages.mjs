@@ -112,6 +112,33 @@ await Promise.all(
     assert.equal(material.toString('ascii', 8, 12), 'WEBP', name);
   })
 );
+for (const name of ['sedan', 'suv', 'exteriors']) {
+  const model = await asset(
+    '/models/dover-' + name + '.glb',
+    /model\/gltf-binary|application\/octet-stream/
+  );
+  assert.equal(model.toString('ascii', 0, 4), 'glTF', name);
+  assert.equal(model.readUInt32LE(8), model.length, name);
+}
+const landmarkPack = await asset(
+  '/models/broomfield-landmarks.glb',
+  /model\/gltf-binary|application\/octet-stream/
+);
+assert.equal(landmarkPack.toString('ascii', 0, 4), 'glTF');
+assert.equal(landmarkPack.readUInt32LE(8), landmarkPack.length);
+for (const name of [
+  'dover-asphalt',
+  'dover-houses',
+  'dover-leaves',
+  'dover-spray',
+  'dover-hedge',
+  'dover-lawn',
+]) {
+  const tile = await asset('/scenery/' + name + '.webp', /image\/webp/);
+  assert.equal(tile.toString('ascii', 8, 12), 'WEBP', name);
+}
+const gravel = await asset('/scenery/trail-gravel.webp', /image\/webp/);
+assert.equal(gravel.toString('ascii', 8, 12), 'WEBP');
 const balloons = await asset(
   '/models/parade-balloons.glb',
   /model\/gltf-binary|application\/octet-stream/
@@ -120,19 +147,45 @@ assert.equal(balloons.readUInt32LE(8), balloons.length);
 const paradePack = JSON.parse(
   balloons.toString('utf8', 20, 20 + balloons.readUInt32LE(12))
 );
-const lineup = paradePack.nodes.toSorted((a, b) => a.extras.paradeOrder - b.extras.paradeOrder);
-assert.deepEqual(lineup.map((node) => node.name), [
-  'Jett', 'Elf', 'Thomas', 'Chase', 'Goku', 'CharlieBrown', 'Scrat', 'Sonic',
-  'SnoopyWoodstock', 'JimmyNeutron', 'SkatingRonald', 'Paddington', 'SpiderMan',
-  'Doughboy', 'Eruptor', 'GregHeffley', 'SonicModern', 'FinnJake', 'RedRanger',
-  'Pikachu', 'RonaldMcDonald', 'SuperGrover',
-]);
+const lineup = paradePack.nodes.toSorted(
+  (a, b) => a.extras.paradeOrder - b.extras.paradeOrder
+);
+assert.deepEqual(
+  lineup.map((node) => node.name),
+  [
+    'Jett',
+    'Elf',
+    'Thomas',
+    'Chase',
+    'Goku',
+    'CharlieBrown',
+    'Scrat',
+    'Sonic',
+    'SnoopyWoodstock',
+    'JimmyNeutron',
+    'SkatingRonald',
+    'Paddington',
+    'SpiderMan',
+    'Doughboy',
+    'Eruptor',
+    'GregHeffley',
+    'SonicModern',
+    'FinnJake',
+    'RedRanger',
+    'Pikachu',
+    'RonaldMcDonald',
+    'SuperGrover',
+  ]
+);
 for (const [i, node] of lineup.entries()) {
   assert.equal(node.extras.paradeOrder, i);
   assert.ok(node.extras.paradeLabel, node.name);
   const [primitive] = paradePack.meshes[node.mesh].primitives;
-  const { baseColorTexture } = paradePack.materials[primitive.material].pbrMetallicRoughness;
-  const image = paradePack.textures[baseColorTexture.index].extensions.EXT_texture_webp.source;
+  const { baseColorTexture } =
+    paradePack.materials[primitive.material].pbrMetallicRoughness;
+  const image =
+    paradePack.textures[baseColorTexture.index].extensions.EXT_texture_webp
+      .source;
   assert.equal(paradePack.images[image].mimeType, 'image/webp', node.name);
 }
 assert.equal(grasses.toString('ascii', 0, 4), 'glTF');

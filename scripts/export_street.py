@@ -1,4 +1,5 @@
 """Bake the street materials from Pasha's Street GLB. Requires Pillow and numpy."""
+import argparse
 import io
 import json
 from pathlib import Path
@@ -100,5 +101,42 @@ def bake():
     house_fronts(images)
 
 
+def bake_gravel(path):
+    # Match the scan to sunlit ground on surveyed soft-trail centerlines.
+    geo = ROOT / 'public/geo'
+    park = json.loads((geo / 'broomfield.json').read_bytes())
+    sites = json.loads((geo / 'courses/maps.json').read_bytes())
+    samples = []
+    for site in [park, *sites]:
+        aerial = geo / ('courses/' + site['id'] + '.jpg' if 'id' in site else 'aerial.jpg')
+        image = np.asarray(Image.open(aerial).convert('RGB'))
+        b = site['bounds']
+        for trail in site['paths']:
+            if trail['type'] != 'Soft Surface Trail':
+                continue
+            points = np.array(trail['points'])
+            for a, end in zip(points, points[1:]):
+                count = max(1, round(np.linalg.norm(end - a) / 2))
+                for x, z in np.linspace(a, end, count, endpoint=False):
+                    col = int((x-b['minX']) / (b['maxX']-b['minX']) * image.shape[1])
+                    row = int((z-b['minZ']) / (b['maxZ']-b['minZ']) * image.shape[0])
+                    if 0 <= row < image.shape[0] and 0 <= col < image.shape[1]:
+                        r, g, blue = image[row, col]
+                        if r > g > blue and r > 105:
+                            samples.append((r, g, blue))
+    if not samples:
+        raise ValueError('Missing soft trail color samples')
+    tone = np.median(samples, axis=0)
+    scan = np.asarray(Image.open(path).convert('RGB').resize((768, 768), Image.Resampling.LANCZOS))
+    graded = np.clip(scan * tone / np.median(scan, axis=(0, 1)), 0, 255)
+    Image.fromarray(graded.astype('uint8')).save(OUTPUT / 'trail-gravel.webp', quality=84, method=6)
+
+
 if __name__ == '__main__':
-    bake()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--gravel', type=Path, help='Bake the soft-trail tile from Gravel Ground 01 diffuse')
+    args = parser.parse_args()
+    if args.gravel:
+        bake_gravel(args.gravel)
+    else:
+        bake()
