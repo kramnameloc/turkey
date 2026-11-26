@@ -56,6 +56,10 @@ export function sound(event) {
     note(240, 440, 0, 0.14, 0.035);
     note(360, 590, 0.2, 0.15, 0.03);
   }
+  if (event === 'harvest') {
+    note(196, 294, 0, 0.23, 0.085, 'triangle');
+    note(392, 587, 0.06, 0.22, 0.06);
+  }
   if (event === 'toss') note(480, 260, 0, 0.2, 0.035, 'triangle');
   if (event === 'splat') note(120, 42, 0, 0.2, 0.07, 'triangle');
   if (event === 'toot') {

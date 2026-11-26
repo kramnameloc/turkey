@@ -13,9 +13,11 @@ import { overlapsBody, separateFromActors } from './body-collision.js';
 import { addPeaks } from './peaks.js';
 import { DoverCottage } from './dover.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
+import { CORNUCOPIA, WEAPONS, dealDamage } from './weapons.js';
+import { EnemyHealthBars } from './enemy-health-bars.js';
 import { FoodFight } from './foodfight.js';
 import { Flurries } from './flurries.js';
-import { COURSES, COURSE_TIME, coursePoint, rollSnow } from './courses.js';
+import { COURSES, COURSE_TIME, MAX_HEALTH, coursePoint, rollSnow } from './courses.js';
 import { DishGuide } from './guidance.js';
 import { foodModel, caster, animateFood } from './models.js';
 import {
@@ -106,11 +108,20 @@ export class Hunt {
       this.thirdPerson = localStorage.getItem('gobbler-chase-view') === 'on';
     } catch {}
     this.fight = new FoodFight(this);
-    this.standardTool = caster();
-    this.wideTool = this.fight.art.upgrade('wide');
-    this.wideTool.visible = false;
+    this.tools = {
+      net: caster(),
+      wide: this.fight.art.tool('caster'),
+      popper: this.fight.art.tool('popper'),
+      sling: this.fight.art.tool('sling'),
+      cornucopia: this.fight.art.tool(CORNUCOPIA.id),
+    };
     this.tool = new T.Group();
-    this.tool.add(this.standardTool, this.wideTool);
+    for (const [id, model] of Object.entries(this.tools)) {
+      model.name = id;
+      model.visible = id === WEAPONS[0].id;
+      this.tool.add(model);
+    }
+    this.healthBars = new EnemyHealthBars();
     this.camera.add(this.tool);
     this.tool.position.set(0, toolRest.y, toolRest.z);
     this.tool.rotation.set(0.1, 0.32, -0.1);
@@ -122,8 +133,15 @@ export class Hunt {
         opacity: 1,
       })
     );
-    this.net.visible = false;
-    this.scene.add(this.net);
+    this.shotModels = {
+      net: this.net,
+      ...Object.fromEntries(WEAPONS.filter((w) => w.shot).map((w) => [
+        w.id, this.fight.art.projectile(w.shot),
+      ])),
+    };
+    for (const shot of Object.values(this.shotModels)) shot.visible = false;
+    this.castModel = this.net;
+    this.castCooldown = WEAPONS[0].cooldown;
     this.netStart = new T.Vector3();
     this.netEnd = new T.Vector3();
     this.keys = new Set();
@@ -151,7 +169,7 @@ export class Hunt {
   async init() {
     const [data, wing] = await Promise.all([
       fieldData(),
-      this.avatar.load(this.standardTool.clone(), this.wideTool.clone()),
+      this.avatar.load(...Object.values(this.tools).map((tool) => tool.clone())),
     ]);
     this.data = data;
     this.parkStreetAt = streetLocator(data);
@@ -186,7 +204,8 @@ export class Hunt {
     });
     this.fieldActors = new T.Group();
     this.fieldActors.add(
-      this.net,
+      ...Object.values(this.shotModels),
+      this.healthBars,
       this.guide.arrows,
       this.fight.group,
       this.fight.trails,
@@ -344,6 +363,13 @@ export class Hunt {
       this.yaw = 0;
       this.guide.hide();
       this.toast('Hall of Gravy · Search the display pedestal.', 3);
+    } else if (this.house.nearRecipe(p)) {
+      this.house.unfoldRecipe();
+      this.weapon = CORNUCOPIA;
+      sound('bonus');
+      this.toast(CORNUCOPIA.name + ' discovered! Capture a dish to restore health.', 5);
+      this.setHUD();
+      return;
     } else if (p.z > 0) {
       this.leaveCottage();
       this.yaw = -Math.PI / 2;
@@ -366,7 +392,7 @@ export class Hunt {
     }
     this.lift = this.flapTime = this.velocityY = this.pitch = 0;
     this.netTime = 0;
-    this.net.visible = false;
+    this.castModel.visible = false;
     this.updateViewControls();
     this.syncView(0, true);
     this.setHUD();
@@ -507,7 +533,7 @@ export class Hunt {
     this.last = 0;
     this.cooldown = 0;
     this.netTime = 0;
-    this.net.visible = false;
+    for (const model of Object.values(this.shotModels)) model.visible = false;
     this.noticeTime = 0;
     this.hudTime = 1;
     this.tileTime = 1;
@@ -516,8 +542,10 @@ export class Hunt {
     this.steps = 0;
     this.count = 0;
     this.shots = this.saved.shots;
+    this.hits = this.saved.hits ?? 0;
     this.paradeHits = this.saved.paradeHits ?? 0;
     this.paradeCaptures = this.saved.paradeCaptures ?? 0;
+    this.weapon = this.availableWeapons.find((w) => w.id === this.saved.weapon) ?? WEAPONS[0];
     this.fight.reset(this.saved);
     $('#hit-flash').style.opacity = '0';
     this.yaw = campaign ? (course.yaw ?? 0) : Math.atan2(16, 4);
@@ -570,6 +598,9 @@ export class Hunt {
       t.model.visible = t.shadow.visible =
         !this.untimed && (!anchors || anchors.has(t.id));
       if (!t.model.visible) continue;
+      t.maxHealth = t.baseHealth + this.level * 4;
+      t.health = t.maxHealth;
+      t.snaredUntil = 0;
       this.targets.push(t);
       const anchor = anchors ? anchors.get(t.id) : dishSpawn(t, this.mode);
       t.x = anchor.x;
@@ -837,6 +868,7 @@ export class Hunt {
           'ShiftRight',
           'Space',
           'KeyF',
+          'KeyR',
           'KeyH',
           'KeyV',
           'KeyG',
@@ -850,6 +882,7 @@ export class Hunt {
       if (e.repeat) return;
       if (e.code === 'Space') this.flap();
       if (e.code === 'KeyF') this.cast();
+      if (e.code === 'KeyR') this.switchWeapon();
       if (e.code === 'KeyV') this.toggleView();
       if (e.code === 'KeyG') this.interact();
       if (e.code === 'KeyH') this.findDish();
@@ -954,6 +987,7 @@ export class Hunt {
     };
     on(window, 'touchend', checkStickTouches, true);
     on(window, 'touchcancel', checkStickTouches, true);
+    on($('#weapon-switch'), 'click', () => this.switchWeapon());
     on($('#view-toggle'), 'click', () => this.toggleView());
     on($('#interact'), 'click', () => this.interact());
     on($('#compass'), 'click', () => this.findDish());
@@ -1005,6 +1039,7 @@ export class Hunt {
     this.viewportObserver?.disconnect();
     this.renderer.setAnimationLoop(null);
     this.weather?.dispose();
+    this.healthBars.dispose();
     this.fight.dispose();
     this.renderer.dispose();
   }
@@ -1016,12 +1051,33 @@ export class Hunt {
       this.region?.occludes(ray)
     );
   }
+  get weaponCaptures() {
+    return this.bankedCount + this.count + this.paradeCaptures;
+  }
+  get availableWeapons() {
+    return WEAPONS.filter((w) => w === CORNUCOPIA
+      ? this.house.recipeFound
+      : w.captures <= this.weaponCaptures);
+  }
+  switchWeapon() {
+    if (!this.playing || this.house.inside) return;
+    const available = this.availableWeapons;
+    this.weapon = available[(available.indexOf(this.weapon) + 1) % available.length];
+    this.setHUD();
+  }
+  unlockWeapon() {
+    const earned = WEAPONS.find((w) => w.captures === this.weaponCaptures);
+    if (!earned) return '';
+    if (this.weapon !== CORNUCOPIA) this.weapon = earned;
+    sound('bonus');
+    return earned.name + ' unlocked · ' + earned.damage + ' damage!';
+  }
   aim() {
     if (this.house.inside) return null;
     const p = this.camera.position,
       view = this.viewCamera;
     view.getWorldDirection(direction);
-    const range = this.fight.wide ? 52 : 35;
+    const range = this.fight.wide ? 52 : this.weapon.range;
     let best = null,
       bestDepth = Infinity;
     const participants = this.streetParade?.nearbyActors;
@@ -1080,12 +1136,16 @@ export class Hunt {
   }
   cast() {
     if (!this.playing || this.house.inside || this.cooldown > 0) return;
-    const t = this.aim();
+    const t = this.aim(), weapon = this.weapon;
     this.shots++;
+    if (t) this.hits++;
     this.wideCast = this.fight.wide > 0;
     if (this.wideCast) this.fight.wide--;
     this.net.material.color.setHex(this.wideCast ? 0x8bffe0 : 0xffdc91);
-    this.cooldown = this.wideCast ? 0.3 : 0.58;
+    this.castCooldown = weapon.cooldown * (this.wideCast ? 0.52 : 1);
+    this.cooldown = this.castCooldown;
+    this.castModel.visible = false;
+    this.castModel = this.shotModels[weapon.id];
     this.netTime = 0.24;
     if (this.thirdPerson) {
       this.avatar.rotation.y = this.yaw;
@@ -1093,31 +1153,50 @@ export class Hunt {
     }
     this.viewCamera.getWorldDirection(direction);
     this.netStart.set(0.19, -0.15, -0.63).applyMatrix4(this.camera.matrixWorld);
-    this.netEnd.copy(this.viewCamera.position).addScaledVector(direction, 28);
+    this.netEnd.copy(this.viewCamera.position)
+      .addScaledVector(direction, this.wideCast ? 52 : weapon.range);
     if (t) {
       this.netEnd.copy(t.model.position);
       this.netEnd.y += t.model.userData.aimHeight;
     }
-    this.net.quaternion.copy(this.viewCamera.quaternion);
-    this.net.visible = true;
-    sound('cast');
+    this.castModel.position.copy(this.netStart);
+    this.castModel.quaternion.copy(this.viewCamera.quaternion);
+    this.castModel.visible = true;
+    sound(weapon === CORNUCOPIA ? 'harvest' : weapon.shot ? 'toss' : 'cast');
     if (t?.isParadeParticipant) {
       this.paradeHits++;
-      this.toast(this.streetParade.hit(t), 3.2);
+      let notice = this.streetParade.hit(t, weapon.damage);
       if (t.caught) {
         this.paradeCaptures++;
+        notice += ' ' + this.unlockWeapon();
         sound('catch');
       }
+      this.toast(notice, 3.2);
       this.setHUD();
       return;
     }
     if (t) {
+      const dealt = dealDamage(t, weapon.damage);
+      if (t.health > 0) {
+        sound('splat');
+        if (weapon.id === 'net') t.snaredUntil = this.elapsed + 1.1;
+        const interrupted = weapon.id === 'sling' && this.fight.interrupt(t);
+        const impact = interrupted ? ' · Throw interrupted!' : '';
+        this.toast(t.name + ' −' + dealt + ' HP' + impact, 0.85);
+        return;
+      }
       t.caught = true;
       t.model.visible = t.shadow.visible = false;
       this.count++;
       this.guide.reset(this.elapsed);
       sound('catch');
-      const bonus = this.fight.reward(t);
+      const healed = Math.min(weapon.heal ?? 0, MAX_HEALTH - this.fight.health);
+      this.fight.health += healed;
+      const bonus = [
+        healed ? '+' + healed + ' turkey HP.' : '',
+        this.unlockWeapon(),
+        this.fight.reward(t),
+      ].filter(Boolean).join(' ');
       this.toast(t.name + ' captured! ' + bonus, bonus ? 3.2 : 1.8);
       if (this.targets.every((target) => target.caught)) {
         this.completeHunt(bonus);
@@ -1135,7 +1214,7 @@ export class Hunt {
       this.fight.clearField();
       this.guide.reset(this.elapsed);
       this.toast(
-        'Follow the trail to ' + this.pendingDestination.name + '.',
+        'Follow the trail to ' + this.pendingDestination.name + '.' + (bonus ? ' ' + bonus : ''),
         5
       );
     } else {
@@ -1155,6 +1234,8 @@ export class Hunt {
     this.bankedCount += this.count;
     this.saved = {
       ...this.fight.checkpoint(),
+      weapon: this.weapon.id,
+      hits: this.hits,
       shots: this.shots,
       paradeHits: this.paradeHits,
       paradeCaptures: this.paradeCaptures,
@@ -1197,9 +1278,11 @@ export class Hunt {
         dt
       );
       if (dist > 480 && this.mode === 'city') continue;
-      if (!this.blocked(p.x + t.vx * dt, p.z)) p.x += t.vx * dt;
-      if (!this.blocked(p.x, p.z + t.vz * dt)) p.z += t.vz * dt;
-      animateFood(t.model, time, Math.hypot(t.vx, t.vz), t.index * 1.57);
+      const pace = time < t.snaredUntil ? 0.4 : 1;
+      const stepX = t.vx * dt * pace, stepZ = t.vz * dt * pace;
+      if (!this.blocked(p.x + stepX, p.z)) p.x += stepX;
+      if (!this.blocked(p.x, p.z + stepZ)) p.z += stepZ;
+      animateFood(t.model, time, Math.hypot(t.vx, t.vz) * pace, t.index * 1.57);
       p.y =
         this.height(p.x, p.z) +
         0.1 +
@@ -1219,18 +1302,25 @@ export class Hunt {
       pip.hidden = i >= this.targets.length;
       pip.classList.toggle('filled', !!this.targets[i]?.caught);
     });
-    this.standardTool.visible = !this.fight.wide;
-    this.wideTool.visible = !!this.fight.wide;
-    this.avatar.showWishbone(!!this.fight.wide);
-    $('#gear-name').textContent = this.fight.wide
-      ? 'Wishbone slinger'
-      : 'Net caster';
+    const toolId = this.fight.wide && this.weapon.id === 'net' ? 'wide' : this.weapon.id;
+    for (const tool of Object.values(this.tools)) tool.visible = tool.name === toolId;
+    for (const tool of this.avatar.gear.children) tool.visible = tool.name === toolId;
+    const gearName = toolId === 'wide' ? 'Wishbone slinger' : this.weapon.name;
+    $('#gear-name').textContent = gearName;
+    $('#weapon-damage').textContent = this.weapon.damage + ' DMG';
+    const switcher = $('#weapon-switch');
+    switcher.hidden = this.house.inside;
+    switcher.disabled = this.availableWeapons.length < 2;
+    const nextWeapon = WEAPONS.find((w) => this.weaponCaptures < w.captures);
+    const nextHint = nextWeapon ? 'Next at ' + nextWeapon.captures + ' captures' : '';
+    $('#switch-hint').textContent = [switcher.disabled ? '' : 'Switch', nextHint]
+      .filter(Boolean).join(' · ');
     $('#vitals').hidden =
       untimed && !this.streetParade?.chasers.size && this.fight.health === 100;
     $('#health-value').textContent = this.fight.health;
     $('#vitals').classList.toggle('low', this.fight.health <= 35);
     const bonuses = [
-      this.fight.wide ? 'Wishbone ×' + this.fight.wide : '',
+      this.fight.wide ? 'Wide casts ×' + this.fight.wide : '',
       this.fight.speed ? 'Boots ' + Math.ceil(this.fight.speed) + 's' : '',
     ].filter(Boolean);
     $('#boosts').textContent = bonuses.join(' · ');
@@ -1513,14 +1603,19 @@ export class Hunt {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.tool.position.y = toolRest.y + Math.sin(this.steps) * 0.009;
     this.tool.position.z =
-      toolRest.z + Math.pow(this.cooldown / 0.58, 3) * 0.105;
+      toolRest.z + Math.pow(this.cooldown / this.castCooldown, 3) * 0.105;
     if (this.netTime > 0) {
       this.netTime -= dt;
       const progress = 1 - Math.max(0, this.netTime) / 0.24;
-      this.net.position.lerpVectors(this.netStart, this.netEnd, progress);
-      this.net.scale.setScalar(0.12 + progress * (this.wideCast ? 2.8 : 1.3));
-      this.net.material.opacity = 1 - progress * 0.5;
-      this.net.visible = this.netTime > 0;
+      this.castModel.position.lerpVectors(this.netStart, this.netEnd, progress);
+      if (this.castModel === this.net) {
+        this.net.scale.setScalar(0.12 + progress * (this.wideCast ? 2.8 : 1.3));
+        this.net.material.opacity = 1 - progress * 0.5;
+      } else {
+        this.castModel.rotation.x += dt * 12;
+        this.castModel.position.y += Math.sin(progress * Math.PI) * 0.32;
+      }
+      this.castModel.visible = this.netTime > 0;
     }
     this.noticeTime -= dt;
     if (this.noticeTime <= 0 && $('#notice').textContent)
@@ -1543,11 +1638,12 @@ export class Hunt {
           target.name +
           ' · ' +
           Math.round(p.distanceTo(target.model.position)) +
-          ' m';
+          ' m · ' + target.health + '/' + target.maxHealth + ' HP';
       }
       this.guide.update(this, target?.isParadeParticipant ? null : target);
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
+    this.healthBars.update(this.targets, this.streetParade?.chasers, p, this.viewCamera);
     if (this.house.inside) this.house.animate(this.elapsed);
     else if (this.venue) this.venue.update?.(this.elapsed);
     else {

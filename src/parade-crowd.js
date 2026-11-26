@@ -276,6 +276,8 @@ export function paradeCrowd(route, data, world, shade) {
         obj.userData = { aimHeight: height * 0.55, labelHeight: height + 0.15 };
         const person = {
           name: 'Parade spectator',
+          maxHealth: 40,
+          health: 40,
           isParadeParticipant: true,
           model: obj,
           radius: 0.29 * scale,
@@ -348,6 +350,7 @@ export function paradeCrowd(route, data, world, shade) {
   function reset() {
     for (const person of people) {
       person.caught = false;
+      person.health = person.maxHealth;
       person.model.position.copy(person.home);
       person.model.rotation.y = person.homeYaw;
       person.stride = 0;

@@ -497,6 +497,65 @@ function wishbone(g) {
   }
 }
 
+function cranberryPopper(g) {
+  const tin = new T.Group();
+  g.add(tin);
+  tin.rotation.x = -Math.PI / 2;
+  tin.position.z = -0.29;
+  tin.scale.setScalar(0.58);
+  cranberryCan(tin);
+  add(g, butterBlock, '#884d38', [0, -0.04, 0.02], [0.078, 0.085, 0.36]);
+  hoop(g, [0, 0, -0.14], 0.13, 0.018, '#d5a25c', unit, origin, true);
+}
+
+function butteredRollSling(g) {
+  curve(g, [[0, 0, 0.23], [0, 0, -0.06], [0, 0.02, -0.22], [0, 0.04, -0.38]], 0.038, '#945c37');
+  add(g, ball, '#c58b52', [0, 0.025, -0.4], [0.19, 0.065, 0.2]);
+  const bun = new T.Group();
+  g.add(bun);
+  bun.scale.setScalar(0.44);
+  bun.position.set(0, 0.14, -0.4);
+  dinnerRoll(bun);
+  add(g, butterBlock, '#ffda70', [0, 0.275, -0.4], [0.11, 0.029, 0.082], [0, 0.3, 0]);
+}
+
+function cornucopia(g) {
+  // The taper curls up at the tip. Raised bands follow the wicker bell.
+  const rings = [
+    [0.014, 0.13, 0.20], [0.035, 0.057, 0.22], [0.065, 0, 0.15],
+    [0.095, -0.012, 0.02], [0.135, 0.005, -0.13],
+    [0.18, 0.04, -0.28], [0.23, 0.09, -0.43],
+  ];
+  add(g, ringShell(rings.length, 36, (i, a) => {
+    const [r, y, z] = rings[i];
+    return [r * Math.cos(a), y + r * Math.sin(a), z];
+  }), '#aa622d');
+  for (const [r, y, z] of rings)
+    hoop(g, [0, y, z], r, 0.013, '#efb955', unit, origin, true);
+  add(g, ball, '#583528', [0, 0.09, -0.419], [0.223, 0.223, 0.012]);
+  for (let i = 0; i < 10; i++) {
+    const a = tau * i / 10;
+    curve(g, rings.map(([r, y, z]) =>
+      [r * Math.cos(a + z), y + r * Math.sin(a + z), z]), 0.006, '#d89444');
+  }
+}
+
+function harvest(g) {
+  for (let i = 0; i < 8; i++) {
+    const a = i * tau / 8;
+    add(g, ball, i % 2 ? '#ef9835' : '#eead44',
+      [0.18 * Math.cos(a), 0, 0.18 * Math.sin(a)], [0.22, 0.31, 0.22], origin, true);
+  }
+  curve(g, [[0, 0.23, 0], [0, 0.34, 0], [0.06, 0.39, 0]], 0.044, '#755334');
+  add(g, ball, '#739741', [-0.082, 0.31, 0], [0.13, 0.018, 0.062], [0.1, 0.25, -0.22]);
+  hoop(g, origin, 0.48, 0.014, '#ffdb79', unit, [0.9, 0.42, 0.3], true);
+}
+
+function cranberry(g) {
+  add(g, ball, '#a72347', origin, [0.2, 0.23, 0.2], origin, true);
+  add(g, bead, '#623d37', [0, 0.224, 0], [0.039, 0.017, 0.039]);
+}
+
 function widePickup(g) {
   const relic = new T.Group();
   g.add(relic);
@@ -529,6 +588,11 @@ export function createFoodFightArt() {
     speed: shoes,
     wide: widePickup,
     caster: wishbone,
+    popper: cranberryPopper,
+    sling: butteredRollSling,
+    berry: cranberry,
+    cornucopia,
+    harvest,
   };
   const templates = new Map();
   function instance(kind) {
@@ -544,7 +608,7 @@ export function createFoodFightArt() {
   return {
     projectile: instance,
     pickup: instance,
-    upgrade: (kind) => (kind === 'wide' ? instance('caster') : null),
+    tool: instance,
     dispose() {
       for (const template of templates.values()) template.children.forEach((m) => m.geometry.dispose());
       templates.clear();

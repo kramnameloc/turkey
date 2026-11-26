@@ -203,7 +203,8 @@ test('participants block a sprint, chase only when hit, and a released balloon l
   slideMove(player, 0, -7, (x, z) => parade.blocks(x, z));
   assert.ok(player.z - origin.z >= BODY_RADIUS + person.radius);
   player.z += 5;
-  parade.hit(person);
+  parade.hit(person, 18);
+  assert.equal(person.health, person.maxHealth - 18);
   for (let i = 1; i <= 20; i++) parade.update(2 + i * 0.05, player);
   assert.ok(
     player.distanceTo(person.model.position) < player.distanceTo(origin) - 1.5
@@ -228,7 +229,11 @@ test('participants block a sprint, chase only when hit, and a released balloon l
   parade.update(4.2, player);
   assert.equal(parade.contactAttack(player, 0), person);
   assert.equal(parade.contactAttack(player, 0), null, 'contact has a cooldown');
-  assert.match(parade.hit(person), /netted/);
+  parade.hit(person, 18);
+  assert.equal(person.health, 4);
+  assert.ok(parade.chasers.has(person));
+  assert.match(parade.hit(person, 56), /netted/);
+  assert.equal(person.health, 0);
   parade.update(4.3, player);
   assert.ok(!parade.nearbyActors.includes(person));
   shadow.getMatrixAt(person.shadowIndex, m);
@@ -243,6 +248,8 @@ test('participants block a sprint, chase only when hit, and a released balloon l
   parade.update(0);
   assert.equal(parade.chasers.size, 0);
   assert.ok(person.model.position.equals(origin));
+  assert.equal(person.health, person.maxHealth);
+  assert.equal(handler.health, handler.maxHealth);
   assert.ok(float.balloon.visible && float.shadow.visible && !float.release);
   assert.ok(float.balloon.position.distanceTo(release) < 0.001);
 });

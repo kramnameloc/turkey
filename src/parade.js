@@ -5,6 +5,7 @@ import { paradeRoute } from './parade-route.js';
 import { paradeCrowd } from './parade-crowd.js';
 import { BODY_RADIUS, TURKEY_HEIGHT } from './turkey-scale.js';
 import { clearTrail, walkingTrail } from './trail.js';
+import { dealDamage, WEAPONS } from './weapons.js';
 import { overlapsBody } from './body-collision.js';
 
 const spacing = 26,
@@ -79,6 +80,8 @@ function turkeyHandler(avatar, phase) {
   body.userData.labelHeight = TURKEY_HEIGHT + 0.18;
   return {
     name: 'Balloon handler',
+    maxHealth: 48,
+    health: 48,
     isParadeParticipant: true,
     model: body,
     radius: BODY_RADIUS,
@@ -187,6 +190,7 @@ export class Parade {
       f.release = null;
       for (const h of f.handlers) {
         h.caught = false;
+        h.health = h.maxHealth;
         h.body.rotation.x = 0;
       }
       f.balloon.visible = f.shadow.visible = true;
@@ -194,14 +198,21 @@ export class Parade {
     }
     this.time = 0;
   }
-  hit(actor) {
-    if (this.chasers.delete(actor)) {
-      actor.caught = true;
-      if (actor.float) actor.body.visible = actor.shadow.visible = false;
-      else this.crowd.capture(actor);
-      if (this.threat === actor) this.threat = null;
-      return actor.name + ' netted!';
-    }
+  hit(actor, damage = WEAPONS[0].damage) {
+    if (actor.caught) return '';
+    const chasing = this.chasers.has(actor);
+    const notice = chasing ? '' : this.startChase(actor);
+    const dealt = dealDamage(actor, damage);
+    if (actor.health > 0)
+      return (notice || actor.name) + ' −' + dealt + ' HP';
+    this.chasers.delete(actor);
+    actor.caught = true;
+    if (actor.float) actor.body.visible = actor.shadow.visible = false;
+    else this.crowd.capture(actor);
+    if (this.threat === actor) this.threat = null;
+    return actor.name + ' netted!';
+  }
+  startChase(actor) {
     this.chasers.add(actor);
     actor.attackAt = null;
     actor.nextPath = 0;

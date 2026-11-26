@@ -7,6 +7,7 @@ export const LIMIT = 300;
 export const DISHES = [
   {
     id: 'corn',
+    baseHealth: 48,
     stop: 0,
     name: 'Corn on the cob',
     color: '#e7b149',
@@ -16,6 +17,7 @@ export const DISHES = [
   },
   {
     id: 'mash',
+    baseHealth: 72,
     stop: 1,
     name: 'Mashed potatoes',
     color: '#e8d6a8',
@@ -25,6 +27,7 @@ export const DISHES = [
   },
   {
     id: 'beans',
+    baseHealth: 42,
     stop: 2,
     name: 'Green beans',
     color: '#a5b870',
@@ -34,6 +37,7 @@ export const DISHES = [
   },
   {
     id: 'berries',
+    baseHealth: 52,
     stop: 3,
     name: 'Cranberry sauce',
     color: '#d57072',
@@ -43,6 +47,7 @@ export const DISHES = [
   },
   {
     id: 'stuffing',
+    baseHealth: 76,
     stop: 4,
     name: 'Herb stuffing',
     color: '#d29862',
@@ -52,6 +57,7 @@ export const DISHES = [
   },
   {
     id: 'yams',
+    baseHealth: 64,
     stop: 5,
     name: 'Candied yams',
     color: '#ea9452',
@@ -61,6 +67,7 @@ export const DISHES = [
   },
   {
     id: 'pumpkinPie',
+    baseHealth: 68,
     name: 'Pumpkin pie',
     color: '#de8850',
     x: -90,
@@ -71,6 +78,7 @@ export const DISHES = [
   },
   {
     id: 'applePie',
+    baseHealth: 80,
     name: 'Lattice apple pie',
     color: '#daae70',
     x: -138,
@@ -81,6 +89,7 @@ export const DISHES = [
   },
   {
     id: 'cookie',
+    baseHealth: 44,
     name: 'Chocolate chunk cookie',
     color: '#c99967',
     x: -103,
@@ -91,6 +100,7 @@ export const DISHES = [
   },
   {
     id: 'gingerbread',
+    baseHealth: 46,
     name: 'Gingerbread runner',
     color: '#c78658',
     x: 99,
@@ -101,6 +111,7 @@ export const DISHES = [
   },
   {
     id: 'cupcake',
+    baseHealth: 54,
     name: 'Maple cupcake',
     color: '#e5ae86',
     x: 165,
@@ -111,6 +122,7 @@ export const DISHES = [
   },
   {
     id: 'cinnamonRoll',
+    baseHealth: 62,
     name: 'Cinnamon roll',
     color: '#cc966d',
     x: 25,

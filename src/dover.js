@@ -1,6 +1,7 @@
 import * as T from 'three';
-import { PORCH, PORCH_LANTERN, RELIC, hasGrail, collectGrail } from './dover-location.js';
+import { PORCH, PORCH_LANTERN, RELIC, hasGrail, collectGrail, hasRecipe, collectRecipe } from './dover-location.js';
 
+const recipeSpot = { x: 3.43, z: -4.17 };
 const crate = new T.BoxGeometry(1, 1, 1);
 const paint = (color, props = {}) =>
   new T.MeshStandardMaterial({ color, ...props });
@@ -195,6 +196,9 @@ function makeRoom() {
       box(scene, c.metal, x + dx, 0.68, -4.17, 0.24, 0.045, 0.06);
     }
   }
+  const recipe = plaque(scene, ['FAMILY RECIPE', 'Unfold before supper'], recipeSpot.x, 0.47, recipeSpot.z, 0.50, 0.26);
+  recipe.rotation.z = -0.12;
+  plaque(scene, ['Save room for seconds.', 'Check the cupboards.'], -2.86, 1.25, -4.83, 0.95, 0.31);
   plaque(scene, ['THANKSGIVING', 'HALL OF GRAVY'], 0, 3.0, -5.02, 2.72, 0.80);
   box(scene, c.red, 0, 0.015, 0.64, 2.54, 0.024, 5.46);
   const rug = new T.PlaneGeometry(2.54, 5.46).rotateX(-Math.PI / 2);
@@ -265,10 +269,11 @@ function makeRoom() {
   const lamp = new T.PointLight('#ffcf7a', 9, 5);
   lamp.position.set(0, 2.45, -2.6);
   scene.add(lamp);
-  return { scene, grail };
+  return { scene, grail, recipe };
 }
 export class DoverCottage {
   constructor(outdoors) {
+    this.recipeFound = hasRecipe();
     this.porch = makeQuestEmblem();
     this.porch.visible = false;
     outdoors.add(this.porch);
@@ -277,11 +282,21 @@ export class DoverCottage {
   nearPorch(p) {
     return p.x >= PORCH.x && Math.hypot(p.x - PORCH.x, p.z - PORCH.z) < 3.1;
   }
+  nearRecipe(p) {
+    return this.inside && !this.recipeFound &&
+      Math.hypot(p.x - recipeSpot.x, p.z - recipeSpot.z) < 1.45;
+  }
+  unfoldRecipe() {
+    collectRecipe();
+    this.recipeFound = true;
+    this.recipe.visible = false;
+  }
   prompt(p, finale = false) {
     if (!this.inside)
       return this.porch.visible && this.nearPorch(p)
         ? 'Enter 735 Dover St'
         : '';
+    if (this.nearRecipe(p)) return 'Unfold the family recipe';
     if (Math.hypot(p.x, p.z - 4.75) < 2.0) return 'Return to Dover St';
     if ((finale || !hasGrail()) && Math.hypot(p.x, p.z + 2.75) < 2.05) {
       return hasGrail() ? 'Inspect your Grail engraving' : 'Take the ' + RELIC;
@@ -291,6 +306,8 @@ export class DoverCottage {
   enter() {
     if (!this.scene) Object.assign(this, makeRoom());
     this.inside = true;
+    this.recipeFound = hasRecipe();
+    this.recipe.visible = !this.recipeFound;
     this.grail.visible = !hasGrail();
   }
   collect() {

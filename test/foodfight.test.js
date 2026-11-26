@@ -15,6 +15,10 @@ import { doverParking } from '../src/dover-block.js';
 import { yardBarriers } from '../src/dover-yard.js';
 import { walkingTrail } from '../src/trail.js';
 import { Hunt } from '../src/game.js';
+import { EnemyHealthBars } from '../src/enemy-health-bars.js';
+import { DoverCottage } from '../src/dover.js';
+import { hasRecipe } from '../src/dover-location.js';
+import { CORNUCOPIA, WEAPONS } from '../src/weapons.js';
 import { FoodFight } from '../src/foodfight.js';
 import { TURKEY_EYE } from '../src/turkey-scale.js';
 
@@ -129,8 +133,8 @@ test('each pair unlocks only the next hunt and the last pair unlocks the shuttle
     setHUD() {},
     guide: { reset() {} },
     fight: { clearField() {} },
-    allTargets: DISHES.map(({ id }) => ({
-      id,
+    allTargets: DISHES.map((dish) => ({
+      ...dish,
       model: new T.Group(),
       shadow: new T.Group(),
       caught: false,
@@ -149,7 +153,11 @@ test('each pair unlocks only the next hunt and the last pair unlocks the shuttle
       assert.equal(t.shadow.visible, expected.has(t.id));
     }
     assert.equal(hunt.advanceClock(30), false);
-    for (const t of hunt.targets) t.caught = true;
+    for (const t of hunt.targets) {
+      assert.equal(t.health, t.baseHealth);
+      assert.equal(t.maxHealth, t.health);
+      t.caught = true;
+    }
     hunt.completeHunt();
   }
   assert.equal(hunt.pendingDestination, COURSES[0].destination);
@@ -235,5 +243,167 @@ test('gravy stays at full health, heals once, and stays consumed after fast trav
   assert.equal(fight.health, 100);
   assert.equal(fight.speed, 4);
   assert.equal(fight.wide, 3);
+  fight.dispose();
+});
+
+test('casts respect range, cover and cooldown and only finishing hits earn captures and weapons', () => {
+  const { fight, g } = field();
+  const [net, popper, sling] = WEAPONS;
+  const shotModels = {
+    net: new T.LineSegments(),
+    popper: fight.art.projectile(popper.shot),
+    sling: fight.art.projectile(sling.shot),
+  };
+  const targets = [0, 5].map((x) => {
+    const model = new T.Group();
+    model.position.set(x, 0, -25);
+    model.userData.aimHeight = TURKEY_EYE;
+    return { model, shadow: new T.Group(), health: 48, maxHealth: 48 };
+  });
+  let rewards = 0;
+  fight.reward = () => { rewards++; return ''; };
+  const hunt = Object.assign(Object.create(Hunt.prototype), {
+    ...g, fight, targets, shotModels, net: shotModels.net, castModel: shotModels.net,
+    netStart: new T.Vector3(), netEnd: new T.Vector3(), weapon: net,
+    playing: true, house: { inside: false }, occluded: () => false,
+    bankedCount: 0, count: 1, paradeCaptures: 0, hits: 0, shots: 0,
+    elapsed: 3, cooldown: 0, setHUD() {}, guide: { reset() {} },
+  });
+  hunt.cast();
+  assert.equal(targets[0].health, 24);
+  assert.equal(targets[0].snaredUntil, 4.1);
+  assert.equal(targets[1].health, 48);
+  hunt.cast();
+  assert.equal(hunt.shots, 1);
+  assert.equal(rewards, 0);
+  hunt.cooldown = 0;
+  hunt.occluded = () => true;
+  hunt.cast();
+  assert.equal(hunt.hits, 1);
+  assert.equal(hunt.shots, 2);
+  assert.equal(targets[0].health, 24);
+  hunt.occluded = () => false;
+  hunt.cooldown = 0;
+  hunt.cast();
+  assert.equal(hunt.count, 2);
+  assert.equal(rewards, 1);
+  assert.equal(hunt.weapon, popper);
+  assert.equal(targets[0].caught, true);
+  targets[1].model.position.set(0, 0, -42);
+  hunt.switchWeapon();
+  assert.equal(hunt.weapon, net);
+  assert.equal(hunt.aim(), null);
+  hunt.switchWeapon();
+  assert.equal(hunt.weapon, popper);
+  assert.equal(hunt.aim(), targets[1]);
+  assert.equal(hunt.cooldown, net.cooldown);
+  hunt.cooldown = 0;
+  hunt.cast();
+  assert.equal(targets[1].health, 48 - popper.damage);
+  assert.equal(hunt.castModel, shotModels.popper);
+  assert.equal(hunt.cooldown, popper.cooldown);
+  hunt.paradeCaptures = 3;
+  assert.match(hunt.unlockWeapon(), /Buttered Roll Sling/);
+  assert.equal(hunt.weapon, sling);
+  assert.equal(hunt.aim(), null);
+  hunt.fight.wide = 1;
+  hunt.cooldown = 0;
+  hunt.completeHunt = () => {};
+  hunt.cast();
+  assert.equal(targets[1].health, 0);
+  assert.equal(targets[1].caught, true);
+  assert.equal(fight.wide, 0);
+  assert.equal(rewards, 2);
+  fight.dispose();
+});
+
+test('an interrupted windup cancels only the targeted throw', () => {
+  const { fight, dish } = field();
+  fight.windUp(dish, 'can');
+  assert.equal(fight.interrupt({}), false);
+  assert.equal(fight.attack.dish, dish);
+  assert.equal(fight.interrupt(dish), true);
+  assert.equal(fight.warning(), '');
+  assert.equal(fight.tosses.length, 0);
+  fight.windUp(dish, 'roll');
+  fight.release(fight.attack);
+  assert.equal(fight.interrupt(dish), false);
+  assert.equal(fight.tosses.length, 1);
+  fight.dispose();
+});
+
+test('health bars track individual dishes and pursuers and retire after capture', () => {
+  const bars = new EnemyHealthBars(), camera = new T.PerspectiveCamera();
+  const actors = [20, 60].map((health, i) => {
+    const model = new T.Group();
+    model.position.set(i * 3, 0, -8);
+    model.userData.labelHeight = 2;
+    return { model, health, maxHealth: 80 };
+  });
+  const [dish, chaser] = actors;
+  const chasers = new Set([chaser]);
+  bars.update([dish], chasers, camera.position, camera);
+  const [first, second] = bars.children;
+  assert.equal(first.children[0].scale.x * 3, second.children[0].scale.x);
+  dish.caught = true;
+  bars.update([dish], chasers, camera.position, camera);
+  assert.equal(first.position.x, chaser.model.position.x);
+  assert.equal(second.visible, false);
+  chasers.clear();
+  bars.update([dish], chasers, camera.position, camera);
+  assert.equal(first.visible, false);
+  bars.dispose();
+});
+
+test('the hidden recipe unlocks from a reachable cupboard and the horn heals only on a dish capture', () => {
+  const { fight, dish, g } = field();
+  const house = Object.assign(Object.create(DoverCottage.prototype), {
+    inside: true, recipeFound: false, recipe: new T.Group(),
+  });
+  const net = new T.LineSegments();
+  const hunt = Object.assign(Object.create(Hunt.prototype), {
+    ...g, fight, house, playing: true, weapon: WEAPONS[0],
+    bankedCount: 0, count: 36, paradeCaptures: 0, hits: 0, shots: 0,
+    net, castModel: net, shotModels: { cornucopia: fight.art.projectile(CORNUCOPIA.shot) },
+    netStart: new T.Vector3(), netEnd: new T.Vector3(), cooldown: 0,
+    occluded: () => false, guide: { reset() {} }, setHUD() {}, completeHunt() {},
+  });
+  assert.ok(!hunt.availableWeapons.includes(CORNUCOPIA), 'capture milestones cannot reveal the secret');
+  const p = hunt.camera.position;
+  p.set(3.43, TURKEY_EYE, -3.3);
+  assert.ok(!house.blocked(p.x, p.z));
+  assert.match(house.prompt(p, true), /Unfold/);
+  hunt.interact();
+  assert.equal(hunt.weapon, CORNUCOPIA);
+  assert.ok(hasRecipe());
+  assert.ok(!house.recipe.visible);
+  assert.equal(house.prompt(p, true), '');
+  assert.match(house.prompt({ x: 0, z: -1.5 }, true), /Grail/);
+  assert.ok(house.inside, 'secret discovery leaves the campaign objective available');
+  house.inside = false;
+  hunt.count = 0;
+  hunt.switchWeapon();
+  assert.equal(hunt.weapon, WEAPONS[0]);
+  hunt.switchWeapon();
+  assert.equal(hunt.weapon, CORNUCOPIA, 'available even at zero captures');
+
+  p.set(0, TURKEY_EYE, 0);
+  Object.assign(dish, { health: 101, maxHealth: 101, shadow: new T.Group() });
+  dish.model.userData.aimHeight = TURKEY_EYE;
+  hunt.targets = [dish];
+  fight.health = 94;
+  hunt.cast();
+  assert.equal(dish.health, 1);
+  assert.equal(fight.health, 94);
+  assert.equal(hunt.cooldown, CORNUCOPIA.cooldown);
+  hunt.cast();
+  assert.equal(hunt.shots, 1);
+  hunt.cooldown = 0;
+  hunt.cast();
+  assert.ok(dish.caught);
+  assert.equal(fight.health, 100);
+  assert.equal(hunt.count, 1);
+  const horn = fight.art.tool(CORNUCOPIA.id);
+  assert.ok(!new T.Box3().setFromObject(horn).isEmpty());
   fight.dispose();
 });

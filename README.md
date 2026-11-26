@@ -1,6 +1,6 @@
 # Turkey Takeover
 
-Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set along Colorado’s Front Range. Play as a Bourbon Red turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
+Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set along Colorado’s Front Range. Play as a Bourbon Red turkey and unlock Thanksgiving weapons to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
 
 ## Play locally
 
@@ -15,9 +15,9 @@ Open the local URL printed by Vite in a WebGL 2 browser. The game bundles its ge
 
 To play on a phone or tablet, connect it to the same Wi-Fi as the computer. Run `npm run build` followed by `npm run play:lan` on the computer, then open the printed **Network** URL on the device. The controls adapt when you rotate the screen.
 
-- **Start trip** opens the six-day campaign. Play three hunts each day, with two dishes per hunt and 36 captures across the trip. Each pair you catch reveals the next pair at a new spot. The optional two-minute clock restarts for each hunt. At Denver arrivals, board the shuttle and follow the porch light to the display at 735 Dover St. Explore the block on Day 2 and hunt alongside its Thanksgiving balloon parade on Day 3. Spend Black Friday inside the Nightmare Before Christmas ice gallery at Gaylord Rockies, visit Indian Hot Springs in Idaho Springs, then finish with tea at the Boulder Dushanbe Teahouse off Pearl Street. The clock holds for the shuttle, cottage and tea stops. Health and bonuses carry between days. Retry a failed day from its starting checkpoint.
+- **Start trip** opens the six-day campaign. Play three hunts each day, with two dishes per hunt and 36 captures across the trip. Each pair you catch reveals the next pair at a new spot. The optional two-minute clock restarts for each hunt. At Denver arrivals, board the shuttle and follow the porch light to the display at 735 Dover St. Explore the block on Day 2 and hunt alongside its Thanksgiving balloon parade on Day 3. Spend Black Friday inside the Nightmare Before Christmas ice gallery at Gaylord Rockies, visit Indian Hot Springs in Idaho Springs, then finish with tea at the Boulder Dushanbe Teahouse off Pearl Street. The clock holds for the shuttle, cottage and tea stops. Health, unlocked weapons, and bonuses carry between days. Retry a failed day from its starting checkpoint.
 - **Hunt timer** in the lobby or pause menu turns the countdown on or off. With it off you can finish every hunt and campaign course at your own pace. Turning it back on resumes the remaining time. The browser remembers your choice. Personal bests are recorded for runs played with the timer on.
-- **Watch parade** starts an untimed curbside visit. Four turkey handlers guide each of the 22 balloons around Main Street, 1st Avenue, and Community Park Road. Look for Snoopy carrying Woodstock, Finn riding Jake, Spider-Man, Pikachu, two Sonic designs, and a skating Ronald McDonald. The same procession runs during hunts and free roam near Community Park. Spectators and marching turkeys block your path. A net hit makes that participant chase you. They can tag you for damage. A second net catches the pursuer. Hitting a handler releases its balloon, and the rest of that crew keeps marching. The star on the park map marks the lead crew. In parade mode, choose any balloon on the map and select **Rejoin the parade** for a curbside view as it approaches.
+- **Watch parade** starts an untimed curbside visit. Four turkey handlers guide each of the 22 balloons around Main Street, 1st Avenue, and Community Park Road. Look for Snoopy carrying Woodstock, Finn riding Jake, Spider-Man, Pikachu, two Sonic designs, and a skating Ronald McDonald. The same procession runs during hunts and free roam near Community Park. Spectators and marching turkeys block your path. A net hit makes that participant chase you. They can tag you for damage. Keep landing casts to catch the pursuer at zero HP. Hitting a handler releases its balloon, and the rest of that crew keeps marching. The star on the park map marks the lead crew. In parade mode, choose any balloon on the map and select **Rejoin the parade** for a curbside view as it approaches.
 - **Hunt map → Park time trial** keeps the original twelve-dish, five-minute park challenge. Orange diamonds mark dishes. Get within 35 meters, aim until the reticle turns amber, and cast.
 - **Hunt map → Greater Broomfield → Citywide hunt** places one side and one dessert at each of six landmarks. Open the map during play to travel between them.
 - **Explore freely** opens the full regional map without a timer. Walk between neighborhoods or use a landmark travel stop.
@@ -28,7 +28,19 @@ Tap jump to hop over shorter enemies. Hold it for a short burst of flight and a 
 
 Dishes wind up and throw fossilized dinner rolls, jiggly cranberry cans, or gassy Brussels sprouts. Their throws aim at where you stood during the windup. Sidestep, flap over the food, or take cover. Walk into a mint-marked **Emergency Gravy Boat** to restore up to 35 health. A full-health turkey leaves the gravy for later.
 
-Each capture has a 50% chance of a bonus. A third capture following two misses guarantees one. **Buttered boots** boost walking and sprint speed by 65% for 20 seconds. The **wishbone slinger** gives four faster, wider casts with a 52-meter reach. Both equip automatically and work with the regular controls.
+Aim at a dish or parade pursuer to see its remaining HP. Nearby enemies carry a health bar, and the cast that brings one to zero HP captures it. Each campaign day adds 4 HP to each dish. Captures of dishes and parade pursuers both count toward weapon unlocks during the run. Each new weapon equips immediately.
+
+| Weapon | Unlock | Damage | Reach | Time between casts |
+| --- | --- | ---: | ---: | ---: |
+| Harvest Net | Starting gear | 24 | 35 m | 0.58 s |
+| Cranberry Popper | 2 captures | 18 | 46 m | 0.28 s |
+| Buttered Roll Sling | 5 captures | 56 | 24 m | 0.95 s |
+
+A Harvest Net hit slows a dish for 1.1 seconds. A Buttered Roll Sling hit interrupts the targeted dish if it is winding up a throw.
+
+There is also a family recipe hidden in the Hall of Gravy. The field guide carries a clue. Once discovered, its weapon stays available in future runs on the same browser.
+
+Each dish capture has a 50% chance of a bonus. A third capture following two misses guarantees one. **Buttered boots** boost walking and sprint speed by 65% for 20 seconds. The **wishbone bonus** gives the equipped weapon four faster, wider casts with a 52-meter reach. Both equip automatically and work with the regular controls.
 
 In the Broomfield outdoor scenes, the November forecast rolls a 35% chance of flurries at each course start and on periodic weather changes during play. Reduced-motion settings thin and slow the snowfall.
 
@@ -38,7 +50,8 @@ In the Broomfield outdoor scenes, the November forecast rolls a 35% chance of fl
 | --- | --- | --- |
 | Move | W/A/S/D | Left stick |
 | Aim | Mouse, or drag when the pointer is unlocked | Drag the world |
-| Cast net | Left click or F | Tap Cast, or drag from Cast to aim and release to throw |
+| Switch unlocked weapon | R | Tap the weapon name |
+| Cast weapon | Left click or F | Tap Cast, or drag from Cast to aim and release to throw |
 | Sprint | Hold Shift while moving | Full stick |
 | Jump / glide | Tap / hold Space | Tap / hold Flap |
 | Find next dish | H or compass | Compass |

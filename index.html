@@ -240,13 +240,11 @@
               ><kbd>V</kbd>
             </button>
           </div>
-          <div class="equipment">
-            <small>CAPTURE TOOL</small
-            ><strong
-              ><i data-i="focus"></i>
-              <span id="gear-name">Net caster</span></strong
-            ><span id="net-state">READY</span>
-          </div>
+          <button class="equipment" id="weapon-switch" title="Switch capture weapon (R)">
+            <strong id="gear-name">Harvest Net</strong>
+            <span class="weapon-stats"><b id="weapon-damage">24 DMG</b> · <span id="net-state">READY</span></span>
+            <small><span id="switch-hint">Next at 2 captures</span> <kbd>R</kbd></small>
+          </button>
         </div>
         <div class="touch" id="touch-controls">
           <div id="stick" role="group" aria-label="Movement joystick">
@@ -254,7 +252,7 @@
           </div>
           <button id="touch-flap" aria-label="Flap" title="Tap to jump, hold to glide">
             <i data-i="feather"></i><span>Flap</span></button
-          ><button id="touch-fire" aria-label="Cast net">
+          ><button id="touch-fire" aria-label="Cast equipped weapon">
             <i data-i="focus"></i><span>Cast</span>
           </button>
         </div>

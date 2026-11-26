@@ -108,7 +108,7 @@ export class FoodFight {
     sound('bonus');
     return kind === 'speed'
       ? 'Buttered boots! Speed up for 20s.'
-      : 'Wishbone slinger! Four wide casts.';
+      : 'Wishbone bonus! Four wide casts.';
   }
   // The dish commits to a spot when the windup starts. It cannot steer the throw.
   windUp(dish, kind) {
@@ -122,6 +122,13 @@ export class FoodFight {
     this.group.add(obj);
     this.attack = { dish, kind, obj, target, wind: 1.05 };
     sound('windup');
+  }
+  interrupt(dish) {
+    if (this.attack?.dish !== dish) return false;
+    this.group.remove(this.attack.obj);
+    this.attack = null;
+    this.lull = 1.8;
+    return true;
   }
   release(a) {
     const start = a.obj.position.clone();
@@ -186,9 +193,7 @@ export class FoodFight {
     if (this.attack) {
       const a = this.attack;
       if (a.dish.caught) {
-        this.group.remove(a.obj);
-        this.attack = null;
-        this.lull = 1.8;
+        this.interrupt(a.dish);
       } else {
         a.wind -= dt;
         a.obj.position.copy(a.dish.model.position);

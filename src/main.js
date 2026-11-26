@@ -1,7 +1,7 @@
 import './style.css';
 import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
-import { DOVER, RELIC, hasGrail } from './dover-location.js';
+import { DOVER, RELIC, hasGrail, hasRecipe } from './dover-location.js';
 import { COURSES, TRIP_HUNTS, TRIP_CAPTURES } from './courses.js';
 import { renderPearlMap } from './pearl-map.js';
 import { fillIcons, icon } from './icons.js';
@@ -223,7 +223,8 @@ function guide(tab = 'dishes') {
         ['Move', 'Left stick'],
         ['Sprint', 'Push stick to the rim'],
         ['Aim', 'Swipe the view'],
-        ['Cast net', 'Tap Cast'],
+        ['Cast weapon', 'Tap Cast'],
+        ['Switch weapon', 'Tap the weapon name'],
         ['Aim and cast', 'Drag Cast, then release'],
         ['Jump / glide', 'Tap / hold Flap'],
         ['Find next dish', 'Tap the compass'],
@@ -235,7 +236,8 @@ function guide(tab = 'dishes') {
     : [
         ['Move', 'W A S D'],
         ['Aim', 'Mouse'],
-        ['Cast net', 'Left click / F'],
+        ['Cast weapon', 'Left click / F'],
+        ['Switch weapon', 'R'],
         ['Sprint', 'Shift'],
         ['Jump / glide', 'Tap / hold Space'],
         ['Find next dish', 'H'],
@@ -265,13 +267,13 @@ function guide(tab = 'dishes') {
     heading('FIELD MANUAL', isControls ? 'How to play' : 'Field guide') +
       '<p class="panel-text">' +
       (isControls
-        ? 'Cast when the reticle turns amber. Step sideways or flap when a dish winds up.'
+        ? 'Cast when the reticle turns amber. Bring a dish to zero HP to capture it. Step sideways or flap when a dish winds up.'
         : 'Each trip day has three hunts. Catch both dishes to start the next hunt. Orange diamonds mark food. A mint cross marks an Emergency Gravy Boat.') +
       '</p>' +
       tabs +
       (isControls
         ? controls +
-          '<div class="field-note"><strong>Food fight rules</strong><p>Captures can give 20 seconds of buttered boots or four long-range, wide casts from the wishbone slinger. Both equip automatically. Walk into a green gravy boat for up to 35 health. If a sprout starts tooting, move.</p></div>'
+          '<div class="field-note"><strong>Food fight rules</strong><p>The Harvest Net slows a fleeing dish. Two captures unlock the quick Cranberry Popper. Five unlock the Buttered Roll Sling, which can interrupt a dish winding up at close range. New weapons equip automatically. Captures can also grant 20 seconds of buttered boots or four wide casts. Walk into a green gravy boat for up to 35 health. If a sprout starts tooting, move.</p></div>'
         : '<div class="targets">' +
           list +
           '</div><div class="field-note"><strong>' +
@@ -280,6 +282,10 @@ function guide(tab = 'dishes') {
           (hasGrail()
             ? 'One of one. Your turkey found the prize in the Hall of Gravy.'
             : 'Follow the porch light to 735 Dover St on your first night. You can also visit the cottage from the Greater Broomfield map.') +
+          '</p><p>' +
+          (hasRecipe()
+            ? 'Family recipe decoded. The Cornucopia of Plenty fires a golden pumpkin for 100 damage. Each dish it captures restores up to 12 turkey HP.'
+            : 'A handwritten note reads, “Save room for seconds. Check the cupboards.”') +
           '</p></div>') +
       '<div class="panel-actions">' +
       (game?.active
@@ -715,10 +721,10 @@ function end({ won, time, shots, count, reason }) {
     ...(game.untimed ? [] : [['DISHES CAPTURED', count + ' / ' + total]]),
     ...(game.paradeHits ? [['PURSUERS NETTED', game.paradeCaptures]] : []),
     ...(timerEnabled ? [['TIME AFIELD', formatTime(time)]] : []),
-    ['NETS CAST', shots],
+    ['CASTS', shots],
     [
       'ACCURACY',
-      (shots ? Math.round(((count + game.paradeHits) / shots) * 100) : 0) + '%',
+      (shots ? Math.round((game.hits / shots) * 100) : 0) + '%',
     ],
   ];
   show(
@@ -742,7 +748,7 @@ function end({ won, time, shots, count, reason }) {
             ? 'The full Thanksgiving menu is at the table. New personal best!'
             : 'The full Thanksgiving menu is at the table.'
         : reason === 'parade'
-          ? 'Cast your net again to catch a pursuer. Hold Flap to glide over the crowd.'
+          ? 'Bring a pursuer to zero HP to catch them. Hold Flap to glide over the crowd.'
           : reason === 'health'
             ? 'The side dishes won the food fight. Watch for the windup and grab an Emergency Gravy Boat when your health dips.'
             : 'Supper started with ' +

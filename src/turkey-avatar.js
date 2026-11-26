@@ -9,7 +9,7 @@ export class TurkeyAvatar extends T.Group {
     this.actions = new Map();
   }
 
-  async load(netCaster, wishbone) {
+  async load(...tools) {
     const { scene, animations } = await new GLTFLoader().loadAsync(
       '/models/bourbon-red.glb'
     );
@@ -32,12 +32,10 @@ export class TurkeyAvatar extends T.Group {
     this.play('Stand');
     this.mixer.update(0);
 
-    this.netCaster = netCaster;
-    this.wishbone = wishbone;
     const gear = new T.Group();
     this.gear = gear;
     gear.name = 'Turkey equipment';
-    gear.add(netCaster, wishbone);
+    gear.add(...tools);
     gear.scale.setScalar(CASTER_SCALE);
     gear.position.set(1.07, 1.13, -0.5).multiplyScalar(TURKEY_MODEL_SCALE);
     this.add(gear);
@@ -60,11 +58,6 @@ export class TurkeyAvatar extends T.Group {
     if (this.current && this.current !== action) action.fadeIn(0.09);
     this.current = action;
     return action;
-  }
-
-  showWishbone(wide) {
-    this.netCaster.visible = !wide;
-    this.wishbone.visible = wide;
   }
 
   cast() {
