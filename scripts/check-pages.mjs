@@ -83,7 +83,7 @@ assert.equal(badge.toString('ascii', 1, 4), 'PNG');
 assert.equal(badge.readUInt32BE(16), 180);
 assert.equal(badge.readUInt32BE(20), 180);
 assert.equal(dish.toString('ascii', 8, 12), 'WEBP');
-const [maps, mountains, dem, turkey] = await Promise.all([
+const [maps, mountains, dem, turkey, oaks] = await Promise.all([
   asset('/geo/courses/maps.json', /json/),
   asset('/scenery/front-range.webp', /image\/webp/),
   asset('/geo/park-elevation.json', /json/),
@@ -91,7 +91,13 @@ const [maps, mountains, dem, turkey] = await Promise.all([
     '/models/bourbon-red.glb',
     /model\/gltf-binary|application\/octet-stream/
   ),
+  asset(
+    '/models/november-oaks.glb',
+    /model\/gltf-binary|application\/octet-stream/
+  ),
 ]);
+assert.equal(oaks.toString('ascii', 0, 4), 'glTF');
+assert.equal(oaks.readUInt32LE(8), oaks.length);
 // This model is required before a hunt starts. Check that the release contains
 // the rig, both player views, the texture, and every action the mixer expects.
 assert.equal(turkey.toString('ascii', 0, 4), 'glTF');

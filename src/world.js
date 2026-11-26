@@ -2,6 +2,7 @@ import * as T from 'three';
 import { parkFloor, pavement } from './surfaces.js';
 import {
   Obstacles,
+  plantParkSaplings,
   regionData,
   SPAWN,
   BODY_RADIUS,
@@ -10,7 +11,7 @@ import {
   SIGN_DEPTH,
 } from './field.js';
 import { makeTerrain } from './terrain.js';
-import { TreeStand } from './trees.js';
+import { loadOaks, TreeStand } from './trees.js';
 const loader = new T.TextureLoader();
 function texture(url, repeat = false) {
   return loader.loadAsync(url).then((t) => {
@@ -321,7 +322,7 @@ function water(scene, rings, height) {
   scene.add(new T.Mesh(geometry(positions), surface));
 }
 export async function buildWorld(scene, data) {
-  const [photo, grass, sky, brick, civic, treeTexture, fine, regional] =
+  const [photo, grass, sky, brick, civic, treeTexture, oaks, fine, regional] =
     await Promise.all([
       texture(data.orthophoto.url),
       texture('/scenery/grass.webp', true),
@@ -329,6 +330,7 @@ export async function buildWorld(scene, data) {
       texture('/scenery/brick-facade.webp', true),
       texture('/scenery/civic-facade.webp', true),
       texture('/scenery/tree-materials.webp'),
+      loadOaks(),
       fetch('/geo/park-elevation.json').then((r) => {
         if (!r.ok) throw Error('The park elevation map could not load.');
         return r.json();
@@ -354,10 +356,12 @@ export async function buildWorld(scene, data) {
     height,
     walls
   );
-  const trees = new TreeStand(scene, treeTexture);
+  const solids = new Obstacles(data, PARK_SIGNS);
+  const plantings = [...data.trees, ...plantParkSaplings(data, solids)];
+  const trees = new TreeStand(scene, treeTexture, oaks);
   trees.add(
     'park',
-    data.trees.map((t) => ({ ...t, ground: height(t.x, t.z) }))
+    plantings.map((t) => ({ ...t, ground: height(t.x, t.z) }))
   );
   trees.update(SPAWN.x, SPAWN.z);
   scene.add(
@@ -366,13 +370,12 @@ export async function buildWorld(scene, data) {
   );
   const signs = PARK_SIGNS.map((s) => parkSign(s, height));
   scene.add(
-    parkFloor(data, photo, height),
+    parkFloor({ ...data, trees: plantings }, photo, height),
     pavement([...data.roads, ...data.paths], terrain),
     ...signs
   );
   parkFurniture(scene, data, height);
   water(scene, data.water, height);
-  const solids = new Obstacles(data, PARK_SIGNS);
   return {
     walls: [...structures.children, ...signs.flatMap((sign) => sign.children)],
     solids,

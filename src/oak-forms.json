@@ -1,0 +1,76 @@
+{
+  "sapling": [
+    {
+      "id": "sapling1",
+      "aspect": 0.6077,
+      "trunk": 0.025,
+      "low": 0.2438
+    },
+    {
+      "id": "sapling2",
+      "aspect": 0.5704,
+      "trunk": 0.0217,
+      "low": 0.3729
+    }
+  ],
+  "small": [
+    {
+      "id": "small1",
+      "aspect": 0.7177,
+      "trunk": 0.0244,
+      "low": 0.2288
+    },
+    {
+      "id": "small2",
+      "aspect": 0.7477,
+      "trunk": 0.0241,
+      "low": 0.2284
+    },
+    {
+      "id": "small3",
+      "aspect": 0.6971,
+      "trunk": 0.0295,
+      "low": 0.2579
+    }
+  ],
+  "medium": [
+    {
+      "id": "medium1",
+      "aspect": 0.8428,
+      "trunk": 0.0274,
+      "low": 0.2659
+    },
+    {
+      "id": "medium2",
+      "aspect": 0.8765,
+      "trunk": 0.0305,
+      "low": 0.1662
+    },
+    {
+      "id": "medium3",
+      "aspect": 0.741,
+      "trunk": 0.0276,
+      "low": 0.154
+    }
+  ],
+  "mature": [
+    {
+      "id": "mature1",
+      "aspect": 1.0538,
+      "trunk": 0.0428,
+      "low": 0.1114
+    },
+    {
+      "id": "mature2",
+      "aspect": 0.8574,
+      "trunk": 0.0474,
+      "low": 0.1415
+    },
+    {
+      "id": "mature3",
+      "aspect": 0.9943,
+      "trunk": 0.0439,
+      "low": 0.1081
+    }
+  ]
+}

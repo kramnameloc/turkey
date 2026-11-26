@@ -1,4 +1,12 @@
 {
+  "/models/november-oaks.glb": {
+    "title": "Oak trees pack (17var, LODs, seasons, gameready)",
+    "author": "LOLIPOP",
+    "source": "https://sketchfab.com/3d-models/oak-trees-pack-17var-lods-seasons-gameready-a5e4e64f9f1d4089bdcc6170a9333393",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Selected eleven silhouettes, normalized their trunk pivots and dimensions, simplified distant geometry, and resized the bark, early autumn, late autumn and winter textures for instanced rendering."
+  },
   "sky.webp": {
     "title": "Front Range sky composite",
     "license": "CC BY-SA 4.0",

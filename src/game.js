@@ -5,6 +5,7 @@ import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
 import { ChaseView, TURKEY_EYE } from './view.js';
 import { TurkeyAvatar } from './turkey-avatar.js';
+import { CASTER_SCALE } from './turkey-scale.js';
 import { addPeaks } from './peaks.js';
 import { DoverCottage } from './dover.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
@@ -33,6 +34,7 @@ const direction = new T.Vector3(),
   projected = new T.Vector3(),
   ray = new T.Raycaster();
 const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const toolRest = { y: -0.24, z: -0.50 };
 function netGeometry() {
   const segments = [];
   const point = (r, a) => [
@@ -100,7 +102,7 @@ export class Hunt {
     this.tool = new T.Group();
     this.tool.add(this.standardTool, this.wideTool);
     this.camera.add(this.tool);
-    this.tool.position.set(0.3, -0.25, -0.37);
+    this.tool.position.set(0, toolRest.y, toolRest.z);
     this.tool.rotation.set(0.1, 0.32, -0.1);
     this.net = new T.LineSegments(
       netGeometry(),
@@ -193,8 +195,8 @@ export class Hunt {
     this.chaseCamera.aspect = aspect;
     this.chaseCamera.fov = this.camera.fov;
     this.chaseCamera.updateProjectionMatrix();
-    this.tool.position.x = Math.min(0.39, 0.25 * this.camera.aspect);
-    this.tool.scale.setScalar(this.camera.aspect < 1 ? 0.72 : 1);
+    this.tool.position.x = Math.min(0.29, 0.2 * this.camera.aspect);
+    this.tool.scale.setScalar(CASTER_SCALE * (this.camera.aspect < 1 ? 0.72 : 1));
   }
   get mapPosition() {
     return this.house.inside ? PORCH : this.camera.position;
@@ -1063,8 +1065,8 @@ export class Hunt {
       this.tileTime = 0;
     }
     this.cooldown = Math.max(0, this.cooldown - dt);
-    this.tool.position.y = -0.29 + Math.sin(this.steps) * 0.009;
-    this.tool.position.z = -0.46 + Math.pow(this.cooldown / 0.58, 3) * 0.105;
+    this.tool.position.y = toolRest.y + Math.sin(this.steps) * 0.009;
+    this.tool.position.z = toolRest.z + Math.pow(this.cooldown / 0.58, 3) * 0.105;
     if (this.netTime > 0) {
       this.netTime -= dt;
       const progress = 1 - Math.max(0, this.netTime) / 0.24;

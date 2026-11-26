@@ -413,6 +413,7 @@ function credits() {
       '. ' +
       links('/cover/credits.json', 'Original photographs') +
       '.</p><h3>Player model</h3><p>The Bourbon Red turkey uses the supplied model, color texture, and character animations. Its right wing also appears in first person.</p><h3>Field scenery</h3><p>Adapted Broomfield Flatirons by Kpsudeep (CC BY-SA 4.0), photographic panorama by Greg Zaal, grass by Charlotte Baglioni, cottonwood by Famartin (CC BY-SA 4.0), oak by Betelguese (CC BY-SA 3.0), and photographed façades by Scouser. ' +
+      'The oak models and November foliage are adapted from the Oak trees pack by LOLIPOP (CC BY 4.0). ' +
       links('/scenery/sources.json', 'Scenery sources and licenses') +
       '. The western skyline uses USGS elevation and aerial imagery with illustrated November snow and emphasized distant relief. ' +
       links('/scenery/peaks-credits.json', 'Front Range sources') +

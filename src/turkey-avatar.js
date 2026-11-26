@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CASTER_SCALE, TURKEY_MODEL_SCALE } from './turkey-scale.js';
 
 export class TurkeyAvatar extends T.Group {
   constructor() {
@@ -14,10 +15,9 @@ export class TurkeyAvatar extends T.Group {
     );
     const wing = scene.getObjectByName('FirstPersonWing');
     wing.removeFromParent();
-    // The player looks down -Z. The source bird faces +Z and stands 3.54
-    // source units tall. Keep its standing height at 1.06 game meters.
+    // The player looks down -Z. The source bird faces +Z.
     scene.rotation.y = Math.PI;
-    scene.scale.setScalar(0.3);
+    scene.scale.setScalar(TURKEY_MODEL_SCALE);
     this.add(scene);
     this.mixer = new T.AnimationMixer(scene);
     for (const clip of animations)
@@ -34,15 +34,15 @@ export class TurkeyAvatar extends T.Group {
     this.wishbone = wishbone;
     const gear = new T.Group();
     gear.add(netCaster, wishbone);
-    gear.scale.setScalar(0.73);
-    gear.position.set(0.32, 0.34, -0.15);
+    gear.scale.setScalar(CASTER_SCALE);
+    gear.position.set(1.07, 1.13, -0.5).multiplyScalar(TURKEY_MODEL_SCALE);
     this.add(gear);
     this.updateWorldMatrix(true, true);
     scene.getObjectByName('Wing_R').attach(gear);
 
     // This wing was cut from the standing mesh with its original UVs. It
     // rides the first-person caster, sharing its portrait scaling and recoil.
-    wing.scale.setScalar(0.26);
+    wing.scale.setScalar(TURKEY_MODEL_SCALE / CASTER_SCALE);
     wing.rotation.set(1.02, -0.55, -0.56);
     wing.position.set(0.06, -0.035, -0.11);
     return wing;

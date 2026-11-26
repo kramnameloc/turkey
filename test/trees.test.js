@@ -1,47 +1,115 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import * as T from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TreeStand } from '../src/trees.js';
-import { treeShape } from '../src/field.js';
+import {
+  Obstacles,
+  PARK_SIGNS,
+  plantParkSaplings,
+  treeShape,
+} from '../src/field.js';
 
-test('streamed trees retain solid 3D geometry, surveyed positions and scaled heights at every detail level', () => {
-  const scene = new T.Scene(),
-    stand = new TreeStand(scene, null);
-  const trees = [
-    { x: -7.4, z: 0, height: 8, ground: 4, species: 'Maple' },
-    { x: -2, z: 0, height: 11, ground: 14, species: 'Cottonwood' },
-    { x: 3, z: 0, height: 6, ground: -1, species: 'Oak' },
-    { x: 7, z: 0, height: 15, ground: 2, type: 'Coniferous' },
-  ];
-  stand.add('tile', trees);
-  const countTriangles = [];
-  for (const distance of [0, 80, 300]) {
-    stand.update(0, distance);
-    const batches = stand.group.children.filter((m) => m.visible && m.count);
-    assert.equal(batches.length, trees.length);
-    let triangles = 0;
-    for (const mesh of batches) {
+const park = JSON.parse(
+  await readFile(new URL('../public/geo/broomfield.json', import.meta.url))
+);
+const file = await readFile(
+  new URL('../public/models/november-oaks.glb', import.meta.url)
+);
+const loader = new GLTFLoader();
+// Parse the shipped geometry and materials. Node has no browser image decoder.
+loader.register((parser) => {
+  parser.loadImageSource = async () => new T.Texture();
+  return { name: 'HeadlessTextures' };
+});
+const { scene: oaks } = await loader.parseAsync(
+  Uint8Array.from(file).buffer,
+  ''
+);
+
+test('every oak form and the spruce stay grounded and scaled through distance changes and tile reloads', () => {
+  const stand = new TreeStand(new T.Scene(), null, oaks);
+  const sites = new Map();
+  for (const t of park.trees) sites.set(treeShape(t).variety, t);
+  assert.deepEqual([...sites.keys()].sort(), [...stand.levels.keys()].sort());
+  const matrix = new T.Matrix4();
+  for (const [form, tree] of sites) {
+    const site = { ...tree, ground: -3.4 };
+    const shape = treeShape(site);
+    stand.add('tile', [site]);
+    const triangles = [];
+    let original;
+    for (const [detail, distance] of [0, 80, 300].entries()) {
+      stand.update(site.x, site.z + distance);
+      const visible = stand.group.children.filter((m) => m.visible);
+      assert.equal(visible.length, 1);
+      const [mesh] = visible;
+      assert.equal(mesh.name, form + '_' + detail);
       assert.equal(mesh.count, 1);
-      const m = new T.Matrix4();
-      mesh.getMatrixAt(0, m);
-      const site = new T.Vector3().setFromMatrixPosition(m);
-      const tree = trees.find((t) => Math.abs(t.x - site.x) < 0.0001);
-      assert.ok(tree);
-      assert.equal(site.y, tree.ground);
-      const extent = mesh.geometry.boundingBox.getSize(new T.Vector3());
-      assert.ok(extent.x > 0.55 && extent.z > 0.55);
+      mesh.getMatrixAt(0, matrix);
+      for (const [i, value] of [
+        [12, site.x],
+        [13, site.ground],
+        [14, site.z],
+      ]) {
+        assert.ok(Math.abs(matrix.elements[i] - value) < 0.0001);
+      }
+      const box = mesh.geometry.boundingBox;
+      const extent = box.getSize(new T.Vector3());
+      assert.ok(Math.abs(box.min.y) < 0.00001, form);
+      assert.ok(extent.x > 0.4 && extent.z > 0.4, form);
       assert.ok(
-        Math.abs(extent.y * m.elements[5] - treeShape(tree).height) < 0.0001
+        Math.abs(extent.y * matrix.elements[5] - shape.height) < 0.0001,
+        form
       );
-      triangles += mesh.geometry.index.count / 3;
+      if (form !== 'pine') {
+        const scaleX = new T.Vector3().setFromMatrixColumn(matrix, 0).length();
+        assert.ok(
+          Math.abs(Math.max(extent.x, extent.z) * scaleX - shape.width) <
+            0.0001,
+          form
+        );
+        assert.equal(mesh.geometry.groups.length, 2);
+        assert.ok(mesh.material[1].alphaTest > 0);
+      }
+      if (!original) original = matrix.clone();
+      assert.ok(matrix.equals(original));
+      triangles.push(mesh.geometry.index.count / 3);
     }
-    countTriangles.push(triangles);
+    assert.ok(triangles[0] > triangles[1] && triangles[1] > triangles[2], form);
+    stand.remove('tile');
+    stand.update(site.x, site.z);
+    assert.ok(stand.group.children.every((m) => !m.visible));
+    stand.add('tile', [site]);
+    stand.update(site.x, site.z);
+    stand.group.children.find((m) => m.visible).getMatrixAt(0, matrix);
+    assert.ok(matrix.equals(original));
+    stand.remove('tile');
   }
-  assert.ok(
-    countTriangles[0] > countTriangles[1] &&
-      countTriangles[1] > countTriangles[2]
+});
+
+test('branches above the turkey leave the ground clear up to the trunk', () => {
+  const tree = { x: 0, z: 0, height: 6, species: 'Oak' };
+  const { variety, radius, width } = treeShape(tree);
+  const leaves = oaks.getObjectByName(variety + '_0_leaves');
+  const lowestBranch = leaves.geometry.boundingBox.min.y * tree.height;
+  assert.ok(lowestBranch > 0.9 && lowestBranch < 2.1);
+  assert.ok(radius < width * 0.08);
+});
+
+test('scattered park saplings have repeatable positions, clear ground and matching collisions', () => {
+  const surveyed = new Obstacles(park, PARK_SIGNS);
+  const planted = new Obstacles(park, PARK_SIGNS);
+  const saplings = plantParkSaplings(park, planted);
+  assert.ok(saplings.length > 0);
+  assert.deepEqual(
+    saplings,
+    plantParkSaplings(park, new Obstacles(park, PARK_SIGNS))
   );
-  stand.remove('tile');
-  stand.update(0, 300);
-  assert.equal(stand.group.children.filter((m) => m.visible).length, 0);
+  for (const t of saplings) {
+    assert.match(treeShape(t).variety, /^sapling/);
+    assert.equal(surveyed.blocked(t.x, t.z), false);
+    assert.equal(planted.blocked(t.x, t.z), true);
+  }
 });

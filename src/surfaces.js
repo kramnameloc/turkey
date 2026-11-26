@@ -1,12 +1,6 @@
 import * as T from 'three';
+import { randomSeed, treeShape } from './field.js';
 const up = new T.Object3D();
-function randomSeed(seed) {
-  let state = seed;
-  return () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
 // Pavement follows the surveyed centerlines. Join normals keep bends continuous.
 export function pavement(lines, terrain, regional = false) {
   const random = randomSeed(954);
@@ -167,7 +161,7 @@ export function parkFloor(data, photo, height) {
   let count = 0;
   const leafColors = ['#a48843', '#8f632b', '#b1823f', '#c39447', '#8c7841'];
   trees.forEach((t, i) => {
-    const treeHeight = t.surveyHeight || t.height;
+    const { height: treeHeight, width } = treeShape(t);
     const x = t.x - treeHeight * 0.13,
       z = t.z;
     const slope = new T.Vector3(
@@ -178,12 +172,12 @@ export function parkFloor(data, photo, height) {
     up.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), slope);
     up.rotateY(0.8);
     up.position.set(x, height(x, z) + 0.045, z);
-    up.scale.set(treeHeight * 0.83, 1, treeHeight * 0.45);
+    up.scale.set(width, 1, width * 0.65);
     up.updateMatrix();
     shade.setMatrixAt(i, up.matrix);
-    if (t.type === 'Coniferous') return;
+    if (t.type === 'Coniferous' || treeHeight < 2) return;
     for (let n = 0; n < 18; n++) {
-      const radius = Math.sqrt(random()) * treeHeight * 0.57,
+      const radius = Math.sqrt(random()) * width * 0.57,
         angle = random() * 6.28;
       up.position.set(
         t.x + Math.cos(angle) * radius,

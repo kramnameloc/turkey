@@ -11,6 +11,7 @@ import {
 import { DISHES, TRAVEL, PARK_SIGNS, Obstacles } from '../src/field.js';
 import { walkingTrail } from '../src/trail.js';
 import { FoodFight } from '../src/foodfight.js';
+import { TURKEY_EYE } from '../src/turkey-scale.js';
 
 test('all twelve distinct campaign dishes and gravy boats are reachable on the surveyed maps', () => {
   const json = (url) =>
@@ -75,7 +76,7 @@ test('capture rolls cover both upgrades, dry streak protection and clear or snow
 function field(blocked = () => false) {
   const scene = new T.Scene(),
     camera = new T.PerspectiveCamera();
-  camera.position.set(0, 1.62, 0);
+  camera.position.set(0, TURKEY_EYE, 0);
   const g = {
     scene,
     camera,

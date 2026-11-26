@@ -7,6 +7,7 @@ import {
   SPAWN,
   TRAVEL,
   PARK_SIGNS,
+  plantParkSaplings,
   dishSpawn,
 } from '../src/field.js';
 
@@ -17,6 +18,7 @@ const park = json('/geo/broomfield.json'),
 
 test('every park dish can be reached from the spawn without crossing water or buildings', () => {
   const obstacles = new Obstacles(park, PARK_SIGNS);
+  plantParkSaplings(park, obstacles);
   const remaining = new Set(DISHES);
   const step = 4;
   const queue = [[SPAWN.x, SPAWN.z]],

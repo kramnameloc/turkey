@@ -1,6 +1,6 @@
 import * as T from 'three';
 
-export const TURKEY_EYE = 0.97;
+export { TURKEY_EYE } from './turkey-scale.js';
 const pivot = new T.Vector3();
 const offset = new T.Vector3();
 
@@ -11,15 +11,15 @@ export class ChaseView extends T.PerspectiveCamera {
     this.distance = 0;
   }
   follow(eye, yaw, pitch, dt, snap, blocked, ground, indoors) {
-    const tilt = T.MathUtils.clamp(pitch - 0.22, -1.28, 1.05);
+    const tilt = T.MathUtils.clamp(pitch - 0.12, -1.28, 1.05);
     this.rotation.set(tilt, yaw, 0, 'YXZ');
     pivot.copy(eye);
-    pivot.y += 0.13;
-    // Raise the boom above the line of sight to frame the turkey below the reticle.
+    pivot.y += 0.06;
+    // A longer, lower outdoor boom reduces foreground exaggeration beside trees.
     offset.set(
-      indoors ? 0.32 : 0.64,
-      indoors ? 0.63 : 1.12,
-      indoors ? 2.8 : 4.65
+      indoors ? 0.32 : 0.56,
+      indoors ? 0.52 : 0.78,
+      indoors ? 2.8 : 5.8
     );
     offset.applyQuaternion(this.quaternion);
     const length = offset.length();

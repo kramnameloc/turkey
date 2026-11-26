@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { TURKEY_EYE } from './view.js';
+import { BODY_RADIUS, TURKEY_EYE, TURKEY_HEIGHT } from './turkey-scale.js';
 import { createFoodFightArt } from './foodfight-art.js';
 import {
   captureBonus,
@@ -115,7 +115,7 @@ export class FoodFight {
     const g = this.hunt,
       target = g.camera.position.clone(),
       obj = this.art.projectile(kind);
-    target.y = g.height(target.x, target.z) + 0.85;
+    target.y = g.height(target.x, target.z) + TURKEY_EYE;
     obj.position.copy(dish.model.position);
     obj.position.y += dish.model.userData.labelHeight + 0.3;
     obj.scale.multiplyScalar(1.3);
@@ -223,9 +223,9 @@ export class FoodFight {
           break;
         }
         if (
-          Math.hypot(point.x - p.x, point.z - p.z) < 0.92 &&
+          Math.hypot(point.x - p.x, point.z - p.z) < BODY_RADIUS + 0.3 &&
           point.y > p.y - TURKEY_EYE + 0.035 &&
-          point.y < p.y + 0.32
+          point.y < p.y - TURKEY_EYE + TURKEY_HEIGHT + 0.2
         ) {
           done = true;
           if (this.invulnerable === 0) {

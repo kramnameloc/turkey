@@ -1,3 +1,7 @@
+import oakForms from './oak-forms.json' with { type: 'json' };
+import { BODY_RADIUS, TURKEY_HEIGHT } from './turkey-scale.js';
+export { BODY_RADIUS };
+
 export const SPAWN = { x: -44, z: 20 };
 export const LIMIT = 300;
 export const DISHES = [
@@ -150,37 +154,56 @@ export function contains(points, x, z) {
   }
   return inside;
 }
-// Surveyed trunk location, crown spread and low boughs define both the 3D trees and their collision footprint.
-const TREES = {
-  pine: { aspect: 0.49, lowBranches: 0, crown: 0.44 },
-  maple: { aspect: 0.92, lowBranches: 0.19, crown: 0.45 },
-  gold: { aspect: 1.11, lowBranches: 0.065, crown: 0.45 },
-  bare: { aspect: 0.857, lowBranches: 0.2, crown: 0.39 },
-};
-export function treeShape(tree) {
-  const species = (tree.species || '').toLowerCase();
-  const seed = Math.abs(Math.floor(tree.x * 3.7 + tree.z * 5.3)) % 10;
-  let variety = 'maple';
-  if (tree.type === 'Coniferous') variety = 'pine';
-  else if (species.includes('cottonwood') || species.includes('aspen'))
-    variety = 'gold';
-  else if (species.includes('oak') || seed === 1 || seed === 3)
-    variety = 'bare';
-  else if (seed < 6) variety = 'gold';
-  const { aspect, lowBranches, crown } = TREES[variety];
-  const height = tree.surveyHeight || tree.height || 8;
-  const width = height * aspect;
-  // Intersect low boughs at turkey height. Tall, high-crowned trees only block at the trunk.
-  const fullness =
-    variety === 'pine'
-      ? 1
-      : Math.max(0, Math.min(1, (2.1 / height - lowBranches) / 0.15));
-  return {
-    variety,
-    height,
-    width,
-    radius: Math.max(0.25, width * (0.075 + (crown - 0.075) * fullness)),
+export function randomSeed(seed) {
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
   };
+}
+function siteRandom(x, z) {
+  const seed =
+    Math.imul(Math.round(x * 100), 73856093) ^
+    Math.imul(Math.round(z * 100), 19349663);
+  return randomSeed(seed);
+}
+export function treeShape(tree) {
+  const height = tree.surveyHeight || tree.height || 8;
+  const random = siteRandom(tree.x, tree.z);
+  const rotation = random() * Math.PI * 2;
+  const shade = 0.86 + random() * 0.14;
+  if (tree.type === 'Coniferous') {
+    const width = height * 0.49;
+    return {
+      variety: 'pine',
+      rotation,
+      shade,
+      height,
+      width,
+      radius: Math.max(0.25, width * 0.44),
+    };
+  }
+  // Overlap age classes around inventory height bands. The actual height stays
+  // in meters and the selected model's native spread determines the crown.
+  const age = height * (0.9 + random() * 0.2);
+  const forms =
+    age < 2.6
+      ? oakForms.sapling
+      : age < 7.2
+        ? oakForms.small
+        : age < 14.5
+          ? oakForms.medium
+          : oakForms.mature;
+  const form = forms[Math.floor(random() * forms.length)];
+  const width = height * form.aspect * (0.93 + 0.14 * random());
+  const lowBoughs = Math.max(
+    0,
+    Math.min(1, (TURKEY_HEIGHT / height - form.low) / 0.15)
+  );
+  const radius = Math.max(
+    0.04,
+    width * (form.trunk + (0.42 - form.trunk) * lowBoughs)
+  );
+  return { variety: form.id, rotation, shade, height, width, radius };
 }
 export const PARK_SIGNS = [
   { title: 'COMMUNITY PARK', x: -67, z: 26.8, angle: 1.89 },
@@ -203,7 +226,40 @@ function signFootprint({ x, z, angle }) {
   });
   return { points };
 }
-export const BODY_RADIUS = 0.62;
+// Add occasional young oaks under mapped park oaks, clear of pavement and
+// existing obstacles. A parent's coordinates determine its offset on every visit.
+export function plantParkSaplings(data, solids) {
+  const saplings = [];
+  const pavement = [...data.paths, ...data.roads];
+  for (const parent of data.trees) {
+    if (
+      !/oak/i.test(parent.species) ||
+      (parent.surveyHeight || parent.height) < 7
+    )
+      continue;
+    const random = siteRandom(parent.z, parent.x);
+    if (random() > 0.32) continue;
+    const angle = random() * 2 * Math.PI;
+    const distance = treeShape(parent).width * (0.28 + random() * 0.2);
+    const x = parent.x + Math.cos(angle) * distance;
+    const z = parent.z + Math.sin(angle) * distance;
+    if (solids.blocked(x, z)) continue;
+    // Leave space for the benches and lamps that line the park paths.
+    const onPath = pavement.some(({ points, width }) =>
+      points.some(
+        ([bx, bz], i) =>
+          i > 0 &&
+          segmentDistanceSq(x, z, ...points[i - 1], bx, bz) <
+            (width / 2 + 3.5) ** 2
+      )
+    );
+    if (onPath) continue;
+    const sapling = { x, z, height: 0.8 + random() * 0.8, species: 'Oak' };
+    solids.addTree(sapling);
+    saplings.push(sapling);
+  }
+  return saplings;
+}
 export function segmentDistanceSq(x, z, ax, az, bx, bz) {
   const dx = bx - ax,
     dz = bz - az;
@@ -217,23 +273,6 @@ export class Obstacles {
   constructor(data, signs = []) {
     this.cells = new Map();
     this.bounds = data.bounds;
-    const add = (feature, minX, maxX, minZ, maxZ) => {
-      for (
-        let i = Math.floor((minX - BODY_RADIUS) / 30);
-        i <= Math.floor((maxX + BODY_RADIUS) / 30);
-        i++
-      ) {
-        for (
-          let j = Math.floor((minZ - BODY_RADIUS) / 30);
-          j <= Math.floor((maxZ + BODY_RADIUS) / 30);
-          j++
-        ) {
-          const key = i + ',' + j;
-          if (!this.cells.has(key)) this.cells.set(key, []);
-          this.cells.get(key).push(feature);
-        }
-      }
-    };
     for (const { points } of [
       ...data.buildings,
       ...data.water,
@@ -241,7 +280,7 @@ export class Obstacles {
     ]) {
       const xs = points.map((p) => p[0]),
         zs = points.map((p) => p[1]);
-      add(
+      this.indexFeature(
         { points },
         Math.min(...xs),
         Math.max(...xs),
@@ -249,16 +288,34 @@ export class Obstacles {
         Math.max(...zs)
       );
     }
-    for (const tree of data.trees || []) {
-      const { radius } = treeShape(tree);
-      add(
-        { x: tree.x, z: tree.z, radius },
-        tree.x - radius,
-        tree.x + radius,
-        tree.z - radius,
-        tree.z + radius
-      );
+    for (const tree of data.trees || []) this.addTree(tree);
+  }
+  indexFeature(feature, minX, maxX, minZ, maxZ) {
+    for (
+      let i = Math.floor((minX - BODY_RADIUS) / 30);
+      i <= Math.floor((maxX + BODY_RADIUS) / 30);
+      i++
+    ) {
+      for (
+        let j = Math.floor((minZ - BODY_RADIUS) / 30);
+        j <= Math.floor((maxZ + BODY_RADIUS) / 30);
+        j++
+      ) {
+        const key = i + ',' + j;
+        if (!this.cells.has(key)) this.cells.set(key, []);
+        this.cells.get(key).push(feature);
+      }
     }
+  }
+  addTree(tree) {
+    const { radius } = treeShape(tree);
+    this.indexFeature(
+      { x: tree.x, z: tree.z, radius },
+      tree.x - radius,
+      tree.x + radius,
+      tree.z - radius,
+      tree.z + radius
+    );
   }
   occupied(x, z) {
     const features = this.cells.get(
