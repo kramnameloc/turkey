@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#161915" />
+    <meta
+      name="description"
+      content="Play Turkey Takeover, a first-person Thanksgiving food hunt in Broomfield, Colorado."
+    />
+    <link rel="icon" href="/ui/mark.svg" />
+    <title>Turkey Takeover · Gobbler Ops</title>
+  </head>
+  <body>
+    <main id="lobby">
+      <header class="mast">
+        <a class="brand" href="#lobby" aria-label="Gobbler Ops hunt lobby"
+          ><img src="/ui/mark.svg" alt="" /><span
+            >GOBBLER<span class="brand-light">OPS</span></span
+          ></a
+        >
+        <nav aria-label="Game navigation">
+          <button class="nav-item active" data-action="home">Hunt lobby</button>
+          <button class="nav-item" data-action="guide">Field guide</button>
+          <button class="nav-item" data-action="map">Hunt map</button>
+        </nav>
+        <div class="tools">
+          <button
+            class="icon-button"
+            data-action="sound"
+            aria-label="Mute audio"
+            title="Mute audio"
+          >
+            <i data-i="volume"></i></button
+          ><button
+            class="icon-button"
+            data-action="fullscreen"
+            aria-label="Enter fullscreen"
+            title="Enter fullscreen"
+          >
+            <i data-i="expand"></i>
+          </button>
+        </div>
+      </header>
+      <section class="hero" aria-labelledby="title">
+        <div class="cover-art"></div>
+        <div class="hero-shade"></div>
+        <div class="hero-frame" aria-hidden="true">
+          <b></b><b></b><b></b><b></b>
+        </div>
+        <div class="intro">
+          <div class="eyebrow">
+            <span class="dash"></span> A THANKSGIVING FPS
+          </div>
+          <h1 id="title"><span>TURKEY</span><span>TAKEOVER</span></h1>
+          <div class="title-rule" aria-hidden="true"><b></b><b></b><b></b></div>
+          <p>
+            Dinner is on the run. Take the field as a wild turkey and capture
+            runaway sides and desserts in Broomfield, Colorado.
+          </p>
+          <div class="actions">
+            <button class="primary" data-action="start">
+              <i data-i="focus"></i>Start hunt</button
+            ><button class="secondary" data-action="controls">
+              <i data-i="controller"></i>How to play
+            </button>
+          </div>
+        </div>
+        <div class="species-tag" aria-hidden="true">
+          <div class="leader"></div>
+          <div><small>PLAYER SPECIES</small><strong>Wild turkey</strong></div>
+        </div>
+        <div class="photo-coordinate">
+          <i data-i="pin"></i>39.9185° N &nbsp; 105.0688° W
+        </div>
+      </section>
+      <section class="intel" aria-label="Hunt information">
+        <button class="stat location" data-action="map">
+          <span class="stat-icon"><i data-i="map"></i></span
+          ><span><small>HUNT ZONE</small><strong>Broomfield, CO</strong></span>
+        </button>
+        <button class="stat" data-action="guide">
+          <span class="stat-icon"><i data-i="target"></i></span
+          ><span
+            ><small>THE OBJECTIVE</small
+            ><strong id="lobby-total">12 dishes</strong></span
+          >
+        </button>
+        <div class="stat">
+          <span class="stat-icon"><i data-i="clock"></i></span
+          ><span><small>TIME LIMIT</small><strong>5 minutes</strong></span>
+        </div>
+        <div class="stat best">
+          <span class="stat-icon"><i data-i="flag"></i></span
+          ><span
+            ><small>PERSONAL BEST</small
+            ><strong id="best">Unrecorded</strong></span
+          >
+        </div>
+      </section>
+      <footer>
+        <span class="field-status"><b></b> SINGLE PLAYER</span
+        ><button data-action="credits">
+          <i data-i="layers"></i> Map &amp; photo credits
+        </button>
+      </footer>
+    </main>
+    <section id="arena" hidden aria-label="First-person capture hunt">
+      <canvas
+        id="scene"
+        tabindex="-1"
+        aria-label="Three-dimensional Broomfield hunting grounds"
+      ></canvas>
+      <img src="/cover/wing.webp" id="wing" alt="" />
+      <div class="hud">
+        <div class="hud-top">
+          <div class="hud-box">
+            <small>DISHES CAPTURED</small><strong id="counter"></strong>
+            <div id="progress-pips" aria-hidden="true"></div>
+          </div>
+          <button
+            id="compass"
+            class="hud-btn"
+            aria-label="Show navigation arrows to the next dish"
+            aria-pressed="false"
+            title="Find the next dish (H)"
+          >
+            <span id="bearing">N</span
+            ><span class="compass-find">FIND DISH</span>
+          </button>
+          <div class="hud-box clock-box">
+            <small>SUPPER IN</small><strong id="time">5:00</strong>
+          </div>
+          <button
+            class="icon-button hud-btn"
+            data-action="pause"
+            aria-label="Pause hunt"
+          >
+            <i data-i="pause"></i>
+          </button>
+        </div>
+        <div id="trail-hint" hidden>
+          <span class="trail-dial" aria-hidden="true"
+            ><svg class="trail-needle" viewBox="0 0 32 32">
+              <path d="M16 2 27 27 16 21 5 27Z" fill="currentColor" /></svg
+          ></span>
+          <div><strong></strong><small></small></div>
+        </div>
+        <div id="crosshair" aria-hidden="true"><b></b></div>
+        <div id="in-world-label" hidden></div>
+        <div id="notice" role="status"></div>
+        <div class="hud-bottom">
+          <button
+            class="radar"
+            data-action="map"
+            title="Open hunt map"
+            aria-label="Open hunt map"
+          >
+            <canvas id="radar" width="200" height="160"></canvas
+            ><span><i data-i="map"></i> HUNT MAP <kbd>M</kbd></span>
+          </button>
+          <div class="equipment">
+            <small>CAPTURE TOOL</small
+            ><strong><i data-i="focus"></i> Net caster</strong
+            ><span id="net-state">READY</span>
+          </div>
+        </div>
+        <div class="touch" id="touch-controls">
+          <div id="stick" role="group" aria-label="Movement joystick">
+            <b></b>
+          </div>
+          <button id="touch-flap" aria-label="Flap">
+            <i data-i="feather"></i><span>Flap</span></button
+          ><button id="touch-fire" aria-label="Cast net">
+            <i data-i="focus"></i><span>Cast</span>
+          </button>
+        </div>
+      </div>
+    </section>
+    <dialog id="panel">
+      <div class="panel-head">
+        <div class="panel-brand">
+          <img alt="" src="/ui/mark.svg" /> GOBBLER OPS
+        </div>
+        <button
+          data-action="close"
+          class="icon-button"
+          aria-label="Close panel"
+        >
+          <i data-i="x"></i>
+        </button>
+      </div>
+      <div id="panel-content"></div>
+    </dialog>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

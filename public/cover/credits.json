@@ -1,0 +1,36 @@
+{
+  "asset": "title.jpg",
+  "title": "Turkey Takeover cover photograph composite",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "changes": "The turkey was isolated, resized and composited over cropped landscape photographs. Color and contrast were adjusted across the image.",
+  "firstPersonWing": {
+    "asset": "wing.webp",
+    "title": "Strutting Turkey",
+    "author": "P. Hughes",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "url": "https://commons.wikimedia.org/wiki/File:Strutting_Turkey.jpg",
+    "changes": "The wing and shoulder were isolated from the photograph, rotated and resized into a transparent first-person game sprite."
+  },
+  "sources": [
+    {
+      "title": "Meleagris gallopavo displaying at Deer Island Open Space Preserve",
+      "author": "Frank Schulenburg",
+      "license": "CC BY-SA 4.0",
+      "url": "https://commons.wikimedia.org/wiki/File:Meleagris_gallopavo_displaying_at_Deer_Island_Open_Space_Preserve.jpg"
+    },
+    {
+      "title": "Flatirons view from Broomfield, Colorado",
+      "author": "Kpsudeep",
+      "license": "CC BY-SA 4.0",
+      "url": "https://commons.wikimedia.org/wiki/File:Flatirons_view_from_Broomfield,_Colorado.jpg"
+    },
+    {
+      "title": "Rocky Flats NWR springtime with Lindsay Ranch",
+      "author": "Zach Schiff / U.S. Fish and Wildlife Service",
+      "license": "Public domain",
+      "url": "https://www.fws.gov/media/rocky-flats-nwr-springtime-lindsay-ranch"
+    }
+  ]
+}
