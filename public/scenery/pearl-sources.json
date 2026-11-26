@@ -1,0 +1,46 @@
+{
+  "model": "/models/trip-pearl.glb",
+  "coverage": "A game-scale walk from the 1200 and 1300 blocks of Pearl Street to 1770 13th Street. The route compresses the intervening blocks. The storefronts, building dimensions, ornament and sculpture poses are original interpretations.",
+  "references": [
+    {
+      "title": "Pearl Street Mall location gallery",
+      "source": "https://bouldercountyfilmcommission.com/locations/pearl-street-mall/",
+      "use": "Street-level winter photography of the brick paving, storefront heights, blue kiosk, banners and benches."
+    },
+    {
+      "title": "Boulder County Courthouse",
+      "source": "https://bouldercounty.gov/news/celebrate-the-boulder-county-courthouse-national-historic-landmark-designation-may-30/",
+      "use": "Stepped tower and vertical window bays facing the courthouse lawn."
+    },
+    {
+      "title": "City of Boulder Civic Area, Zone 1",
+      "source": "https://bouldercolorado.gov/media/18433/download?inline=",
+      "use": "Orientation of 13th Street, Canyon Boulevard, the teahouse and the water channel beside the patio."
+    },
+    {
+      "title": "City of Boulder teahouse exterior photograph",
+      "source": "https://bouldercolorado.gov/sites/default/files/2021-02/dushanbe-teahouse.jpg",
+      "use": "Reference for the blue framing, buff masonry, glazed panels, entrance, curtains and painted eaves."
+    },
+    {
+      "title": "Explore the Teahouse",
+      "source": "https://www.boulderteahouse.com/explore-the-teahouse-2",
+      "use": "Cedar columns, painted ceiling, carved plaster, roses and seven hammered-copper figures in the central pool."
+    },
+    {
+      "title": "Boulder Dushanbe Teahouse press kit",
+      "source": "https://static1.squarespace.com/static/5bd35d440b77bd6582890f4b/t/627d6ef2963dbb3a1c3d4022/1652387584063/Boulder%2BDushanbe%2BTeahouse%2BPress%2BPak%2B2022.pdf",
+      "use": "Eight exterior ceramic relief panels with individual Tree of Life motifs."
+    }
+  ],
+  "westernSkyline": "The existing Front Range terrain is rendered from the approximate position of downtown Boulder. See /scenery/peaks-credits.json for the terrain, imagery and alpine model credits.",
+  "imageGeneration": {
+    "method": "Built-in ImageGen. Source textures are baked into the local GLB.",
+    "assets": {
+      "pearl-shopfronts.webp": "Create a seamless-to-cut architectural game texture atlas, landscape exactly 3:2 aspect. A perfectly front-on ORTHOGRAPHIC street elevation of THREE distinct neighboring historic two-story commercial buildings on Pearl Street Mall, Boulder Colorado. Each building occupies EXACTLY ONE THIRD of the image, has the SAME flat roof height at the very top edge and sidewalk threshold at the very bottom edge. Left third: weathered rust-red brick Victorian bookseller, arched upper windows and projecting cream cornice, warm shop windows filled with rows of books. Middle third: buff sandstone and honey brick, paired double-hung upper sashes, dark green-painted wood retail window bays, book prints and plants behind glazing. Right third: oxblood brick with white lintels and dark sash upper windows, old-fashioned black iron ground-floor storefront with coffee shop interior behind a recessed door. Small red and teal accents, detailed merchandise, quiet natural November daylight. Frame contains ONLY building facades edge to edge. No people, sky, street, paving, awnings, readable text, signs, trees or street furniture. All verticals and horizontals straight, no perspective, no sides of buildings visible. Realistic photographic PBR diffuse base color with believable glass and material variation.",
+      "pearl-ceramic-panels.webp": "Use the supplied City of Boulder exterior photograph as an architectural reference for the ceramic panels ONLY. Create an original game texture atlas with exactly FOUR COLUMNS and TWO ROWS of EIGHT different tall rectangular ceramic Tree of Life panels inspired by the Boulder Dushanbe Teahouse. Landscape 4:3 canvas. Each cell is a 2:3 portrait panel. Every cell fills its quarter-width and half-height, equal divisions, no gutters or external borders. Each mural has its own distinctive slender turquoise branching tree, laurel or flowering vine flowing up inside an elegant interlaced pointed ivory mihrab arch, indigo outlines, and tiny lavender, mulberry, ochre and pale pink petals, on a luminous turquoise or deep cobalt field. Each composition and silhouette differs. Traditional Tajik glazed relief in the reference's palette. Orthographic, evenly lit, straight-on diffuse material; artwork only, no windows, scenery, labels, people or perspective.",
+      "pearl-tree-of-life.webp": "A portrait 2:3 architectural game material. One original glazed Tajik ceramic Tree of Life relief panel, inspired by the Boulder Dushanbe Teahouse exterior. Straight-on orthographic albedo, frame fills image edge to edge. A tall pointed mihrab arch encloses a branching flowering tree, symmetrical curling vines with turquoise and cobalt leaves, small rose and amber flowers, dark outlines, pale ivory field. Deep blue and turquoise floral border, subtle square tile joints and glaze variation. Even daylight. No letters, perspective, surrounding wall, scenery or cast shadow.",
+      "pearl-painted-coffer.webp": "A square orthographic game albedo texture, a single intricate traditional Tajik painted wooden ceiling coffer inspired by the Boulder Dushanbe Teahouse. Perfect straight-up, flat centered square, symmetrical eight-point star nested in interlocking polygonal wooden lattice, small painted floral arabesques. Saturated lapis blue, malachite green, vermilion, ochre gold, pale ivory, dark cedar. Fine ornamental brushwork, crisp edges that read at a distance, a narrow repeating floral border all around the edge. Even lighting, full bleed, no perspective, no letters, no furniture, no walls."
+    }
+  }
+}

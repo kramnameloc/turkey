@@ -107,20 +107,30 @@ function horizon(scene) {
   return strip;
 }
 
-export async function addPeaks(scene) {
-  const [data, surface] = await Promise.all([
+let assets;
+function peakAssets() {
+  assets ??= Promise.all([
     fetch('/scenery/front-range.mesh').then((response) => {
       if (!response.ok) throw new Error('Could not load the Front Range elevation mesh');
       return response.arrayBuffer();
     }),
     new T.TextureLoader().loadAsync('/scenery/front-range.webp'),
-  ]);
+  ]).catch((error) => {
+    assets = null;
+    throw error;
+  });
+  return assets;
+}
+
+export async function addPeaks(scene, viewpoint = new T.Vector3()) {
+  const [data, surface] = await peakAssets();
   surface.colorSpace = T.SRGBColorSpace;
   surface.anisotropy = 4;
   const m = new T.ShaderMaterial({
     name: 'Front Range atmospheric perspective',
     uniforms: {
       surface: { value: surface },
+      viewpoint: { value: viewpoint },
       clearHaze: { value: new T.Color('#9baebb') },
       snowHaze: { value: new T.Color('#bac5cb') },
       weather: { value: 0 },
@@ -131,16 +141,22 @@ export async function addPeaks(scene) {
       varying float range;
       varying float edge;
       attribute float opacity;
+      uniform vec3 viewpoint;
       void main() {
         mapUV = uv;
         visibility = opacity;
-        vec3 p = position;
+        vec3 p = position - viewpoint;
         range = length(cameraPosition.xz - p.xz);
         edge = 1.0 - smoothstep(70000.0, 87040.0, abs(p.z));
         // A mild vertical emphasis keeps the alpine relief legible at a wide
         // game FOV. Curvature includes standard terrestrial refraction.
         float emphasis = mix(1.12, 1.82, smoothstep(700.0, 2400.0, p.y));
         p.y = p.y * emphasis * edge - range * range / 15000000.0;
+        // Downtown Boulder lies inside the DEM. Blend the near valley floor
+        // below the venue so the coarse terrain meets the local streets.
+        float valley = smoothstep(-2200.0, -700.0, p.x);
+        p.y = mix(p.y, -160.0, valley);
+        visibility *= 1.0 - valley;
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         // This draw has its own depth range so adjacent ridges occlude
         // correctly without changing gameplay's near/far clipping precision.

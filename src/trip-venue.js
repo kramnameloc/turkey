@@ -2,6 +2,7 @@ import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Obstacles, treeShape, randomSeed } from './field.js';
 import { PORCH } from './dover-location.js';
+import { addPeaks } from './peaks.js';
 
 let nightPanorama;
 function eveningSky() {
@@ -140,6 +141,8 @@ export async function loadVenue(id, world, sky) {
     light.shadow.needsUpdate = true;
   }
   scene.add(light);
+  // 13th and Pearl, in metres relative to the Community Park DEM origin.
+  if (id === 'pearl') await addPeaks(scene, new T.Vector3(-17900, 6, -11000));
   if (data.trees.length) scene.add(venueTrees(data.trees, world.trees.levels));
   const walls = [];
   model.traverse((mesh) => {
@@ -164,10 +167,11 @@ export async function loadVenue(id, world, sky) {
       mat.envMap = sky;
       mat.envMapIntensity = ice ? 0.42 : 0.7;
     }
-    if (mat.name === 'Greenhouse') {
+    if (mat.name === 'Greenhouse' || mat.name === 'Teahouse glass') {
       mat.transparent = true;
-      mat.opacity = 0.26;
+      mat.opacity = mat.name === 'Greenhouse' ? 0.26 : 0.22;
       mat.depthWrite = false;
+      mesh.castShadow = false;
     }
     if (mat.name === 'Glow' || mat.name === 'Ice' || mat.name === 'Amber') {
       mat.emissive
@@ -198,13 +202,23 @@ export async function loadVenue(id, world, sky) {
   }
   const steam = id === 'springs' ? poolSteam() : null;
   if (steam) scene.add(steam.group);
-  const placeAt = (p) =>
-    data.places.reduce((best, place) =>
+  function placeAt(p) {
+    const interior = data.places.find(
+      ({ bounds }) =>
+        bounds &&
+        p.x >= bounds[0] &&
+        p.z >= bounds[1] &&
+        p.x <= bounds[2] &&
+        p.z <= bounds[3]
+    );
+    if (interior) return interior.name;
+    return data.places.reduce((best, place) =>
       Math.hypot(p.x - place.x, p.z - place.z) <
       Math.hypot(p.x - best.x, p.z - best.z)
         ? place
         : best
     ).name;
+  }
   return {
     scene,
     data,

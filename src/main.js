@@ -3,6 +3,7 @@ import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
 import { DOVER, RELIC, hasGrail } from './dover-location.js';
 import { COURSES, TRIP_HUNTS, TRIP_CAPTURES } from './courses.js';
+import { renderPearlMap } from './pearl-map.js';
 import { fillIcons, icon } from './icons.js';
 import {
   DISHES,
@@ -502,6 +503,8 @@ function credits() {
     heading('FIELD ARCHIVE', 'Map & photo credits') +
       '<div class="credits"><h3>Broomfield geography</h3><p>Buildings, streets, paths, landmarks, and surveyed trees come from the City and County of Broomfield. USGS elevation follows the local slopes. USGS lidar supplies many roof and tree heights, with estimates elsewhere. The Dover aerial comes from Colorado’s 2020 Denver Regional Aerial Photography Project (CC0). Fifteen Dover roofs follow the laser survey. The two houses at 735 Dover and next door use modeled exteriors based on a July 2026 street view. Five civic roof models follow the lidar survey. The Library and Auditorium exterior uses local photographs by HonjuTheCat (CC0). Brunner Farmhouse was modeled from the city’s exterior photograph and footprint. ' +
       links('/geo/sources.json', 'Map sources and coverage') +
+      '</p><h3>Pearl Street and the teahouse</h3><p>The Boulder walk compresses the blocks between the mall and 1770 13th Street. Street-level photographs and the city’s civic-area plan guided the original scenery. ImageGen supplied the shopfronts and ornamental textures. ' +
+      links('/scenery/pearl-sources.json', 'Boulder references and artwork') +
       '</p><h3>Cover photography</h3><p>Wild turkey by Frank Schulenburg, Flatirons by Kpsudeep, and Rocky Flats prairie by Zach Schiff / USFWS. The cropped and color-graded composite is licensed under ' +
       links('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0') +
       '. ' +
@@ -563,6 +566,17 @@ function pause() {
 function courseMap() {
   const course = game.course,
     p = game.mapPosition;
+  if (course.venue === 'pearl') {
+    show(
+      'map',
+      heading('DAY ' + (game.level + 1) + ' · BOULDER', 'Pearl Street') +
+        '<div id="pearl-map"></div><div class="panel-actions">' +
+        button('Return to trip', 'resume', true, 'focus') +
+        '</div>'
+    );
+    renderPearlMap($('#pearl-map'), game);
+    return;
+  }
   const porch = game.arrivalAtDover;
   const parade = game.localParade;
   const dest = game.pendingDestination;
@@ -684,6 +698,8 @@ async function changeCourse(retry) {
 }
 function end({ won, time, shots, count, reason }) {
   modalOrigin = 'end';
+  const teaServed =
+    won && game.mode === 'campaign' && game.course.venue === 'pearl';
   let record = false;
   if (
     won &&
@@ -747,7 +763,11 @@ function end({ won, time, shots, count, reason }) {
             '</strong></div>'
         )
         .join('') +
-      '</div><div class="panel-actions">' +
+      '</div>' +
+      (teaServed
+        ? '<details class="pearl-recap"><summary>Completed Pearl Street map</summary><div id="pearl-map"></div></details>'
+        : '') +
+      '<div class="panel-actions">' +
       button(
         !won && game.mode === 'campaign'
           ? 'Retry ' + game.course.name
@@ -766,6 +786,7 @@ function end({ won, time, shots, count, reason }) {
       button('Return to lobby', 'home') +
       '</div>'
   );
+  if (teaServed) renderPearlMap($('#pearl-map'), game, true);
   refreshBest();
 }
 async function start(mode = 'campaign') {

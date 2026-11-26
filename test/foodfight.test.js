@@ -85,6 +85,37 @@ test('all six days have walkable spawns, capture targets, gravy and destination 
   }
   assert.deepEqual(names, new Set(DISHES.map((d) => d.id)));
 });
+test('Pearl Street map stops match the hunts and the tea table is reached through the west door', () => {
+  const course = COURSES.find((day) => day.venue === 'pearl');
+  const glb = readFileSync(
+    new URL('../public/models/trip-pearl.glb', import.meta.url)
+  );
+  const { plan } = JSON.parse(
+    glb.toString('utf8', 20, 20 + glb.readUInt32LE(12))
+  ).nodes[0].extras;
+  for (const stop of [...course.hunts, course.destination]) {
+    assert.ok(
+      plan.places.some((place) => place.name === stop.name),
+      stop.name
+    );
+  }
+  const [west, north, east, south] = plan.places.find(
+    (p) => p.name === course.destination.name
+  ).bounds;
+  const { x, z } = course.destination;
+  assert.ok(
+    Math.min(x - west, east - x, z - north, south - z) > 3,
+    'interact radius lies indoors'
+  );
+  const obstacles = new Obstacles(plan);
+  const approach = { x: west - 2, z: (north + south) / 2 };
+  const route = walkingTrail(approach, course.destination, (x, z) =>
+    obstacles.blocked(x, z)
+  );
+  assert.ok(!obstacles.blocked(west, approach.z));
+  assert.ok(obstacles.blocked(west, approach.z - 5));
+  assert.deepEqual(route.at(-1), { x, z });
+});
 test('each pair unlocks only the next hunt and the last pair unlocks the shuttle', () => {
   const hunt = Object.assign(Object.create(Hunt.prototype), {
     mode: 'campaign',

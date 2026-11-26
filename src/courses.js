@@ -181,40 +181,40 @@ export const COURSES = [
   {
     venue: 'pearl',
     name: 'Pearl Street & the teahouse',
-    menu: 'Hunt along Boulder’s brick pedestrian mall, then meet for tea at the Dushanbe Teahouse.',
-    spawn: { x: -26, z: 0 },
+    menu: 'Hunt the Pearl Street shops and courthouse lawn. Follow 13th Street south to the rose garden and meet for tea beside the fountain.',
+    spawn: { x: -37, z: 0 },
     yaw: -Math.PI / 2,
     hunts: [
       {
         name: 'Pearl Street shops',
         dishes: [
-          ['berries', 15, 1],
-          ['cookie', 23, -3],
+          ['berries', 11, 1],
+          ['cookie', 22, -2],
         ],
       },
       {
-        name: 'Brick mall',
+        name: 'Courthouse lawn',
         dishes: [
-          ['mash', 46, 1],
-          ['applePie', 56, 3],
+          ['mash', 54, -9],
+          ['applePie', 67, -13],
         ],
       },
       {
-        name: 'Teahouse garden',
+        name: 'Rose garden',
         dishes: [
-          ['stuffing', 41, 17],
-          ['cupcake', 41, 24],
+          ['stuffing', 46, 46.5],
+          ['cupcake', 52, 59.7],
         ],
       },
     ],
     gravy: [
       [7, -2],
-      [42, 14],
+      [42, 35],
     ],
     destination: {
       name: 'Dushanbe Teahouse',
-      x: 15,
-      z: 31,
+      x: 32,
+      z: 51.6,
       prompt: 'Sit down for tea',
     },
   },

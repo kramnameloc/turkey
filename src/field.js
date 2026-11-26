@@ -401,13 +401,17 @@ function atlas(data) {
     c.drawImage(data.mapImage, 0, 0, a.width, a.height);
     c.globalAlpha = 1;
   }
+  for (const { rect: [x, z, w, d], color } of data.surfaces || []) {
+    c.fillStyle = color;
+    c.fillRect((x - b.minX) * sx, (z - b.minZ) * sy, w * sx, d * sy);
+  }
   for (const t of data.trees || []) {
-    c.fillStyle = '#394b3388';
+    c.fillStyle = data.surfaces ? '#4f644b' : '#394b3388';
     c.beginPath();
     c.arc(
       (t.x - b.minX) * sx,
       (t.z - b.minZ) * sy,
-      Math.max(1, Math.min(5, t.height * 0.22 * sx)),
+      Math.max(1, Math.min(data.surfaces ? 28 : 5, t.height * 0.22 * sx)),
       0,
       Math.PI * 2
     );
@@ -475,6 +479,7 @@ export function drawMap(
     selected = -1,
     route = [],
     destination = null,
+    drawLandmarks,
   } = {}
 ) {
   const c = canvas.getContext('2d'),
@@ -603,6 +608,11 @@ export function drawMap(
         c.fillText(label, labelX, y - 4);
         used.push([x, y]);
       }
+  }
+  if (drawLandmarks) {
+    c.save();
+    drawLandmarks(c, px, py);
+    c.restore();
   }
   if (route.length > 1) {
     c.save();

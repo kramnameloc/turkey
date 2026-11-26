@@ -39,6 +39,7 @@ const direction = new T.Vector3(),
   ray = new T.Raycaster();
 const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const toolRest = { y: -0.24, z: -0.5 };
+const PLAYER_PACE = 0.8;
 function netGeometry() {
   const segments = [];
   const point = (r, a) => [
@@ -1388,6 +1389,7 @@ export class Hunt {
             ? 33
             : 13
           : (sprint ? 13 : 7.2) * (this.fight.speed > 0 ? 1.65 : 1),
+      travel = speed * dt * PLAYER_PACE,
       sn = Math.sin(this.yaw),
       cs = Math.cos(this.yaw);
     const oldX = this.camera.position.x,
@@ -1395,8 +1397,8 @@ export class Hunt {
     this.advanceFlight(dt, k.has('Space') || this.flapId != null);
     slideMove(
       this.camera.position,
-      (strafe * cs - forward * sn) * speed * dt,
-      (-strafe * sn - forward * cs) * speed * dt,
+      (strafe * cs - forward * sn) * travel,
+      (-strafe * sn - forward * cs) * travel,
       this.playerBlocked
     );
     this.updateParade();
@@ -1422,7 +1424,8 @@ export class Hunt {
         this.streetParade.nearbyActors,
         this.playerBlocked
       );
-    this.steps += dt * Math.hypot(strafe, forward) * (sprint ? 13 : 9);
+    this.steps +=
+      dt * PLAYER_PACE * Math.hypot(strafe, forward) * (sprint ? 13 : 9);
     const p = this.camera.position;
     p.y =
       this.height(p.x, p.z) +

@@ -42,6 +42,7 @@ PALETTE = dict(
     Brick="914f40",
     Copper="528b80",
     Ochre="d2a05b",
+    **{"Teahouse glass": "92bcc1", "Hammered copper": "996c53"},
 )
 
 
@@ -557,143 +558,12 @@ def springs():
     s.save()
 
 
-def tile_pattern():
-    img = Image.new("RGB", (192, 192), "#276179")
-    draw = ImageDraw.Draw(img)
-    for x, z in [(96, 96), (0, 0), (192, 0), (0, 192), (192, 192)]:
-        for size, color in [
-            (74, "#b89863"),
-            (66, "#203e66"),
-            (54, "#e3d2af"),
-            (48, "#2e999a"),
-            (33, "#264c76"),
-            (19, "#d9b476"),
-            (10, "#e8e2c5"),
-        ]:
-            points = [
-                (
-                    x + size * (1 if i % 2 == 0 else 0.65) * cos(i * pi / 8),
-                    z + size * (1 if i % 2 == 0 else 0.65) * sin(i * pi / 8),
-                )
-                for i in range(16)
-            ]
-            draw.polygon(points, fill=color)
-    return img
-
-
 def pearl():
-    s = Venue("pearl", (-32, 34, -9, 39))
-    s.paint("Masonry", "brick-facade.webp")
-    s.paint("Pavers", "street-concrete.webp", ("#975e4e", "#d5b6a1"))
-    s.paint("Garden", "grass.webp")
-    s.images["Faience"] = tile_pattern()
-    # Staggered brick paving from the same concrete grain as the Denver curb.
-    tile = s.images["Pavers"].resize((256, 256))
-    draw = ImageDraw.Draw(tile)
-    for row in range(16):
-        y = row * 16
-        draw.line((0, y, 256, y), fill="#a18b7d", width=1)
-        for x in range(-16 + (row % 2) * 16, 257, 32):
-            draw.line((x, y, x, y + 16), fill="#92796c", width=1)
-    s.images["Pavers"] = tile
-    s.pad("Garden", 0, 10, 215, 175)
-    s.pad("Pavers", 0, 0, 94, 16, 0.025)
-    s.pad("Pavers", 15, 20, 13, 42, 0.026)
-    for z in (-6, 6):
-        s.pad("Linen", 0, z, 76, 0.18, 0.034)
-    # Two rows of independent storefronts open onto the brick mall.
-    shops = [
-        ("BOOKS", "Cobalt"),
-        ("PRINT SHOP", "Holly"),
-        ("CAFE", "Candy"),
-        ("RECORDS", "Ink"),
-        ("PAPER GOODS", "Holly"),
-        ("OUTFITTERS", "Cobalt"),
-    ]
-    for side in (-1, 1):
-        for i, x in enumerate(range(-30, 36, 11)):
-            if side == 1 and x >= 8:
-                continue
-            z = side * 14
-            h = 6.8 + ((i * 7 + side) % 4) * 0.62
-            s.block("Masonry", x, z, 10.8, 10, h)
-            face = side * 8.96
-            s.box("Linen", (x, h - 0.18, face), (11, 0.32, 0.46))
-            name, awning = shops[(i + (side + 1)) % len(shops)]
-            for dx in (-3, 0, 3):
-                s.box("Glass", (x + dx, 1.51, face), (2.62, 2.78, 0.15))
-                s.box("Gold", (x + dx, 2.43, face - side * 0.09), (2.60, 0.055, 0.08))
-                s.box("Timber", (x + dx + 0.96, 1.51, face - side * 0.09), (0.065, 2.74, 0.08))
-                for j in range(3):
-                    s.box(
-                        ("Ochre", "Copper", "Clay")[(j + i) % 3],
-                        (x + dx - 0.7 + j * 0.46, 0.72 + 0.11 * j, face - side * 0.10),
-                        (0.32, 0.52 + 0.22 * j, 0.08),
-                    )
-                s.box("Timber", (x + dx, 0.35, face - side * 0.12), (2.60, 0.14, 0.12))
-                s.box("Timber", (x + dx, 5.36, face), (1.63, 1.82, 0.21))
-                s.box("Glass", (x + dx, 5.36, face - side * 0.13), (1.4, 1.59, 0.11))
-            s.face(
-                awning,
-                [
-                    (x - 5, 3.42, face),
-                    (x + 5, 3.42, face),
-                    (x + 5, 2.98, face - side * 1.25),
-                    (x - 5, 2.98, face - side * 1.25),
-                ],
-            )
-            s.sign(
-                name, x, 3.93, face - side * 0.13, 7, 0.85, "#343b39", yaw=pi if side == 1 else 0
-            )
-    # The short garden walk ends inside a pavilion with tiled panels, painted
-    # ceiling bays, carved columns and a central teapot and cups.
-    for x in (6, 24):
-        s.block("Faience", x, 31, 0.55, 14, 2.6)
-    s.block("Faience", 15, 38, 18.5, 0.5, 3.7)
-    for x in (6, 12, 18, 24):
-        for z in (24, 37.8):
-            s.tube("Timber", (x, 0, z), (x, 4.7, z), 0.25, 0.21, 12)
-            s.tube("Gold", (x, 0.08, z), (x, 0.42, z), 0.36, 0.29, 12)
-            s.tube("Tile", (x, 3.9, z), (x, 4.55, z), 0.24, 0.52, 12)
-            for y in (1.1, 1.23, 3.5, 3.6):
-                s.tube("Ochre", (x, y, z), (x, y + 0.07, z), 0.26, n=12)
-            s.barrier(x, z, 0.52, 0.52)
-    for x in (5.3, 24.7):
-        s.face("Copper", [(x, 4.6, 22.7), (x, 4.6, 39), (15, 7.2, 38), (15, 7.2, 24)])
-    s.box("Gold", (15, 4.57, 23.2), (19.7, 0.38, 0.35))
-    s.pad("Faience", 15, 31, 18.6, 15, 4.76, 2.3)
-    for x in (7.2, 22.8):
-        s.box("Faience", (x, 2, 24), (2.1, 3.95, 0.4))
-        s.barrier(x, 24, 2.1, 0.4)
-    s.sign("DUSHANBE TEAHOUSE", 15, 4.2, 23.45, 8.4, 0.95, "#21535a", yaw=pi)
-    s.block("Timber", 15, 33, 2.6, 1.3, 0.76)
-    s.ellipsoid("Tile", (15, 1.04, 33), (0.36, 0.26, 0.31))
-    s.ellipsoid("Gold", (15, 1.30, 33), (0.17, 0.055, 0.17))
-    s.tube("Tile", (14.72, 1.03, 33), (14.46, 1.22, 33), 0.13, 0.075)
-    for x in (14.1, 15.8):
-        s.tube("Linen", (x, 0.77, 33), (x, 0.96, 33), 0.1, 0.15, 16)
-    s.extras["furniture"] = []
-    for x in (-23, -12, 0, 11, 24):
-        for side in (-1, 1):
-            if side == 1 and x == 11:
-                continue
-            z = side * 5.4
-            s.extras["furniture"].append(["Bench", x, z, pi if side < 0 else 0])
-            s.barrier(x, z, 2, 0.85)
-            s.extras["furniture"].append(["PathLamp", x + 2.3, z, 0])
-            s.barrier(x + 2.3, z, 0.2, 0.2)
-    for x in range(-26, 35, 10):
-        for side in (-1, 1):
-            z = side * 4.45
-            s.plan["trees"].append(dict(x=x, z=z, height=5.9 + cos(x) * 0.85, species="Oak"))
-            s.pad("Ink", x, z, 1.02, 1.02, 0.043)
-    for x, z in [(2, 18), (26, 18), (1, 32), (29, 33)]:
-        s.plan["trees"].append(dict(x=x, z=z, height=7.6, species="Oak"))
-    s.way([[-30, 0], [30, 0]], 10)
-    s.way([[15, 0], [15, 36]], 6)
-    s.place("Pearl Street", -15, 0)
-    s.place("Dushanbe Teahouse", 15, 31)
-    s.save()
+    from pearl_street import build_pearl
+
+    venue = Venue("pearl", (-48, 50, -25, 66))
+    build_pearl(venue)
+    venue.save()
 
 
 if __name__ == "__main__":
