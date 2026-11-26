@@ -1,20 +1,15 @@
 import * as T from 'three';
+import { downstairsBlocked, drawDownstairsPlan, furnishDownstairs } from './dover-downstairs.js';
 import { PORCH, PORCH_LANTERN, RELIC, hasGrail, collectGrail, hasRecipe, collectRecipe } from './dover-location.js';
 
-const recipeSpot = { x: 3.43, z: -4.17 };
+const recipeSpot = { x: 3.43, z: -4.273 };
 const crate = new T.BoxGeometry(1, 1, 1);
 const paint = (color, props = {}) =>
   new T.MeshStandardMaterial({ color, ...props });
 const colors = {
   timber: paint('#533424'),
-  oak: paint('#ac7446'),
-  trim: paint('#e7cfa4'),
-  blue: paint('#32655f'),
   dark: paint('#153b38'),
-  red: paint('#a8472d'),
-  tile: paint('#d4b996'),
   metal: paint('#d69b39', { metalness: 0.52, roughness: 0.28 }),
-  pane: paint('#93c3c8', { emissive: '#779fa2', emissiveIntensity: 0.5 }),
   lamp: paint('#ffe3a5', { emissive: '#ffb94d', emissiveIntensity: 0.9 }),
 };
 function mesh(parent, geo, mat, x, y, z) {
@@ -28,17 +23,17 @@ function box(p, mat, x, y, z, w, h, d) {
   m.scale.set(w, h, d);
   return m;
 }
-function plaque(p, lines, x, y, z, w, h) {
+function plaque(p, lines, x, y, z, w, h, paper = false) {
   const canvas = document.createElement('canvas');
   canvas.width = 768;
   canvas.height = Math.round((768 * h) / w);
   const g = canvas.getContext('2d');
-  g.fillStyle = '#273d33';
+  g.fillStyle = paper ? '#f3e7cb' : '#273d33';
   g.fillRect(0, 0, canvas.width, canvas.height);
   g.strokeStyle = '#d6af6b';
   g.lineWidth = 6;
   g.strokeRect(8, 8, 752, canvas.height - 16);
-  g.fillStyle = '#fff0c7';
+  g.fillStyle = paper ? '#57453b' : '#fff0c7';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   lines.forEach((line, i) => {
@@ -53,19 +48,11 @@ function plaque(p, lines, x, y, z, w, h) {
   return mesh(
     p,
     new T.PlaneGeometry(w, h),
-    new T.MeshBasicMaterial({ map }),
+    paper ? new T.MeshLambertMaterial({ map }) : new T.MeshBasicMaterial({ map }),
     x,
     y,
     z
   );
-}
-function door(parent) {
-  const { trim, blue, dark, metal } = colors;
-  box(parent, trim, 0, 1.17, 0, 1.52, 2.34, 0.18);
-  box(parent, blue, 0, 1.11, 0.12, 1.28, 2.18, 0.1);
-  for (const y of [0.54, 1.52])
-    box(parent, dark, 0, y, 0.18, 0.94, 0.61, 0.045);
-  mesh(parent, new T.SphereGeometry(0.065, 10, 8), metal, 0.46, 1, 0.24);
 }
 // The collectible uses a small game emblem at the garage. The visible exterior
 // comes from the regional building model, which also supplies the wall collision.
@@ -118,94 +105,23 @@ function makeQuestEmblem() {
   return group;
 }
 
-function wovenRunner() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 512;
-  const g = canvas.getContext('2d');
-  g.fillStyle = '#8e4432';
-  g.fillRect(0, 0, 256, 512);
-  function diamond(x, y, w, h, fill) {
-    g.fillStyle = fill;
-    g.beginPath();
-    g.moveTo(x, y - h);
-    g.lineTo(x + w, y);
-    g.lineTo(x, y + h);
-    g.lineTo(x - w, y);
-    g.closePath();
-    g.fill();
-  }
-  for (const x of [9, 239]) {
-    g.fillStyle = '#d2ac74';
-    g.fillRect(x, 0, 8, 512);
-    for (let y = 0; y < 512; y += 16) diamond(x + 4, y + 8, 4, 6, '#723e31');
-  }
-  for (const y of [64, 192, 320, 448]) {
-    diamond(128, y, 78, 56, '#c59a63');
-    diamond(128, y, 68, 48, '#35544c');
-    diamond(128, y, 43, 30, '#c59a63');
-    diamond(128, y, 30, 19, '#974d34');
-    for (const x of [42, 214]) diamond(x, y, 8, 7, '#ddc08a');
-  }
-  g.fillStyle = '#30211d24';
-  for (let y = 0; y < 512; y += 3) g.fillRect(0, y, 256, 1);
-  const map = new T.CanvasTexture(canvas);
-  map.colorSpace = T.SRGBColorSpace;
-  map.anisotropy = 4;
-  return new T.MeshLambertMaterial({ map });
-}
 function makeRoom() {
-  const scene = new T.Scene(),
-    c = colors;
-  scene.background = new T.Color('#30231c');
-  scene.add(new T.HemisphereLight('#fff1cf', '#b9987a', 1.95));
-  const sun = new T.DirectionalLight('#fff1cf', 2.15);
-  sun.position.set(3, 6, 4);
-  scene.add(sun);
-  box(scene, c.timber, 0, -0.09, 0, 8.6, 0.18, 10.6);
-  for (let i = 0; i < 19; i++) {
-    const mat = paint(
-      i % 3 === 0 ? '#ac8058' : i % 3 === 1 ? '#986c49' : '#b78c65'
-    );
-    box(scene, mat, -4.05 + i * 0.45, -0.012, 0, 0.435, 0.024, 10.5);
-  }
-  for (const side of [-1, 1]) {
-    box(scene, c.tile, 4.2 * side, 1.82, 0, 0.18, 3.64, 10.6);
-    box(scene, c.blue, 4.08 * side, 0.6, 0, 0.12, 1.2, 10.6);
-    box(scene, c.trim, 3.99 * side, 1.2, 0, 0.12, 0.09, 10.6);
-    box(scene, c.tile, 0, 1.82, 5.2 * side, 8.45, 3.64, 0.18);
-  }
-  box(scene, c.trim, 0, 3.7, 0, 8.5, 0.16, 10.6);
-  for (const z of [-3.6, 0, 3.6])
-    box(scene, c.timber, 0, 3.52, z, 8.45, 0.19, 0.18);
-  const exit = new T.Group();
-  exit.position.z = 5.05;
-  exit.rotation.y = Math.PI;
-  scene.add(exit);
-  door(exit);
-  plaque(exit, ['DOVER ST'], 0, 2.56, 0.14, 1.3, 0.35);
-  for (const x of [-2.86, 2.86]) {
-    box(scene, c.trim, x, 2.05, -5.05, 1.8, 1.52, 0.12);
-    box(scene, c.pane, x, 2.05, -4.96, 1.57, 1.28, 0.08);
-    box(scene, c.trim, x, 2.05, -4.9, 0.065, 1.28, 0.06);
-    box(scene, c.trim, x, 2.05, -4.9, 1.6, 0.08, 0.06);
-    box(scene, c.blue, x, 0.48, -4.69, 2.42, 0.96, 0.85);
-    box(scene, c.oak, x, 1, -4.69, 2.55, 0.12, 0.95);
-    for (const dx of [-0.57, 0.57]) {
-      box(scene, c.dark, x + dx, 0.48, -4.23, 0.96, 0.75, 0.04);
-      box(scene, c.metal, x + dx, 0.68, -4.17, 0.24, 0.045, 0.06);
-    }
-  }
-  const recipe = plaque(scene, ['FAMILY RECIPE', 'Unfold before supper'], recipeSpot.x, 0.47, recipeSpot.z, 0.50, 0.26);
-  recipe.rotation.z = -0.12;
-  plaque(scene, ['Save room for seconds.', 'Check the cupboards.'], -2.86, 1.25, -4.83, 0.95, 0.31);
-  plaque(scene, ['THANKSGIVING', 'HALL OF GRAVY'], 0, 3.0, -5.02, 2.72, 0.80);
-  box(scene, c.red, 0, 0.015, 0.64, 2.54, 0.024, 5.46);
-  const rug = new T.PlaneGeometry(2.54, 5.46).rotateX(-Math.PI / 2);
-  mesh(scene, rug, wovenRunner(), 0, 0.028, 0.64);
-  box(scene, c.timber, 0, 0.49, -2.75, 1.12, 0.96, 1.12);
-  box(scene, c.metal, 0, 1.02, -2.75, 1.31, 0.11, 1.31);
-  plaque(scene, ['GOLDEN GRAVY GRAIL'], 0, 0.64, -2.175, 0.94, 0.24);
+  const scene = new T.Scene(), c = colors;
+  furnishDownstairs(scene);
+  plaque(scene, ['DOVER ST'], 0, 2.29, 5.17, 0.58, 0.16).rotation.y = Math.PI;
+  const recipe = plaque(scene, ['Family recipe', 'Unfold before supper'], recipeSpot.x, 0.43, recipeSpot.z, 0.37, 0.21, true);
+  recipe.rotation.z = -0.075;
+  const stand = new T.Group();
+  scene.add(stand);
+  stand.position.z = -2.75;
+  for (const x of [-0.49, 0.49])
+    for (const z of [-0.49, 0.49])
+      box(stand, c.timber, x, 0.41, z, 0.105, 0.82, 0.105);
+  box(stand, c.timber, 0, 0.21, 0, 1.06, 0.065, 1.06);
+  box(stand, c.timber, 0, 0.76, 0, 1.13, 0.20, 1.13);
+  box(stand, paint('#986f4e'), 0, 0.895, 0, 1.31, 0.07, 1.31);
+  stand.traverse(part => { if (part.isMesh) part.castShadow = part.receiveShadow = true; });
+  plaque(stand, ['HALL OF GRAVY', 'Golden Gravy Grail'], 0, 0.76, 0.57, 0.54, 0.17);
   const grail = new T.Group();
   const profile = [
     [0.01, 0],
@@ -264,11 +180,8 @@ function makeRoom() {
     );
     handle.scale.y = 1.36;
   }
-  grail.position.set(0, 1.21, -2.75);
+  grail.position.set(0, 0.931, -2.75);
   scene.add(grail);
-  const lamp = new T.PointLight('#ffcf7a', 9, 5);
-  lamp.position.set(0, 2.45, -2.6);
-  scene.add(lamp);
   return { scene, grail, recipe };
 }
 export class DoverCottage {
@@ -315,12 +228,7 @@ export class DoverCottage {
     this.grail.visible = false;
   }
   blocked(x, z) {
-    return (
-      Math.abs(x) > 3.66 ||
-      Math.abs(z) > 4.66 ||
-      (Math.abs(x) < 1.04 && Math.abs(z + 2.75) < 1.06) ||
-      (Math.abs(x) > 1.13 && z < -3.77)
-    );
+    return downstairsBlocked(x, z);
   }
   drawRadar(canvas, p, yaw) {
     const c = canvas.getContext('2d'),
@@ -332,8 +240,7 @@ export class DoverCottage {
     c.fillRect(0, 0, w, h);
     c.translate(w / 2, h / 2);
     c.scale(scale, scale);
-    c.fillStyle = '#526051';
-    c.fillRect(-4.2, -5.2, 8.4, 10.4);
+    drawDownstairsPlan(c);
     c.fillStyle = '#c5d6b7';
     c.fillRect(-0.72, 4.82, 1.44, 0.38);
     c.fillStyle = this.grail.visible ? '#ffb852' : '#a7885b';
@@ -347,9 +254,5 @@ export class DoverCottage {
     c.lineTo(-0.31, 0.38);
     c.fill();
     c.restore();
-  }
-  animate(time) {
-    this.grail.rotation.y = time * 0.86;
-    this.grail.position.y = 1.2 + Math.sin(time * 2.2) * 0.07;
   }
 }

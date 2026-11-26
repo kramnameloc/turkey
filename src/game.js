@@ -9,10 +9,11 @@ import { doverCorners } from './parade-route.js';
 import { doverLeg } from './dover-guide.js';
 import { ChaseView, TURKEY_EYE } from './view.js';
 import { TurkeyAvatar } from './turkey-avatar.js';
-import { BODY_RADIUS, CASTER_SCALE } from './turkey-scale.js';
+import { BODY_RADIUS, CASTER_SCALE, TURKEY_HEIGHT } from './turkey-scale.js';
 import { overlapsBody, separateFromActors } from './body-collision.js';
 import { addPeaks } from './peaks.js';
 import { DoverCottage } from './dover.js';
+import { downstairsHeadroom } from './dover-downstairs.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './dover-location.js';
 import { CORNUCOPIA, WEAPONS, dealDamage } from './weapons.js';
 import { EnemyHealthBars } from './enemy-health-bars.js';
@@ -315,7 +316,7 @@ export class Hunt {
       this.isBlocked,
       this.ground,
       this.house.inside || this.venue?.data.id === 'ice',
-      this.house.inside ? 3.26 : 10.3
+      this.house.inside ? downstairsHeadroom : 10.3
     );
     // At a wall the boom can fold to the eye. Keep feathers out of the near plane.
     this.avatar.visible = this.chaseCamera.distance > 0.9;
@@ -821,8 +822,8 @@ export class Hunt {
     this.velocityY -= 18 * coast;
     if (held) this.velocityY = Math.max(-1.35, this.velocityY);
     this.lift = Math.max(0, this.lift + this.velocityY * coast);
-    if (this.house.inside && this.lift >= 2.15) {
-      this.lift = 2.15;
+    if (this.house.inside && this.lift >= downstairsHeadroom - TURKEY_HEIGHT) {
+      this.lift = downstairsHeadroom - TURKEY_HEIGHT;
       this.velocityY = Math.min(0, this.velocityY);
       this.flapTime = 0;
     }
@@ -1658,9 +1659,8 @@ export class Hunt {
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
     this.healthBars.update(this.targets, this.streetParade?.chasers, p, this.viewCamera);
-    if (this.house.inside) this.house.animate(this.elapsed);
-    else if (this.venue) this.venue.update?.(this.elapsed);
-    else {
+    if (this.venue && !this.house.inside) this.venue.update?.(this.elapsed);
+    else if (!this.house.inside) {
       this.world.trees.update(p.x, p.z, this.viewCamera);
       this.world.grasses.update(p.x, p.z, time * 0.001);
     }
