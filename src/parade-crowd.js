@@ -7,6 +7,36 @@ const farSphere = new T.SphereGeometry(1, 6, 4);
 const taper = new T.CylinderGeometry(0.83, 1, 1, 10);
 const boot = new T.BoxGeometry(1, 1, 1);
 const up = new T.Vector3(0, 1, 0);
+// Duplicate the cloth's back so both sides have outward-facing normals.
+function pennantPanel(points, front) {
+  const panel = new T.BufferGeometry();
+  panel.setAttribute(
+    'position',
+    new T.Float32BufferAttribute([...points, ...points].flat(), 3)
+  );
+  panel.setIndex([
+    ...front,
+    ...front.map((i) => i + points.length).reverse()
+  ]);
+  panel.computeVertexNormals();
+  return panel;
+}
+const cuffTop = [0.035, -0.009, 0.004],
+  cuffBottom = [0.016, -0.147, 0.006];
+const pennantStripe = pennantPanel(
+  [[0, 0, 0], [-0.03, -0.155, 0.002], cuffTop, cuffBottom],
+  [0, 1, 2, 1, 3, 2]
+);
+const pennantCloth = pennantPanel(
+  [
+    cuffTop,
+    cuffBottom,
+    [0.142, -0.032, -0.016],
+    [0.13, -0.104, -0.014],
+    [0.285, -0.083, 0.034]
+  ],
+  [0, 1, 2, 1, 3, 2, 2, 3, 4]
+);
 const material = new T.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.95,
@@ -99,6 +129,20 @@ function spectator(index, detailed) {
     parts.push(geometry);
   }
   const v = (x, y, z) => new T.Vector3(x, y, z);
+  // Near the curb a felt pennant turns with the same elbow as its mitten.
+  // The bent tip and contrasting hoist stripe read from either side.
+  function pennant(wrist, field) {
+    const [x, y, z] = wrist;
+    limb(
+      0x976d42,
+      [x - 0.017, y - 0.09, z + 0.02],
+      [x + 0.071, y + 0.375, z + 0.02],
+      0.009
+    );
+    const tip = v(x + 0.067, y + 0.357, z + 0.022);
+    part(pennantStripe, 0xf2d7a0, tip, v(1, 1, 1));
+    part(pennantCloth, field, tip, v(1, 1, 1));
+  }
   function oval(c, x, y, z, w, h, d) {
     part(detailed ? sphere : farSphere, c, v(x, y, z), v(w, h, d));
   }
@@ -135,6 +179,7 @@ function spectator(index, detailed) {
     waving = waves;
     limb(coat, elbow, wrist, 0.071);
     oval(scarf, ...wrist, 0.064, 0.082, 0.055);
+    if (waves && detailed) pennant(wrist, index % 2 ? 0x903f27 : 0xc69032);
     waving = false;
   }
   part(taper, coat, v(0, 1.04, 0), v(0.256, 0.54, 0.163));

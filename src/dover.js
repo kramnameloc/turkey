@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { PORCH, RELIC, hasGrail, collectGrail } from './dover-location.js';
+import { PORCH, PORCH_LANTERN, RELIC, hasGrail, collectGrail } from './dover-location.js';
 
 const crate = new T.BoxGeometry(1, 1, 1);
 const paint = (color, props = {}) =>
@@ -72,8 +72,86 @@ function makeQuestEmblem() {
   const group = new T.Group();
   group.position.set(PORCH.x, 0, PORCH.z);
   group.rotation.y = Math.PI / 2;
-  plaque(group, ['735', '✦'], -1.5, 1.45, .065, .22, .43);
+  // The brick pier beside the twin doors carries the house number and the
+  // lantern players can pick out from the shuttle stop.
+  const pier = PORCH_LANTERN.across;
+  box(group, colors.timber, pier, 1.54, -0.105, 0.59, 0.29, 0.1);
+  plaque(group, ['735'], pier, 1.54, -0.052, 0.55, 0.25);
+  box(group, colors.dark, pier, 2.04, -0.11, 0.17, 0.34, 0.13);
+  box(group, colors.dark, pier, 1.98, 0.055, 0.07, 0.07, 0.25);
+  const lantern = new T.Group();
+  lantern.position.set(pier, PORCH_LANTERN.up, PORCH_LANTERN.out);
+  group.add(lantern);
+  mesh(
+    lantern,
+    new T.CylinderGeometry(0.15, 0.11, 0.29, 4),
+    colors.lamp,
+    0,
+    0,
+    0
+  );
+  mesh(
+    lantern,
+    new T.CylinderGeometry(0.048, 0.2, 0.12, 4),
+    colors.dark,
+    0,
+    0.19,
+    0
+  );
+  mesh(
+    lantern,
+    new T.CylinderGeometry(0.13, 0.054, 0.09, 4),
+    colors.dark,
+    0,
+    -0.18,
+    0
+  );
+  for (let i = 0; i < 4; i++) {
+    const frame = mesh(lantern, crate, colors.dark, 0, 0, 0);
+    frame.scale.set(0.018, 0.31, 0.018);
+    const angle = (i * Math.PI) / 2;
+    frame.position.set(Math.sin(angle) * 0.13, 0, Math.cos(angle) * 0.13);
+    frame.rotation.order = 'YXZ';
+    frame.rotation.set(0.137, angle, 0);
+  }
   return group;
+}
+
+function wovenRunner() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 512;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#8e4432';
+  g.fillRect(0, 0, 256, 512);
+  function diamond(x, y, w, h, fill) {
+    g.fillStyle = fill;
+    g.beginPath();
+    g.moveTo(x, y - h);
+    g.lineTo(x + w, y);
+    g.lineTo(x, y + h);
+    g.lineTo(x - w, y);
+    g.closePath();
+    g.fill();
+  }
+  for (const x of [9, 239]) {
+    g.fillStyle = '#d2ac74';
+    g.fillRect(x, 0, 8, 512);
+    for (let y = 0; y < 512; y += 16) diamond(x + 4, y + 8, 4, 6, '#723e31');
+  }
+  for (const y of [64, 192, 320, 448]) {
+    diamond(128, y, 78, 56, '#c59a63');
+    diamond(128, y, 68, 48, '#35544c');
+    diamond(128, y, 43, 30, '#c59a63');
+    diamond(128, y, 30, 19, '#974d34');
+    for (const x of [42, 214]) diamond(x, y, 8, 7, '#ddc08a');
+  }
+  g.fillStyle = '#30211d24';
+  for (let y = 0; y < 512; y += 3) g.fillRect(0, y, 256, 1);
+  const map = new T.CanvasTexture(canvas);
+  map.colorSpace = T.SRGBColorSpace;
+  map.anisotropy = 4;
+  return new T.MeshLambertMaterial({ map });
 }
 function makeRoom() {
   const scene = new T.Scene(),
@@ -117,24 +195,32 @@ function makeRoom() {
       box(scene, c.metal, x + dx, 0.68, -4.17, 0.24, 0.045, 0.06);
     }
   }
-  plaque(scene, ['THANKSGIVING', 'HALL OF GRAVY'], 0, 2.15, -5.02, 2.72, 1.04);
+  plaque(scene, ['THANKSGIVING', 'HALL OF GRAVY'], 0, 3.0, -5.02, 2.72, 0.80);
   box(scene, c.red, 0, 0.015, 0.64, 2.54, 0.024, 5.46);
-  for (const x of [-1.13, 1.13])
-    box(scene, c.trim, x, 0.032, 0.64, 0.035, 0.012, 5.3);
+  const rug = new T.PlaneGeometry(2.54, 5.46).rotateX(-Math.PI / 2);
+  mesh(scene, rug, wovenRunner(), 0, 0.028, 0.64);
   box(scene, c.timber, 0, 0.49, -2.75, 1.12, 0.96, 1.12);
   box(scene, c.metal, 0, 1.02, -2.75, 1.31, 0.11, 1.31);
   plaque(scene, ['GOLDEN GRAVY GRAIL'], 0, 0.64, -2.175, 0.94, 0.24);
   const grail = new T.Group();
   const profile = [
     [0.01, 0],
-    [0.29, 0],
-    [0.31, 0.04],
+    [0.295, 0],
+    [0.315, 0.016],
+    [0.315, 0.035],
+    [0.285, 0.043],
+    [0.28, 0.057],
     [0.12, 0.11],
     [0.075, 0.23],
+    [0.112, 0.234],
+    [0.116, 0.251],
     [0.17, 0.26],
     [0.29, 0.32],
     [0.38, 0.49],
-    [0.39, 0.58],
+    [0.382, 0.55],
+    [0.397, 0.557],
+    [0.402, 0.575],
+    [0.391, 0.589],
     [0.34, 0.59],
     [0.31, 0.5],
     [0.21, 0.4],
@@ -151,6 +237,18 @@ function makeRoom() {
     0,
     0
   );
+  // Repoussé flutes follow the expanding bowl below the rolled rim.
+  const flutes = new T.InstancedMesh(new T.SphereGeometry(1, 8, 8), c.metal, 16);
+  const stamp = new T.Object3D();
+  stamp.scale.set(0.036, 0.1, 0.017);
+  for (let i = 0; i < flutes.count; i++) {
+    const angle = i * Math.PI * 2 / flutes.count;
+    stamp.position.set(0.334 * Math.sin(angle), 0.405, 0.334 * Math.cos(angle));
+    stamp.rotation.set(0.487, angle, 0, 'YXZ');
+    stamp.updateMatrix();
+    flutes.setMatrixAt(i, stamp.matrix);
+  }
+  grail.add(flutes);
   for (const side of [-1, 1]) {
     const handle = mesh(
       grail,

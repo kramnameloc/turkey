@@ -3,7 +3,9 @@
 from math import cos, pi, sin
 from random import Random
 
-from PIL import ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
+
+SHOP_NAMES = ("BOOKS", "PAPER & INK", "COFFEE", "RECORDS", "PRINTS", "MARKET")
 
 
 def surface(s, material, color, x, z, w, d, top, tile=3):
@@ -11,23 +13,117 @@ def surface(s, material, color, x, z, w, d, top, tile=3):
     s.plan["surfaces"].append(dict(rect=[x - w / 2, z - d / 2, w, d], color=color))
 
 
+def merchant_marks():
+    """Small enamel trade signs in a single atlas, in the order used by shop()."""
+    sheets = Image.new("RGB", (192 * 6, 112))
+    brass, ivory = "#c6a465", "#f8ead1"
+    for i, ground in enumerate(
+        ("#264d45", "#443649", "#673b31", "#2e414d", "#674735", "#3c5042")
+    ):
+        plate = Image.new("RGB", (192, 112), ground)
+        d = ImageDraw.Draw(plate)
+        d.rounded_rectangle((5, 5, 186, 106), 9, outline=brass, width=3)
+        for x in (15, 177):
+            d.ellipse((x - 2, 54, x + 2, 58), fill=brass)
+        if i == 0:  # An open book, with gilt edges along the pages.
+            for direction in (-1, 1):
+                d.polygon(
+                    [
+                        (96, 39),
+                        (96 + direction * 46, 28),
+                        (96 + direction * 46, 71),
+                        (96, 84),
+                    ],
+                    fill=ivory,
+                )
+                d.line(
+                    [(96 + direction * 4, 79), (96 + direction * 40, 68)],
+                    fill=brass,
+                    width=3,
+                )
+            d.line((96, 39, 96, 83), fill=ground, width=3)
+        elif i == 1:
+            d.polygon(
+                [
+                    (68, 84),
+                    (82, 44),
+                    (101, 28),
+                    (127, 22),
+                    (121, 43),
+                    (108, 58),
+                    (90, 67),
+                ],
+                fill=ivory,
+            )
+            d.line((64, 90, 116, 33), fill=brass, width=4)
+            d.line((98, 75, 129, 75), fill=brass, width=3)
+        elif i == 2:
+            d.ellipse((109, 46, 139, 70), outline=ivory, width=6)
+            d.rounded_rectangle((58, 43, 117, 78), 10, fill=ivory)
+            d.line((51, 84, 129, 84), fill=brass, width=4)
+            for x in (77, 94):
+                d.arc((x - 8, 19, x + 3, 39), 265, 100, fill=brass, width=3)
+        elif i == 3:
+            d.ellipse((62, 20, 133, 91), fill="#191e23", outline=ivory, width=3)
+            for r in (22, 27):
+                d.arc((98 - r, 56 - r, 98 + r, 56 + r), 181, 272, fill=brass, width=2)
+            d.ellipse((86, 44, 110, 68), fill="#c38455")
+            d.ellipse((95, 53, 101, 59), fill=ivory)
+        elif i == 4:
+            d.rectangle((52, 25, 140, 86), outline=ivory, width=5)
+            d.ellipse((110, 36, 124, 50), fill=brass)
+            d.polygon([(60, 76), (84, 44), (101, 62), (109, 55), (132, 76)], fill=ivory)
+        else:
+            d.ellipse((68, 44, 123, 84), fill=ivory)
+            d.polygon([(69, 61), (85, 32), (97, 28), (105, 37), (122, 60)], fill=ivory)
+            d.line((96, 38, 101, 20), fill=brass, width=4)
+            d.ellipse((102, 21, 120, 30), fill=brass)
+        sheets.paste(plate, (i * 192, 0))
+    return sheets
+
+
 def shop(s, x, side, width, height, bay, name, awning):
     z = side * 9
-    s.block("Masonry", x, z + side * 5, width, 10, height)
+    # Fold the ground-floor photograph around display windows and recessed doors.
+    # The offsets follow piers and jambs in each of the three atlas elevations.
+    s.box("Masonry", (x, height / 2, z + side * 5.3), (width, height, 9.4))
+    s.barrier(x, z + side * 5, width, 10)
     face = z - side * 0.025
-    dx = -side * width / 2
-    u, v = (bay + 0.006) / 3, (bay + 0.994) / 3
-    s.face(
-        "Shopfronts",
-        [
-            (x - dx, 0, face),
-            (x + dx, 0, face),
-            (x + dx, height, face),
-            (x - dx, height, face),
-        ],
-        [(u, 1), (v, 1), (v, 0), (u, 0)],
+
+    def frontage(left, right, depth_l, depth_r, low, high):
+        corners = [
+            (left, low, depth_l),
+            (right, low, depth_r),
+            (right, high, depth_r),
+            (left, high, depth_l),
+        ]
+        s.face(
+            "Shopfronts",
+            [
+                (x - side * (t - 0.5) * width, h * height, face + side * depth)
+                for t, h, depth in corners
+            ],
+            [((bay + 0.006 + 0.988 * t) / 3, 1 - h) for t, h, _ in corners],
+        )
+
+    cut = 0.51
+    profiles = (
+        [(0, 0), (0.40, 0), (0.43, 0.42), (0.60, 0.42), (0.63, 0), (1, 0)],
+        [(0, 0), (0.09, 0), (0.10, 0.12), (0.90, 0.12), (0.91, 0), (1, 0)],
+        [(0, 0), (0.32, 0), (0.41, 0.57), (0.60, 0.57), (0.69, 0), (1, 0)],
     )
-    s.box("Linen", (x, height, z), (width + 0.05, 0.18, 0.38))
+    frontage(0, 1, 0, 0, cut, 1)
+    for (left, depth_l), (right, depth_r) in zip(profiles[bay], profiles[bay][1:]):
+        frontage(left, right, depth_l, depth_r, 0, cut)
+    s.box("Paving", (x, 0.038, z + side * 0.27), (width, 0.07, 0.70))
+    s.box(awning, (x, cut * height, z + side * 0.27), (width, 0.09, 0.64))
+    for end in (-1, 1):
+        s.box(
+            "Masonry",
+            (x + end * (width / 2 - 0.05), height / 2, z + side * 0.28),
+            (0.10, height, 0.63),
+        )
+    s.box("Linen", (x, height, z + side * 0.27), (width + 0.05, 0.18, 0.92))
     lip = face - side * 1.05
     h = height * 0.485
     w = width * 0.46
@@ -51,6 +147,36 @@ def shop(s, x, side, width, height, bay, name, awning):
         "#2e3e3d",
         yaw=pi if side > 0 else 0,
     )
+    # A blade sign can be seen looking along the block. Its bracket lines up with
+    # the end pier and the sign hangs outside the edge of the canvas awning.
+    mount = x - side * width * 0.475
+    blade = face - side * 0.81
+    s.tube("Ink", (mount, 3.29, face), (mount, 3.29, face - side * 1.52), 0.035, n=6)
+    s.tube("Ink", (mount, 2.88, face), (mount, 3.29, blade), 0.03, n=6)
+    for delta in (-0.37, 0.37):
+        s.tube(
+            "Ink",
+            (mount, 3.29, blade + delta),
+            (mount, 3.10, blade + delta),
+            0.022,
+            n=6,
+        )
+    s.box("Gold", (mount, 2.75, blade), (0.10, 0.70, 1.14))
+    icon = SHOP_NAMES.index(name)
+    for normal in (-1, 1):
+        corners = [(0, 1), (1, 1), (1, 0), (0, 0)]
+        s.face(
+            "Merchant marks",
+            [
+                (
+                    mount + normal * 0.052,
+                    3.06 - v * 0.62,
+                    blade + normal * (0.5 - u) * 1.06,
+                )
+                for u, v in corners
+            ],
+            [((icon + 0.01 + u * 0.98) / 6, v) for u, v in corners],
+        )
 
 
 def courthouse(s):
@@ -136,7 +262,6 @@ def mall(s):
             widths += [8, 11, 9, 12, 9]
         for i, (start, width) in enumerate(zip(starts, widths)):
             bay = (i + (side > 0)) % 3
-            names = ("BOOKS", "PAPER & INK", "COFFEE", "RECORDS", "PRINTS", "MARKET")
             shop(
                 s,
                 start + width / 2,
@@ -144,7 +269,7 @@ def mall(s):
                 width - 0.08,
                 (7.7, 6.9, 8.4, 7.2)[(i + side) % 4],
                 bay,
-                names[(i + 2 * side) % len(names)],
+                SHOP_NAMES[(i + 2 * side) % len(SHOP_NAMES)],
                 ("Holly", "Cobalt", "Ink", "Clay")[i % 4],
             )
     courthouse(s)
@@ -158,7 +283,7 @@ def mall(s):
             s.plan["trees"].append(
                 dict(x=x, z=z, height=6.2 + 0.8 * cos(x), species="Oak")
             )
-            s.pad("Ink", x, z, 1.3, 1.3, 0.065)
+            s.pad("Tree grate", x, z, 1.55, 1.55, 0.047, 1.55)
             s.extras["furniture"].append(["Bench", x + 2.1, z, pi if side < 0 else 0])
             s.barrier(x + 2.1, z, 2, 0.85)
         banner(s, x + 1.3, -2.8 if x in (-22, 33) else 3.3)
@@ -264,13 +389,27 @@ def tea_table(s, x, z, tea=False):
             s.box("Timber", (x + dx * 0.83, 0.23, z + dz), (0.08, 0.43, 0.08))
     s.barrier(x, z, 2.51, 1.04)
     if tea:
-        s.ellipsoid("Tile", (x, 1.02, z), (0.28, 0.22, 0.23))
-        s.ellipsoid("Gold", (x, 1.24, z), (0.12, 0.04, 0.12))
-        s.tube("Tile", (x - 0.21, 1, z), (x - 0.43, 1.19, z), 0.09, 0.055)
-        for dz in (-0.33, 0.33):
-            s.tube(
-                "Linen", (x + 0.42, 0.84, z + dz), (x + 0.42, 0.97, z + dz), 0.07, 0.10
-            )
+        s.tube("Gold", (x, 0.825, z), (x, 0.855, z), 0.46, n=24)
+        s.ellipsoid("Tile", (x, 1.04, z), (0.22, 0.19, 0.20))
+        s.ellipsoid("Linen", (x, 1.21, z), (0.13, 0.035, 0.13))
+        s.ellipsoid("Gold", (x, 1.26, z), (0.038, 0.035, 0.038), 8, 5)
+        s.tube("Tile", (x - 0.16, 1.02, z), (x - 0.31, 1.13, z), 0.08, 0.05)
+        s.tube("Tile", (x - 0.31, 1.13, z), (x - 0.36, 1.20, z), 0.05, 0.06)
+        handle = [
+            (0.14, 0.96),
+            (0.27, 0.97),
+            (0.32, 1.04),
+            (0.32, 1.13),
+            (0.25, 1.17),
+            (0.15, 1.14),
+        ]
+        for (dx, y), (ex, ey) in zip(handle, handle[1:]):
+            s.tube("Gold", (x + dx, y, z), (x + ex, ey, z), 0.024, n=7)
+        for dx, dz in ((0.28, -0.22), (-0.18, 0.26)):
+            cx, cz = x + dx, z + dz
+            s.tube("Cobalt", (cx, 0.855, cz), (cx, 0.87, cz), 0.12, n=16)
+            s.tube("Linen", (cx, 0.87, cz), (cx, 0.99, cz), 0.055, 0.09, n=16)
+            s.tube("Timber", (cx, 0.99, cz), (cx, 0.992, cz), 0.079, n=16)
 
 
 def teahouse(s):
@@ -329,22 +468,60 @@ def teahouse(s):
         s.box("Timber", (24, 5.11, z), (21.4, 0.22, 0.61))
     # The long reflecting pool with seven copper figures holding water vessels.
     s.block("Sandstone", 24, 49, 7.4, 2.8, 0.35)
-    s.pad("Water", 24, 49, 7.12, 2.52, 0.36)
+    s.pad("Water", 24, 49, 7.12, 2.52, 0.355)
+    # Cap the basin with a slender glazed lip and set a floral course into each face.
+    corners = [(20.3, 47.6), (27.7, 47.6), (27.7, 50.4), (20.3, 50.4)]
+    for i, (ax, az) in enumerate(corners):
+        bx, bz = corners[(i + 1) % 4]
+        w, d = abs(bx - ax), abs(bz - az)
+        s.box("Tile", ((ax + bx) / 2, 0.38, (az + bz) / 2), (w + 0.1, 0.07, d + 0.1))
+        nx, nz = (bz - az) * 0.001, (ax - bx) * 0.001
+        s.face(
+            "Floral border",
+            [
+                (ax + nx, 0.16, az + nz),
+                (bx + nx, 0.16, bz + nz),
+                (bx + nx, 0.31, bz + nz),
+                (ax + nx, 0.31, az + nz),
+            ],
+            [(0, 1), (w + d, 1), (w + d, 0), (0, 0)],
+        )
     for i in range(7):
-        x, z = 21.15 + i * 0.95, 49 + (-1) ** i * 0.50
+        side = (-1) ** i
+        x, z = 21.15 + i * 0.95, 49 + side * 0.50
         s.tube("Hammered copper", (x, 0.37, z), (x, 1.07, z), 0.22, 0.12)
         s.ellipsoid("Hammered copper", (x, 1.17, z), (0.18, 0.29, 0.14), 10, 6)
         s.ellipsoid("Hammered copper", (x, 1.54, z), (0.11, 0.15, 0.12), 10, 6)
-        for side in (-1, 1):
+        s.ellipsoid(
+            "Hammered copper", (x, 1.60, z + side * 0.06), (0.12, 0.11, 0.10), 10, 6
+        )
+        for hand in (-1, 1):
             s.tube(
                 "Hammered copper",
-                (x + side * 0.12, 1.32, z),
-                (x + side * 0.10, 1.08, z - 0.22),
+                (x + hand * 0.12, 1.32, z),
+                (x + hand * 0.10, 1.08, z - side * 0.22),
                 0.055,
                 0.04,
                 8,
             )
-        s.tube("Hammered copper", (x, 1.04, z - 0.22), (x, 1.14, z - 0.22), 0.07, 0.15)
+        mouth = z - side * 0.34
+        s.ellipsoid(
+            "Hammered copper", (x, 1.07, z - side * 0.23), (0.12, 0.12, 0.14), 10, 6
+        )
+        s.tube(
+            "Hammered copper",
+            (x, 1.09, z - side * 0.24),
+            (x, 1.13, mouth),
+            0.071,
+            0.066,
+        )
+        # Water arcs into the basin from each tilted vessel.
+        stream = [
+            (x, 1.12 - 0.76 * (j / 5) ** 2, mouth - side * 0.24 * j / 5)
+            for j in range(6)
+        ]
+        for start, end in zip(stream, stream[1:]):
+            s.tube("Water", start, end, 0.019, n=5)
     for x, z in (
         (20.9, 49.65),
         (23.6, 48.3),
@@ -462,6 +639,7 @@ def build_pearl(s):
     s.plan["surfaces"] = []
     s.extras["furniture"] = []
     s.paint("Shopfronts", "pearl-shopfronts.webp")
+    s.images["Merchant marks"] = merchant_marks()
     s.paint("Ceramic panels", "pearl-ceramic-panels.webp")
     s.paint("Relief study", "pearl-tree-of-life.webp")
     s.paint("Painted coffers", "pearl-painted-coffer.webp")
@@ -476,16 +654,40 @@ def build_pearl(s):
     s.paint("Garden", "grass.webp")
     s.paint("Road", "street-asphalt.webp")
     s.paint("Paving", "street-concrete.webp", ("#736f64", "#ccc3ab"))
-    tile = ImageOps.colorize(
-        s.images["Paving"].convert("L"), "#713e35", "#ca9072"
-    ).resize((256, 256))
-    draw = ImageDraw.Draw(tile)
+    # Keep joints and individual firing colors distinct down at turkey eye height.
+    grain = ImageOps.autocontrast(s.images["Paving"].convert("L")).resize((512, 512))
+    shades = (
+        ("#713f35", "#c48f6b"),
+        ("#805244", "#c89471"),
+        ("#6b4438", "#c08668"),
+        ("#7b5142", "#cc9979"),
+    )
+    kiln = [ImageOps.colorize(grain, *shade) for shade in shades]
+    tile = Image.new("RGB", (512, 512), "#887263")
+    rng = Random(1300)
     for row in range(16):
-        y = row * 16
-        draw.line((0, y, 256, y), fill="#897163", width=2)
-        for x in range(-16 + (row % 2) * 16, 257, 32):
-            draw.line((x, y, x, y + 16), fill="#887366", width=2)
+        y = row * 32
+        for col in range(8):
+            x = col * 64 - 32 * (row % 2)
+            brick = rng.choice(kiln)
+            for start in (x, x + 512):
+                left, right = max(0, start + 2), min(512, start + 63)
+                if right > left:
+                    patch = (left, y + 1, right, y + 31)
+                    tile.paste(brick.crop(patch), patch[:2])
     s.images["Pavers"] = tile
+    grate = ImageOps.colorize(grain.resize((256, 256)), "#343a38", "#555954")
+    draw = ImageDraw.Draw(grate)
+    for r in range(31, 114, 13):
+        draw.ellipse((128 - r, 128 - r, 128 + r, 128 + r), outline="#222825", width=8)
+    for i in range(16):
+        a = i * pi / 8
+        draw.line(
+            (128, 128, 128 + 115 * cos(a), 128 + 115 * sin(a)), fill="#545954", width=4
+        )
+    draw.ellipse((102, 102, 154, 154), fill="#3d3429")
+    draw.rectangle((3, 3, 252, 252), outline="#272f2c", width=4)
+    s.images["Tree grate"] = grate
     s.images["Dining floor"] = ImageOps.colorize(
         tile.convert("L"), "#594431", "#cdac82"
     )

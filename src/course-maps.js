@@ -5,6 +5,7 @@ import { coursePhoto, groundMaterial } from './world.js';
 import { doverYard, yardBarriers } from './dover-yard.js';
 import { bluePod } from './soccer.js';
 import { Obstacles } from './field.js';
+import { siteSigns, trailSign } from './trail-sign.js';
 import {
   doverParking,
   doverFurniture,
@@ -129,15 +130,19 @@ export async function courseMaps(scene, world, region) {
                 barriers = pitch.barriers;
               }
             }
-            site.solids = new Obstacles({
-              buildings: [
-                ...world.landmarks.collisionFootprints(site.buildings),
-                ...barriers,
-              ],
-              trees: site.trees,
-              water: [],
-              bounds: site.bounds,
-            });
+            const sign = siteSigns[site.id];
+            site.solids = new Obstacles(
+              {
+                buildings: [
+                  ...world.landmarks.collisionFootprints(site.buildings),
+                  ...barriers,
+                ],
+                trees: site.trees,
+                water: [],
+                bounds: site.bounds,
+              },
+              sign ? [sign] : []
+            );
             if (site.id === 'dover') {
               mesh.add(
                 doverFurniture(
@@ -161,6 +166,11 @@ export async function courseMaps(scene, world, region) {
               contains
             );
             mesh.add(scenery.group);
+            if (sign) {
+              const board = trailSign(sign, site, texture.image, world.height);
+              mesh.add(board);
+              world.walls.push(...board.children);
+            }
             scene.add(mesh);
             site.mesh = mesh;
           })().finally(() => {

@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Obstacles, treeShape, randomSeed } from './field.js';
-import { PORCH } from './dover-location.js';
+import { PORCH, PORCH_LANTERN } from './dover-location.js';
 import { addPeaks } from './peaks.js';
 
 let nightPanorama;
@@ -245,8 +245,12 @@ export function lightDoverPorch(scene, height) {
   for (const light of lights) light.intensity *= 0.3;
   scene.background = eveningSky();
   scene.fog = new T.Fog('#15223c', -13, 67);
-  const lamp = new T.PointLight('#ffc577', 58, 21);
-  lamp.position.set(PORCH.x + 1.6, height(PORCH.x, PORCH.z) + 2.5, PORCH.z);
+  const lamp = new T.PointLight('#ffc577', 24, 21);
+  lamp.position.set(
+    PORCH.x + PORCH_LANTERN.out + 0.18,
+    height(PORCH.x, PORCH.z) + PORCH_LANTERN.up,
+    PORCH.z - PORCH_LANTERN.across
+  );
   scene.add(lamp);
   return () => {
     lamp.removeFromParent();

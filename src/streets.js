@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { streetDisplayName } from './street-location.js';
+import { segmentDistanceSq } from './field.js';
 
 const SIDEWALK = 1,
   TRAIL = 2,
@@ -10,7 +11,8 @@ const LOCAL = 5,
   DIVIDED = 7,
   UNMARKED = 8,
   APRON = 9,
-  DOVER_ASPHALT = 10;
+  DOVER_ASPHALT = 10,
+  CURB_RAMP = 11;
 const inPark = (x, z) => Math.abs(x) < 680 && Math.abs(z) < 680;
 const nodeKey = ([x, z]) => Math.round(x) + ',' + Math.round(z);
 
@@ -117,8 +119,19 @@ export async function streetMaterials(texture) {
         vec3 color = bitumen;
         if (kind == ${SIDEWALK}.) {
           float joint = band(abs(fract(road.y / 1.6 + .5)-.5)*1.6, .009, ay);
-          color = slab * (1.0 - .52 * joint);
+          float panel = floor(road.y / 1.6);
+          float batch = fract(sin(mod(panel, 79.) * 4.71) * 56.3);
+          color = slab * (.94 + .11 * batch) * (1.0 - .52 * joint);
           color *= mix(.68, 1.0, smoothstep(.015,.065,halfWidth-abs(road.x)));
+        } else if (kind == ${CURB_RAMP}.) {
+          float curb = abs(road.y - vStreet.z);
+          float plate = band(abs(curb - .40), .30, ay)
+            * band(abs(road.x), halfWidth - .055, aa);
+          vec2 cell = fract(vec2(road.x, curb) / .055 + .5) - .5;
+          float dome = 1. - smoothstep(.12, .31, length(cell));
+          float close = 1. - smoothstep(.006, .024, max(aa, ay));
+          vec3 iron = vec3(.36,.145,.068) * (.88 + patina + close * dome * (.38 - cell.y));
+          color = mix(slab, iron, plate);
         } else if (kind == ${APRON}.) {
           vec2 joint = abs(fract(road / 3. + .5) - .5) * 3.;
           vec3 driveway = mix(slab,vec3(.63,.61,.58),.70)
@@ -255,6 +268,9 @@ export function pavement(
   const intersections = new Set();
   const chunks = new Map(),
     group = new T.Group();
+  const walks = lines.filter(
+    (line) => line.type.includes('Sidewalk') || line.type === 'Multi-Use Path'
+  );
   function chunk(x, z) {
     const key = regional
       ? Math.floor(x / 1000) + ',' + Math.floor(z / 1000)
@@ -264,26 +280,19 @@ export function pavement(
   }
   // The survey connects sidewalk endpoints. Keep crossing paint on the part
   // that actually overlaps a carriageway, including median and corner gaps.
-  function onRoad(x, z) {
-    return crossingRoads.some(
-      (line) =>
+  function onRoad(x, z, inset = 0.2) {
+    return crossingRoads.some((line) => {
+      const half = line.width * 0.49 - inset;
+      return (
         line.type !== 'Parking Lot' &&
-        line.points.some(([bx, bz], i) => {
-          if (!i) return false;
-          const [ax, az] = line.points[i - 1],
-            dx = bx - ax,
-            dz = bz - az;
-          const t = T.MathUtils.clamp(
-            ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1),
-            0,
-            1
-          );
-          return (
-            Math.hypot(x - ax - dx * t, z - az - dz * t) <
-            line.width * 0.49 - 0.2
-          );
-        })
-    );
+        half > 0 &&
+        line.points.some(
+          ([bx, bz], i) =>
+            i &&
+            segmentDistanceSq(x, z, ...line.points[i - 1], bx, bz) < half * half
+        )
+      );
+    });
   }
   for (const line of lines) {
     const kind = surfaceType(line);
@@ -300,7 +309,7 @@ export function pavement(
     }
     const start = first?.radius || -20;
     const end = length - (last?.radius || -20);
-    const strip = (a, b, left, right, h0, h1) => {
+    const strip = (a, b, left, right, h0, h1, rampEdge) => {
       if (regional && inPark((a.x + b.x) / 2, (a.z + b.z) / 2)) return;
       const target = chunk((a.x + b.x) / 2, (a.z + b.z) / 2);
       const corner = (r, w, h) => [
@@ -315,16 +324,59 @@ export function pavement(
         [
           corner(a, left, h0),
           corner(a, right, h1),
-          corner(b, right, h1),
-          corner(b, left, h0),
+          corner(b, right, rampEdge === undefined ? h1 : 0.021),
+          corner(b, left, rampEdge === undefined ? h0 : 0.021),
         ],
         ([x, z, u, v, h], ground) => {
           target.positions.push(x, ground + h, z);
           target.uvs.push(u, v);
-          target.styles.push(kind, half, start, end);
+          if (rampEdge === undefined)
+            target.styles.push(kind, half, start, end);
+          else target.styles.push(CURB_RAMP, right, rampEdge, 0);
         }
       );
     };
+    let paintStart = 0,
+      paintEnd = length;
+    if (kind === CROSSWALK) {
+      for (const [tip, inner] of [
+        [path[0], path[1]],
+        [path.at(-1), path.at(-2)],
+      ]) {
+        if (onRoad(tip.x, tip.z, 0)) continue;
+        const walk = walks.find((line) =>
+          line.points.some(
+            ([bx, bz], i) =>
+              i &&
+              segmentDistanceSq(tip.x, tip.z, ...line.points[i - 1], bx, bz) <=
+                (line.width / 2) ** 2
+          )
+        );
+        if (!walk) continue;
+        const direction = Math.sign(inner.length - tip.length);
+        const reach = Math.min(9, Math.abs(inner.length - tip.length));
+        for (let distance = 0.2; distance <= reach; distance += 0.2) {
+          const probe = along(tip, inner, tip.length + direction * distance);
+          if (!onRoad(probe.x, probe.z, 0)) continue;
+          if (distance < 0.8) break;
+          let outside = distance - 0.2,
+            inside = distance;
+          while (inside - outside > 0.01) {
+            const middle = (outside + inside) / 2;
+            const row = along(tip, inner, tip.length + direction * middle);
+            if (onRoad(row.x, row.z, 0)) inside = middle;
+            else outside = middle;
+          }
+          const edge = along(tip, inner, tip.length + direction * outside);
+          const width = Math.min(half, walk.width * 0.5);
+          // The inner edge meets the asphalt. The outer edge meets the raised walk.
+          strip(tip, edge, -width, width, 0.078, 0.078, edge.length);
+          if (direction > 0) paintStart = edge.length + 0.12;
+          else paintEnd = edge.length - 0.12;
+          break;
+        }
+      }
+    }
     for (let i = 1; i < path.length; i++) {
       const a = path[i - 1],
         b = path[i];
@@ -334,8 +386,8 @@ export function pavement(
           d < b.length;
           d += 0.95
         ) {
-          const lo = Math.max(a.length, d),
-            hi = Math.min(b.length, d + 0.45);
+          const lo = Math.max(a.length, d, paintStart),
+            hi = Math.min(b.length, d + 0.45, paintEnd);
           if (hi <= lo) continue;
           const mid = along(a, b, (lo + hi) / 2);
           if (onRoad(mid.x, mid.z))

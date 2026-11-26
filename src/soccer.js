@@ -10,52 +10,82 @@ export function bluePod(site, height) {
   const frame = [],
     net = [],
     paint = [],
+    markings = [],
     barriers = [];
   const line = (list, a, b) => list.push(...a, ...b);
   function marking(ax, az, bx, bz) {
-    const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 3);
-    for (let i = 0; i < n; i++) {
-      const a = i / n,
-        b = (i + 1) / n;
-      const x = ax + (bx - ax) * a,
-        z = az + (bz - az) * a;
-      const xx = ax + (bx - ax) * b,
-        zz = az + (bz - az) * b;
-      line(
-        paint,
-        [x, height(x, z) + 0.065, z],
-        [xx, height(xx, zz) + 0.065, zz]
+    const dx = bx - ax,
+      dz = bz - az,
+      length = Math.hypot(dx, dz);
+    const nx = (-dz / length) * 0.06,
+      nz = (dx / length) * 0.06;
+    const steps = Math.ceil(length / 2);
+    const turf = (x, z) => [x, height(x, z) + 0.043, z];
+    for (let i = 0; i < steps; i++) {
+      const x = ax + (dx * i) / steps,
+        z = az + (dz * i) / steps;
+      const xx = ax + (dx * (i + 1)) / steps,
+        zz = az + (dz * (i + 1)) / steps;
+      line(markings, turf(x, z), turf(xx, zz));
+      const a = turf(x + nx, z + nz),
+        b = turf(x - nx, z - nz);
+      const c = turf(xx - nx, zz - nz),
+        d = turf(xx + nx, zz + nz);
+      paint.push(...a, ...d, ...c, ...a, ...c, ...b);
+    }
+  }
+  function arc(x, z, radius, start, end, steps) {
+    for (let i = 0; i < steps; i++) {
+      const a = start + ((end - start) * i) / steps;
+      const b = start + ((end - start) * (i + 1)) / steps;
+      marking(
+        x + radius * Math.cos(a),
+        z + radius * Math.sin(a),
+        x + radius * Math.cos(b),
+        z + radius * Math.sin(b)
       );
     }
   }
-  // Two community pitches run east–west across the open grass.
   for (const cz of [pod.z - 34, pod.z + 34]) {
     const ax = pod.x - 50,
       bx = pod.x + 50;
     for (const x of [ax, pod.x, bx]) marking(x, cz - 29, x, cz + 29);
     for (const z of [cz - 29, cz + 29]) marking(ax, z, bx, z);
-    for (let i = 0; i < 32; i++) {
-      const a = (i * Math.PI) / 16,
-        b = ((i + 1) * Math.PI) / 16;
-      marking(
-        pod.x + 9.15 * Math.cos(a),
-        cz + 9.15 * Math.sin(a),
-        pod.x + 9.15 * Math.cos(b),
-        cz + 9.15 * Math.sin(b)
-      );
-    }
+    arc(pod.x, cz, 9.15, 0, 2 * Math.PI, 64);
+    marking(pod.x - 0.12, cz, pod.x + 0.12, cz);
     for (const x of [ax, bx]) {
-      const rear = x + (x === ax ? -1 : 1) * 2,
-        h = height(x, cz),
+      const intoField = x === ax ? 1 : -1;
+      for (const [depth, halfWidth] of [
+        [5.5, 9.16],
+        [16.5, 20.16],
+      ]) {
+        const end = x + intoField * depth;
+        for (const z of [cz - halfWidth, cz + halfWidth]) marking(x, z, end, z);
+        marking(end, cz - halfWidth, end, cz + halfWidth);
+      }
+      const penalty = x + intoField * 11;
+      marking(penalty - 0.12, cz, penalty + 0.12, cz);
+      const facing = intoField === 1 ? 0 : Math.PI,
+        sweep = Math.acos(5.5 / 9.15);
+      arc(penalty, cz, 9.15, facing - sweep, facing + sweep, 20);
+
+      // The crossbar stays level while the ground rails follow the grade.
+      const rear = x - intoField * 2,
         z1 = cz - 3.66,
         z2 = cz + 3.66;
-      const post = (x, z, y = 0) => [x, h + y, z];
-      line(frame, post(x, z1, 2.44), post(x, z2, 2.44));
+      const crossbar = height(x, cz) + 2.44,
+        backRail = crossbar - 0.79;
+      const front = (z) => [x, crossbar, z];
+      const back = (z) => [rear, backRail, z];
+      const foot = (u, z) => [u, height(u, z) + 0.055, z];
+      line(frame, front(z1), front(z2));
+      line(frame, back(z1), back(z2));
+      line(frame, foot(rear, z1), foot(rear, z2));
       for (const z of [z1, z2]) {
-        line(frame, post(x, z), post(x, z, 2.44));
-        line(frame, post(x, z, 2.44), post(rear, z, 1.65));
-        line(frame, post(rear, z), post(rear, z, 1.65));
-        line(frame, post(x, z), post(rear, z));
+        line(frame, foot(x, z), front(z));
+        line(frame, front(z), back(z));
+        line(frame, foot(rear, z), back(z));
+        line(frame, foot(x, z), foot(rear, z));
         barriers.push({
           points: [
             [x, z - 0.06],
@@ -73,45 +103,92 @@ export function bluePod(site, height) {
           [rear - 0.06, z2],
         ],
       });
-      for (let j = 0; j <= 18; j++) {
-        const z = z1 + ((z2 - z1) * j) / 18;
-        line(net, post(rear, z), post(rear, z, 1.65));
-        line(net, post(rear, z, 1.65), post(x, z, 2.44));
+
+      // A little slack in the back panel makes the net read as cord at eye level.
+      // Pin every edge to its rail and fill the side panels as well as the roof.
+      const backNet = (u, v) => {
+        const z = z1 + (z2 - z1) * u,
+          floor = foot(rear, z)[1];
+        const slack = Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
+        return [
+          rear - intoField * 0.15 * slack,
+          floor + (backRail - floor) * v,
+          z,
+        ];
+      };
+      const roofNet = (u, v) => {
+        const slack = Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
+        return [
+          x + (rear - x) * v,
+          crossbar + (backRail - crossbar) * v - 0.09 * slack,
+          z1 + (z2 - z1) * u,
+        ];
+      };
+      function weave(point, columns, rows) {
+        for (let i = 0; i <= columns; i++) {
+          for (let j = 0; j <= rows; j++) {
+            const at = point(i / columns, j / rows);
+            if (i < columns) line(net, at, point((i + 1) / columns, j / rows));
+            if (j < rows) line(net, at, point(i / columns, (j + 1) / rows));
+          }
+        }
       }
-      for (let j = 0; j <= 4; j++)
-        line(
-          net,
-          post(rear, z1, (1.65 * j) / 4),
-          post(rear, z2, (1.65 * j) / 4)
+      weave(backNet, 34, 8);
+      weave(roofNet, 34, 10);
+      for (const z of [z1, z2]) {
+        weave(
+          (u, v) => {
+            const px = x + (rear - x) * u,
+              floor = foot(px, z)[1];
+            return [
+              px,
+              floor + (crossbar + (backRail - crossbar) * u - floor) * v,
+              z,
+            ];
+          },
+          10,
+          10
         );
+      }
     }
   }
   const group = new T.Group();
-  function lines(vertices, color, opacity) {
-    const geometry = new T.BufferGeometry();
-    geometry.setAttribute(
+  const geo = (vertices) =>
+    new T.BufferGeometry().setAttribute(
       'position',
       new T.Float32BufferAttribute(vertices, 3)
     );
-    group.add(
-      new T.LineSegments(
-        geometry,
-        new T.LineBasicMaterial({ color, transparent: true, opacity })
-      )
-    );
-  }
-  lines(net, '#e3eadc', 0.64);
-  lines(paint, '#fff7dc', 0.7);
-  // Tubular posts keep their physical width at close range.
+  group.add(
+    new T.LineSegments(
+      geo(net),
+      new T.LineBasicMaterial({
+        color: '#f1efdc',
+        transparent: true,
+        opacity: 0.66,
+        depthWrite: false,
+      })
+    )
+  );
+  group.add(
+    new T.Mesh(
+      geo(paint),
+      new T.MeshBasicMaterial({
+        color: '#f1edd6',
+        transparent: true,
+        opacity: 0.83,
+        depthWrite: false,
+      })
+    )
+  );
   const bars = new T.InstancedMesh(
-    new T.CylinderGeometry(0.06, 0.06, 1, 8),
-    new T.MeshLambertMaterial({ color: 0xf5f5ed }),
+    new T.CylinderGeometry(0.055, 0.055, 1, 10),
+    new T.MeshLambertMaterial({ color: '#f0eee6' }),
     frame.length / 6
   );
   const a = new T.Vector3(),
     b = new T.Vector3(),
-    up = new T.Vector3(0, 1, 0),
-    piece = new T.Object3D();
+    up = new T.Vector3(0, 1, 0);
+  const piece = new T.Object3D();
   for (let i = 0; i < frame.length; i += 6) {
     a.fromArray(frame, i);
     b.fromArray(frame, i + 3);
@@ -123,5 +200,5 @@ export function bluePod(site, height) {
     bars.setMatrixAt(i / 6, piece.matrix);
   }
   group.add(bars);
-  return { group, barriers, markings: paint };
+  return { group, barriers, markings };
 }

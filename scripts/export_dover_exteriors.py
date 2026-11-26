@@ -77,8 +77,50 @@ def window(mesh, u,y,d,w,h, trim, lights=2):
 def garage(mesh, u, d, width, height, trim, door):
     box(mesh,trim,u,height/2-.07,d+.055,width+.20,height+.16,.11)
     box(mesh,'Reveal',u,height/2-.07,d+.12,width+.07,height+.04,.08)
-    front_panel(mesh,door,u,height/2-.07,d+.164,width,height)
+    # Each stamped steel panel catches light on its four sloping shoulders.
+    # Keep the grain aligned across each section and at the double-width bay.
+    columns = 3 if width < 3 else 6
+    def surface(corners):
+        mesh.face(door, [point(*p) for p in corners],
+                  [((v-u+width/2)/width*columns/3, 1-(y+.07)/height) for v,y,_ in corners])
+    for row in range(4):
+        for col in range(columns):
+            left, bottom = u-width/2+width*col/columns, -.07+height*row/4
+            right, top = left+width/columns, bottom+height/4
+            def ring(inset, depth):
+                return [(left+inset,bottom+inset,depth),(right-inset,bottom+inset,depth),
+                        (right-inset,top-inset,depth),(left+inset,top-inset,depth)]
+            frame, edge, field = ring(0,d+.164), ring(.058,d+.164), ring(.091,d+.189)
+            for outer,inner in [(frame,edge),(edge,field)]:
+                for i in range(4):
+                    j=(i+1)%4
+                    surface([outer[i],outer[j],inner[j],inner[i]])
+            surface(field)
     box(mesh,'Reveal',u,.025,d+.175,width,.05,.058)
+    # A recessed lift grip just above the bottom weather seal.
+    box(mesh,'Reveal',u,.48,d+.20,.23,.048,.03)
+
+
+def eave_drain(mesh, edge, side, back, front, eave, slope, trim):
+    gutter = edge + side*.23
+    lip = eave - slope*.23
+    box(mesh,trim,gutter,lip-.085,(back+front)/2,.16,.14,front-back+.46)
+    box(mesh,trim,gutter+side*.075,lip-.034,(back+front)/2,.034,.047,front-back+.46)
+    # The outlet doglegs under the overhang, then follows the brick pier.
+    pipe = edge - side*.13
+    path = [(gutter,lip-.12,front+.12),(gutter,lip-.27,front+.12),
+            (pipe,lip-.55,front+.086),(pipe,.3,front+.086),(pipe,.14,front+.24)]
+    prev = None
+    for u,y,d in path:
+        ring = [(u-.047,y,d+.042),(u+.047,y,d+.042),
+                (u+.047,y,d-.042),(u-.047,y,d-.042)]
+        if prev:
+            for i in range(4):
+                j=(i+1)%4
+                panel(mesh, trim, [prev[i], ring[i], ring[j], prev[j]])
+        prev = ring
+    for y in (.68, 2.34):
+        box(mesh,trim,pipe,y,front+.088,.12,.035,.109)
 
 
 def twin_garage():
@@ -101,6 +143,8 @@ def twin_garage():
     for i in range(6):
         box(m,'Louver',-1.325,6.01+i*.066,7.15,.32,.021,.035)
     window(m,5.45,2.8,1,2.35,1.08,'Ivory',3)
+    eave_drain(m,-5.5,-1,-7,7,5.23,(6.86-5.23)/4.175,'Ivory')
+    eave_drain(m,10.5,1,-7,1,3.9,(5.05-3.9)/3.825,'Ivory')
     return m
 
 
@@ -122,6 +166,7 @@ def timber_front():
         box(m,'Side glass',4.087,3.68,depth,.05,1.19,.74)
     box(m,'Buff brick',4.40,3.26,-4.60,.82,6.9,.92)
     box(m,'Capstone',4.40,6.80,-4.60,.91,.20,1.02)
+    eave_drain(m,4,1,-7.1,7,4.96,(6.30-4.96)/4,'Green timber')
     return m
 
 

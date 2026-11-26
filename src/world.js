@@ -7,6 +7,7 @@ import {
 } from './streetscape.js';
 import { FieldGrasses, loadGrasses } from './grass.js';
 import { parkFloor } from './surfaces.js';
+import { trailSign } from './trail-sign.js';
 import {
   pavement,
   streetJunctions,
@@ -21,8 +22,6 @@ import {
   SPAWN,
   BODY_RADIUS,
   PARK_SIGNS,
-  SIGN_WIDTH,
-  SIGN_DEPTH,
 } from './field.js';
 import { loadLandmarks } from './landmarks.js';
 import { makeTerrain } from './terrain.js';
@@ -373,52 +372,6 @@ export function groundMaterial(photo, grass, options = {}) {
   };
   return mat;
 }
-function parkSign({ title, x, z, angle }, height) {
-  const board = document.createElement('canvas');
-  board.width = 768;
-  board.height = 248;
-  const c = board.getContext('2d');
-  c.fillStyle = '#32473b';
-  c.fillRect(0, 0, 768, 248);
-  c.strokeStyle = '#a0946c';
-  c.lineWidth = 5;
-  c.strokeRect(11, 11, 746, 226);
-  c.fillStyle = '#eed8a1';
-  c.font = '500 23px "IBM Plex Mono", monospace';
-  c.fillText('CITY & COUNTY OF BROOMFIELD', 37, 56);
-  c.fillStyle = '#f9f1d9';
-  c.font = '700 84px "Barlow Condensed", sans-serif';
-  c.fillText(title, 32, 150, 704);
-  c.fillStyle = '#cdbc8d';
-  c.fillRect(36, 179, 692, 2);
-  c.font = '500 23px "IBM Plex Mono", monospace';
-  c.fillText('COLORADO   /   PARK TRAILS', 36, 215);
-  const t = new T.CanvasTexture(board);
-  t.colorSpace = T.SRGBColorSpace;
-  t.anisotropy = 8;
-  const g = new T.Group(),
-    wood = new T.MeshLambertMaterial({ color: '#80664b' });
-  for (const dx of [-1.63, 1.63]) {
-    const m = new T.Mesh(new T.BoxGeometry(0.15, 1.08, SIGN_DEPTH), wood);
-    m.position.set(dx, 0.54, 0);
-    g.add(m);
-  }
-  const back = new T.Mesh(new T.BoxGeometry(SIGN_WIDTH, 1.23, 0.12), wood);
-  back.position.y = 1.65;
-  g.add(back);
-  for (const side of [-1, 1]) {
-    const sign = new T.Mesh(
-      new T.PlaneGeometry(SIGN_WIDTH - 0.02, 1.21),
-      new T.MeshBasicMaterial({ map: t })
-    );
-    sign.position.set(0, 1.65, side * 0.065);
-    sign.rotation.y = side < 0 ? Math.PI : 0;
-    g.add(sign);
-  }
-  g.position.set(x, height(x, z), z);
-  g.rotation.y = angle;
-  return g;
-}
 function water(scene, rings, height) {
   const positions = [];
   for (const r of rings) {
@@ -517,7 +470,7 @@ export async function buildWorld(scene, data) {
     new T.Mesh(terrain.parkGround(), groundMaterial(photo, grass)),
     structures
   );
-  const signs = PARK_SIGNS.map((s) => parkSign(s, height));
+  const signs = PARK_SIGNS.map((s) => trailSign(s, data, photo.image, height));
   scene.add(
     parkFloor({ ...data, trees: plantings }, height),
     pavement(

@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PORCH } from './dover-location.js';
+import { randomSeed } from './field.js';
 
 // Blades run parallel to the street they name. The northern pair sits above
 // the stop facing players approaching East 9th from Dover.
@@ -18,9 +19,96 @@ export const doverSigns = [
   ],
 }));
 
+function sidewalkLeaves(paths, height) {
+  const random = randomSeed(735);
+  // A folded blade has a ridge and a lobed outline, visible at turkey height.
+  const rib = [0.002, 0.006, 0.009, 0.012, 0.011, 0.006, 0.002];
+  const widths = [0.001, 0.021, 0.013, 0.029, 0.018, 0.024, 0];
+  const vertices = [],
+    indices = [];
+  for (let i = 0; i < widths.length; i++) {
+    const z = i * 0.019 - 0.054,
+      w = widths[i];
+    vertices.push(-w, 0, z, 0, rib[i], z, w * 0.86, 0.001, z);
+    if (i === widths.length - 1) break;
+    const k = i * 3;
+    indices.push(
+      k,
+      k + 3,
+      k + 1,
+      k + 1,
+      k + 3,
+      k + 4,
+      k + 1,
+      k + 4,
+      k + 2,
+      k + 2,
+      k + 4,
+      k + 5
+    );
+  }
+  const blade = new T.BufferGeometry();
+  blade.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
+  blade.setIndex(indices);
+  blade.computeVertexNormals();
+  const palette = ['#92643e', '#ba8448', '#d8aa60', '#936a49', '#a35b3a'];
+  const leaves = [];
+  const pose = new T.Object3D(),
+    up = new T.Vector3(0, 1, 0),
+    normal = new T.Vector3();
+  for (const path of paths) {
+    if (path.name !== 'Dover block' || path.type !== 'Attached Sidewalk')
+      continue;
+    for (let i = 1; i < path.points.length; i++) {
+      const [ax, az] = path.points[i - 1],
+        [bx, bz] = path.points[i];
+      const length = Math.hypot(bx - ax, bz - az);
+      const dx = (bx - ax) / length,
+        dz = (bz - az) / length;
+      for (let d = 3 + random() * 6; d < length - 2; d += 9 + random() * 11) {
+        const side = random() < 0.5 ? -1 : 1;
+        const count = 10 + Math.floor(random() * 13);
+        for (let j = 0; j < count; j++) {
+          const along = d + (random() - random()) * 1.8;
+          const offset = side * (0.6 - random() ** 2 * 0.9);
+          const x = ax + dx * along - dz * offset,
+            z = az + dz * along + dx * offset;
+          pose.position.set(x, height(x, z) + 0.083, z);
+          normal.set(
+            height(x - 0.1, z) - height(x + 0.1, z),
+            0.2,
+            height(x, z - 0.1) - height(x, z + 0.1)
+          );
+          pose.quaternion.setFromUnitVectors(up, normal.normalize());
+          pose.rotateY(random() * Math.PI * 2);
+          pose.scale.setScalar(0.72 + 0.58 * random());
+          pose.updateMatrix();
+          leaves.push([
+            pose.matrix.clone(),
+            palette[Math.floor(random() * palette.length)]
+          ]);
+        }
+      }
+    }
+  }
+  const mesh = new T.InstancedMesh(
+    blade,
+    new T.MeshLambertMaterial(),
+    leaves.length
+  );
+  const color = new T.Color();
+  leaves.forEach(([matrix, tint], i) => {
+    mesh.setMatrixAt(i, matrix);
+    mesh.setColorAt(i, color.set(tint));
+  });
+  mesh.name = 'Leaves along the Dover sidewalks';
+  return mesh;
+}
+
 export function doverFurniture(models, height, solids, paths) {
   const group = new T.Group();
   group.name = 'Dover street furniture';
+  group.add(sidewalkLeaves(paths, height));
   const pole = (x, z, r) =>
     solids.indexFeature({ x, z, radius: r }, x - r, x + r, z - r, z + r);
   for (const [name, x, z, yaw] of [
