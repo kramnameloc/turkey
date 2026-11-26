@@ -120,6 +120,14 @@ for (const name of ['sedan', 'suv', 'exteriors']) {
   assert.equal(model.toString('ascii', 0, 4), 'glTF', name);
   assert.equal(model.readUInt32LE(8), model.length, name);
 }
+for (const venue of ['airport', 'ice', 'springs', 'pearl']) {
+  const model = await asset(
+    '/models/trip-' + venue + '.glb',
+    /model\/gltf-binary|application\/octet-stream/
+  );
+  assert.equal(model.toString('ascii', 0, 4), 'glTF', venue);
+  assert.equal(model.readUInt32LE(8), model.length, venue);
+}
 const landmarkPack = await asset(
   '/models/broomfield-landmarks.glb',
   /model\/gltf-binary|application\/octet-stream/

@@ -3,6 +3,8 @@ import { addRegion, buildWorld } from './world.js';
 import { courseMaps } from './course-maps.js';
 import { streetLocator } from './street-location.js';
 import { DOVER_ROUTE } from './dover-route.js';
+import { loadVenue, lightDoverPorch } from './trip-venue.js';
+import { doverCorners } from './parade-route.js';
 import { doverLeg } from './dover-guide.js';
 import { ChaseView, TURKEY_EYE } from './view.js';
 import { TurkeyAvatar } from './turkey-avatar.js';
@@ -79,6 +81,7 @@ export class Hunt {
     this.streetLabel = $('#current-street');
     this.streetText = this.streetLabel.querySelector('span');
     this.scene = new T.Scene();
+    this.venues = new Map();
     this.renderer = new T.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
@@ -89,6 +92,7 @@ export class Hunt {
     this.renderer.setPixelRatio(this.maxPixelRatio);
     this.frameSample = 0;
     this.frameCount = 0;
+    this.renderer.shadowMap.enabled = true;
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.camera = new T.PerspectiveCamera(63, 1, 0.045, 4100);
     this.camera.rotation.order = 'YXZ';
@@ -153,6 +157,7 @@ export class Hunt {
     this.tool.add(wing);
     this.world = await buildWorld(this.scene, this.data);
     await Promise.all([addPeaks(this.scene), loadMapImage(this.data)]);
+    this.daySky = this.scene.background;
     this.groundShadow = shadowTexture();
     const shade = new T.MeshBasicMaterial({
       map: this.groundShadow,
@@ -178,6 +183,15 @@ export class Hunt {
         vz: 0,
       };
     });
+    this.fieldActors = new T.Group();
+    this.fieldActors.add(
+      this.net,
+      this.guide.arrows,
+      this.fight.group,
+      this.fight.trails,
+      ...this.allTargets.flatMap((t) => [t.model, t.shadow])
+    );
+    this.scene.add(this.fieldActors);
     this.bindInput();
     this.resize();
     this.camera.position.set(
@@ -273,7 +287,8 @@ export class Hunt {
       snap,
       this.isBlocked,
       this.ground,
-      this.house.inside
+      this.house.inside || this.venue?.data.id === 'ice',
+      this.house.inside ? 3.26 : 10.3
     );
     // At a wall the boom can fold to the eye. Keep feathers out of the near plane.
     this.avatar.visible = this.chaseCamera.distance > 0.9;
@@ -293,11 +308,33 @@ export class Hunt {
     this.updateViewControls();
   }
   interact() {
-    if (
-      !this.playing ||
-      !this.house.prompt(this.camera.position, this.doverFinale)
-    )
+    if (!this.playing) return;
+    if (this.pendingDestination) {
+      const { x, z } = this.pendingDestination;
+      const p = this.camera.position;
+      if (Math.hypot(p.x - x, p.z - z) > 3) return;
+      this.pendingDestination = null;
+      if (this.course.venue === 'airport') {
+        this.useVenue(null);
+        this.arrivalAtDover = true;
+        this.restoreDaylight = lightDoverPorch(this.scene, this.ground);
+        this.arrive({ x: 1160, z: -1015 });
+        this.yaw = Math.atan2(
+          this.camera.position.x - PORCH.x,
+          this.camera.position.z - PORCH.z
+        );
+        this.pitch = 0.045;
+        this.syncView(0, true);
+        this.guide.reset(this.elapsed);
+        this.toast(
+          '735 Dover St · Follow the porch light and inspect the display.',
+          5
+        );
+        this.setHUD();
+      } else this.completeCourse();
       return;
+    }
+    if (!this.house.prompt(this.camera.position, this.arrivalAtDover)) return;
     const p = this.camera.position;
     if (!this.house.inside) {
       this.house.enter();
@@ -318,9 +355,9 @@ export class Hunt {
     } else {
       this.house.collect();
       this.trackingDover = false;
-      if (this.doverFinale) {
+      if (this.arrivalAtDover) {
         sound('win');
-        this.finish(true);
+        this.completeCourse();
         return;
       }
       sound('bonus');
@@ -336,21 +373,24 @@ export class Hunt {
   get untimed() {
     return this.mode === 'roam' || this.mode === 'parade';
   }
+  get activeParade() {
+    return this.mode === 'campaign' ? this.doverParade : this.parade;
+  }
   get streetParade() {
-    return !this.house.inside && this.parade?.group.visible
-      ? this.parade
+    return !this.house.inside && this.activeParade?.group.visible
+      ? this.activeParade
       : null;
   }
   get localParade() {
-    return !this.trackingDover && this.parade?.group.visible
-      ? this.parade
+    return !this.trackingDover && this.activeParade?.group.visible
+      ? this.activeParade
       : null;
   }
   get regional() {
     return (
       this.mode === 'city' ||
       this.mode === 'roam' ||
-      (this.mode === 'campaign' && this.level > 0)
+      (this.mode === 'campaign' && (!this.course?.venue || this.arrivalAtDover))
     );
   }
   get timeLimit() {
@@ -358,6 +398,30 @@ export class Hunt {
   }
   get course() {
     return COURSES[this.level];
+  }
+  get currentHunt() {
+    return this.mode === 'campaign' ? this.course.hunts[this.huntIndex] : null;
+  }
+  get huntLabel() {
+    return (
+      'Hunt ' +
+      (this.huntIndex + 1) +
+      '/' +
+      this.course.hunts.length +
+      ' · ' +
+      this.currentHunt.name
+    );
+  }
+  get huntCaptures() {
+    return this.targets.filter((target) => target.caught).length;
+  }
+  get mapData() {
+    return this.venue?.data ?? (this.regional ? this.region.data : this.data);
+  }
+  useVenue(venue) {
+    this.venue = venue;
+    const scene = venue?.scene ?? this.scene;
+    scene.add(this.fieldActors, this.camera, this.avatar);
   }
   async reset(mode = 'campaign', spot = SPAWN) {
     this.leaveCottage();
@@ -382,26 +446,63 @@ export class Hunt {
     this.bankedCount = 0;
     this.shots = 0;
     this.saved = { shots: 0 };
-    await this.beginCourse(0, spot);
+    await this.beginCourse(0, mode === 'campaign' ? COURSES[0].spawn : spot);
   }
-  async beginCourse(level, spot = TRAVEL[COURSES[level].stop]) {
+  async beginCourse(level, spot = COURSES[level].spawn) {
     const campaign = this.mode === 'campaign';
+    const course = COURSES[level];
+    const regionalSpot = campaign && course.venue === 'airport' ? DOVER : spot;
+    let venue = null;
+    if (campaign && course.venue) {
+      venue = this.venues.get(course.venue);
+      if (!venue) {
+        venue = await loadVenue(course.venue, this.world, this.daySky);
+        this.venues.set(course.venue, venue);
+      }
+    }
     if (
-      this.mode === 'city' ||
-      this.mode === 'roam' ||
-      (campaign && level > 0)
+      ['city', 'roam'].includes(this.mode) ||
+      (campaign && (!venue || course.venue === 'airport'))
     ) {
       const region = await this.ensureRegion();
-      await region.prepareAt(spot.x, spot.z);
-      await this.maps.prepare(spot.x, spot.z);
+      await region.prepareAt(regionalSpot.x, regionalSpot.z);
+      await this.maps.prepare(regionalSpot.x, regionalSpot.z);
+      if (campaign && course.parade && !this.doverParade) {
+        const site = region.data.detailMaps.find((s) => s.id === 'dover');
+        const { Parade } = await import('./parade.js');
+        this.doverParade = await Parade.load(
+          site,
+          {
+            height: this.world.height,
+            streetModels: this.world.streetModels,
+            solids: site.solids,
+          },
+          this.avatar,
+          this.groundShadow,
+          {
+            corners: doverCorners,
+            count: 8,
+            startDistance: 66,
+            name: 'Dover Thanksgiving parade',
+          }
+        );
+        this.doverParade.group.visible = false;
+        this.scene.add(this.doverParade.group);
+      }
     }
+    this.leaveCottage();
+    this.weather.setSnowing(false);
+    this.restoreDaylight?.();
+    this.restoreDaylight = null;
+    this.useVenue(venue);
     this.level = level;
-    this.doverFinale = false;
+    this.arrivalAtDover = false;
+    this.pendingDestination = null;
     this.trackingDover = false;
     this.intermission = false;
     this.active = true;
     this.elapsed = 0;
-    this.countdownElapsed = 0;
+    this.huntIndex = 0;
     this.last = 0;
     this.cooldown = 0;
     this.netTime = 0;
@@ -418,26 +519,53 @@ export class Hunt {
     this.paradeCaptures = this.saved.paradeCaptures ?? 0;
     this.fight.reset(this.saved);
     $('#hit-flash').style.opacity = '0';
-    this.yaw = Math.atan2(16, 4);
-    this.pitch = -0.022;
+    this.yaw = campaign ? (course.yaw ?? 0) : Math.atan2(16, 4);
+    this.pitch = campaign ? (course.pitch ?? -0.022) : -0.022;
     this.keys.clear();
     this.clearTouch();
     this.targets = [];
-    this.parade?.reset();
+    if (this.parade) this.parade.group.visible = false;
+    if (this.doverParade) this.doverParade.group.visible = false;
+    this.activeParade?.reset();
     if (this.mode === 'parade') this.rejoinParade();
     else this.arrive(spot);
     this.updateParade();
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    const anchors = campaign
+    for (const t of this.allTargets) t.caught = false;
+    this.spawnHunt();
+    if (!this.untimed) this.stockGravy(spot);
+    this.weather.setSnowing(
+      !this.venue && this.mode !== 'parade' && rollSnow()
+    );
+    this.weatherAt = 50 + Math.random() * 45;
+    $('#compass').disabled = this.untimed;
+    this.resize();
+    this.setHUD();
+    this.toast(
+      campaign
+        ? 'Day ' + (level + 1) + ' · ' + this.huntLabel
+        : this.mode === 'city'
+          ? 'One side and one dessert per landmark. Open the map to travel.'
+          : this.mode === 'hunt'
+            ? 'Capture all twelve dishes before supper.'
+            : this.mode === 'parade'
+              ? 'Main Street parade · Follow the balloons or watch from the curb.'
+              : 'Free roam · ' + (spot.name || 'Community Park'),
+      3
+    );
+  }
+  spawnHunt() {
+    this.countdownElapsed = 0;
+    this.targets = [];
+    const anchors = this.currentHunt
       ? new Map(
-          this.course.dishes.map(([id, dx, dz]) => [
+          this.currentHunt.dishes.map(([id, dx, dz]) => [
             id,
             coursePoint(this.course, dx, dz),
           ])
         )
       : null;
     for (const t of this.allTargets) {
-      t.caught = false;
       t.model.visible = t.shadow.visible =
         !this.untimed && (!anchors || anchors.has(t.id));
       if (!t.model.visible) continue;
@@ -449,29 +577,7 @@ export class Hunt {
       t.shadow.position.set(t.x, this.height(t.x, t.z) + 0.055, t.z);
       t.vx = t.vz = 0;
     }
-    this.guide.reset(0);
-    if (!this.untimed) this.stockGravy(spot);
-    this.weather.setSnowing(this.mode !== 'parade' && rollSnow());
-    this.weatherAt = 50 + Math.random() * 45;
-    $('#compass').disabled = this.untimed;
-    this.resize();
-    this.setHUD();
-    this.toast(
-      campaign
-        ? 'Course ' +
-            (level + 1) +
-            ' · ' +
-            this.course.name +
-            ' · Capture four dishes.'
-        : this.mode === 'city'
-          ? 'One side and one dessert per landmark. Open the map to travel.'
-          : this.mode === 'hunt'
-            ? 'Capture all twelve dishes before supper.'
-            : this.mode === 'parade'
-              ? 'Main Street parade · Follow the balloons or watch from the curb.'
-              : 'Free roam · ' + (spot.name || 'Community Park'),
-      3
-    );
+    this.guide.reset(this.elapsed);
   }
   loadParade() {
     this.paradeRequest ??= import('./parade.js')
@@ -492,6 +598,17 @@ export class Hunt {
   }
   updateParade() {
     const p = this.camera.position;
+    if (this.mode === 'campaign') {
+      if (this.doverParade) {
+        const visible =
+          !!this.course.parade &&
+          !this.house.inside &&
+          Math.hypot(p.x - DOVER.x, p.z - DOVER.z) < 450;
+        this.doverParade.group.visible = visible;
+        if (visible) this.doverParade.update(this.elapsed, p);
+      }
+      return;
+    }
     const nearby = !this.house.inside && Math.hypot(p.x + 145, p.z - 148) < 650;
     if (!this.parade) {
       if (
@@ -569,7 +686,9 @@ export class Hunt {
     this.house.porch.visible = this.regional;
     if (this.regional)
       this.house.porch.position.y = this.height(PORCH.x, PORCH.z);
-    this.trackingDover = this.doverFinale || (spot === DOVER && !hasGrail());
+    this.trackingDover =
+      this.arrivalAtDover ||
+      (this.mode !== 'campaign' && spot === DOVER && !hasGrail());
     if (spot === DOVER) {
       this.yaw = Math.PI / 2;
       this.pitch = 0;
@@ -616,13 +735,14 @@ export class Hunt {
     this.active = false;
   }
   height(x, z) {
-    if (this.house.inside) return 0;
+    if (this.house.inside || this.venue) return 0;
     return this.regional && this.region
       ? this.region.height(x, z)
       : this.world.height(x, z);
   }
   blocked(x, z) {
     if (this.house.inside) return this.house.blocked(x, z);
+    if (this.venue) return this.venue.solids.blocked(x, z);
     if (!this.regional) return this.world.solids.blocked(x, z);
     return (
       this.world.solids.occupied(x, z) ||
@@ -871,6 +991,14 @@ export class Hunt {
     this.fight.dispose();
     this.renderer.dispose();
   }
+  occluded(ray) {
+    if (this.venue)
+      return ray.intersectObjects(this.venue.walls, false).length > 0;
+    return (
+      ray.intersectObjects(this.world.walls, false).length > 0 ||
+      this.region?.occludes(ray)
+    );
+  }
   aim() {
     if (this.house.inside) return null;
     const p = this.camera.position,
@@ -921,22 +1049,13 @@ export class Hunt {
       // Both the reticle and the turkey must have a clear shot around corners.
       ray.far = toward.length();
       ray.set(view.position, toward.normalize());
-      if (
-        this.thirdPerson &&
-        (ray.intersectObjects(this.world.walls, false).length ||
-          this.region?.occludes(ray))
-      )
-        continue;
+      if (this.thirdPerson && this.occluded(ray)) continue;
       toward.copy(t.model.position);
       toward.y = aimY;
       toward.sub(p);
       ray.far = toward.length();
       ray.set(p, toward.normalize());
-      if (
-        ray.intersectObjects(this.world.walls, false).length ||
-        this.region?.occludes(ray)
-      )
-        continue;
+      if (this.occluded(ray)) continue;
       best = t;
       bestDepth = depth;
     }
@@ -983,35 +1102,47 @@ export class Hunt {
       sound('catch');
       const bonus = this.fight.reward(t);
       this.toast(t.name + ' captured! ' + bonus, bonus ? 3.2 : 1.8);
-      this.setHUD();
-      if (this.count === this.targets.length) {
-        sound('win');
-        if (this.mode === 'campaign' && this.level < COURSES.length - 1) {
-          this.pause();
-          this.intermission = true;
-          this.bankedTime += this.elapsed;
-          this.bankedCount += this.count;
-          this.saved = {
-            ...this.fight.checkpoint(),
-            shots: this.shots,
-            paradeHits: this.paradeHits,
-            paradeCaptures: this.paradeCaptures,
-          };
-          this.events.courseClear(bonus);
-        } else if (this.mode === 'campaign') {
-          this.doverFinale = this.trackingDover = true;
-          this.finaleAt = this.elapsed;
-          this.fight.clearField();
-          this.guide.reset(this.elapsed);
-          this.setHUD();
-          this.toast(
-            'Supper is safe! Follow the gold trail to 735 Dover St.',
-            5
-          );
-          this.guide.update(this, null);
-        } else this.finish(true);
-      }
+      if (this.targets.every((target) => target.caught)) {
+        this.completeHunt(bonus);
+      } else this.setHUD();
     }
+  }
+  completeHunt(bonus) {
+    sound('win');
+    if (this.currentHunt && this.huntIndex + 1 < this.course.hunts.length) {
+      this.huntIndex++;
+      this.spawnHunt();
+      this.toast(this.huntLabel + (bonus ? ' · ' + bonus : ''), 4);
+    } else if (this.currentHunt && this.course.destination) {
+      this.pendingDestination = this.course.destination;
+      this.fight.clearField();
+      this.guide.reset(this.elapsed);
+      this.toast(
+        'Follow the trail to ' + this.pendingDestination.name + '.',
+        5
+      );
+    } else {
+      this.completeCourse(bonus);
+      return;
+    }
+    this.setHUD();
+  }
+  completeCourse(bonus = '') {
+    if (this.mode !== 'campaign' || this.level === COURSES.length - 1) {
+      this.finish(true);
+      return;
+    }
+    this.pause();
+    this.intermission = true;
+    this.bankedTime += this.elapsed;
+    this.bankedCount += this.count;
+    this.saved = {
+      ...this.fight.checkpoint(),
+      shots: this.shots,
+      paradeHits: this.paradeHits,
+      paradeCaptures: this.paradeCaptures,
+    };
+    this.events.courseClear(bonus);
   }
   finish(won, reason = 'time') {
     this.pause();
@@ -1019,7 +1150,7 @@ export class Hunt {
     this.events.end({
       won,
       reason,
-      time: this.bankedTime + (this.doverFinale ? this.finaleAt : this.elapsed),
+      time: this.bankedTime + this.elapsed,
       shots: this.shots,
       count: this.bankedCount + this.count,
     });
@@ -1098,13 +1229,18 @@ export class Hunt {
     $('#counter').previousElementSibling.textContent = untimed
       ? 'MODE'
       : this.mode === 'campaign'
-        ? 'COURSE ' + (this.level + 1) + ' / ' + COURSES.length
+        ? 'DAY ' +
+          (this.level + 1) +
+          ' · HUNT ' +
+          (this.huntIndex + 1) +
+          '/' +
+          this.course.hunts.length
         : 'DISHES CAPTURED';
     $('#counter').textContent = untimed
       ? parade
         ? 'Balloon parade'
         : 'Free roam'
-      : this.count + ' / ' + this.targets.length;
+      : this.huntCaptures + ' / ' + this.targets.length;
     $('.clock-box').hidden = !this.timerEnabled;
     $('#time').previousElementSibling.textContent = untimed
       ? 'TIME AFIELD'
@@ -1131,20 +1267,27 @@ export class Hunt {
       this.regional && !inPark ? this.regionStreetAt : this.parkStreetAt;
     const street = this.house.inside
       ? ''
-      : streetAt(p.x, p.z, this.streetText.textContent);
+      : this.venue
+        ? this.venue.placeAt(p)
+        : streetAt(p.x, p.z, this.streetText.textContent);
     if (this.streetText.textContent !== street) {
       this.streetText.textContent = street;
       this.streetLabel.hidden = !street;
     }
-    const prompt = this.house.prompt(p, this.doverFinale);
+    const dest = this.pendingDestination;
+    const prompt =
+      dest && Math.hypot(p.x - dest.x, p.z - dest.z) <= 3
+        ? dest.prompt
+        : this.house.prompt(p, this.arrivalAtDover);
     $('#interact').hidden = !prompt;
     $('#interact-name').textContent = prompt;
-    $('#compass').disabled = this.trackingDover || this.house.inside || untimed;
-    if (this.doverFinale) {
+    $('#compass').disabled =
+      !!dest || this.trackingDover || this.house.inside || untimed;
+    if (this.arrivalAtDover || dest) {
       $('#time').previousElementSibling.textContent = 'SUPPER CLOCK';
       $('#time').textContent = 'Held';
-      $('#counter').previousElementSibling.textContent = 'BONUS TRAIL';
-      $('#counter').textContent = 'Dover St';
+      $('#counter').previousElementSibling.textContent = 'DESTINATION';
+      $('#counter').textContent = dest?.name ?? '735 Dover St';
     }
     if (this.house.inside) {
       this.house.drawRadar($('#radar'), p, this.yaw);
@@ -1154,21 +1297,26 @@ export class Hunt {
     const route = this.trackingDover
       ? doverLeg(p, DOVER_ROUTE).points
       : this.localParade?.route.points;
-    drawMap($('#radar'), far && this.region ? this.region.data : this.data, {
-      x: p.x,
-      z: p.z,
-      width: far ? 285 : 240,
-      route,
-      destination: this.trackingDover ? PORCH : this.localParade?.leader,
-      targets: untimed ? [] : this.targets,
-      player: p,
-      yaw: this.yaw,
-      pickups: this.fight.pickups,
-    });
+    drawMap(
+      $('#radar'),
+      this.venue?.data ?? (far ? this.region.data : this.data),
+      {
+        x: p.x,
+        z: p.z,
+        width: this.venue ? 84 : far ? 285 : 240,
+        route: dest ? this.guide.route : route,
+        destination:
+          dest ?? (this.trackingDover ? PORCH : this.localParade?.leader),
+        targets: untimed ? [] : this.targets,
+        player: p,
+        yaw: this.yaw,
+        pickups: this.fight.pickups,
+      }
+    );
   }
   advanceClock(delta) {
     this.elapsed += delta;
-    if (!this.doverFinale && !this.untimed) {
+    if (!this.arrivalAtDover && !this.pendingDestination && !this.untimed) {
       if (this.timerEnabled) {
         this.countdownElapsed += delta;
         if (this.countdownElapsed >= this.timeLimit) {
@@ -1252,7 +1400,11 @@ export class Hunt {
       this.playerBlocked
     );
     this.updateParade();
-    const hunting = !this.house.inside && !this.doverFinale && !this.untimed;
+    const hunting =
+      !this.house.inside &&
+      !this.pendingDestination &&
+      !this.arrivalAtDover &&
+      !this.untimed;
     if (hunting) this.moveTargets(dt);
     const feet =
       this.height(this.camera.position.x, this.camera.position.z) + this.lift;
@@ -1318,7 +1470,7 @@ export class Hunt {
       }
     }
     $('#hit-flash').style.opacity = String(this.fight.hitFlash * 0.72);
-    if (this.elapsed >= this.weatherAt) {
+    if (!this.venue && !this.arrivalAtDover && this.elapsed >= this.weatherAt) {
       this.weather.setSnowing(rollSnow());
       this.weatherAt = this.elapsed + 50 + Math.random() * 45;
     }
@@ -1378,12 +1530,13 @@ export class Hunt {
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
     if (this.house.inside) this.house.animate(this.elapsed);
+    else if (this.venue) this.venue.update?.(this.elapsed);
     else {
       this.world.trees.update(p.x, p.z, this.viewCamera);
       this.world.grasses.update(p.x, p.z, time * 0.001);
     }
     this.renderer.render(
-      this.house.inside ? this.house.scene : this.scene,
+      this.house.inside ? this.house.scene : (this.venue?.scene ?? this.scene),
       this.viewCamera
     );
   }

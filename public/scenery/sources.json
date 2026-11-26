@@ -13,7 +13,7 @@
     "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "changes": "Cropped and tiled the asphalt wear, adjusted the palette and added fine aggregate."
+    "changes": "Cropped and tiled the asphalt wear, adjusted the palette and added fine aggregate. Also used for the Jeppesen Terminal shuttle lanes."
   },
   "street-concrete.webp": {
     "title": "Street",
@@ -21,7 +21,7 @@
     "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
     "license": "CC BY 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "changes": "Sampled the weathered concrete, blended its edges for repetition, and added fine grain."
+    "changes": "Sampled the weathered concrete, blended its edges for repetition, and added fine grain. Recolored for airport paving, Pearl Street brickwork and the ice gallery floor and chiseled blocks."
   },
   "street-ironwork.webp": {
     "title": "Street",

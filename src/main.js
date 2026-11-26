@@ -2,7 +2,7 @@ import './style.css';
 import { DOVER_ROUTE } from './dover-route.js';
 import { doverLeg } from './dover-guide.js';
 import { DOVER, RELIC, hasGrail } from './dover-location.js';
-import { COURSES } from './courses.js';
+import { COURSES, TRIP_HUNTS, TRIP_CAPTURES } from './courses.js';
 import { fillIcons, icon } from './icons.js';
 import {
   DISHES,
@@ -35,7 +35,7 @@ try {
 } catch {}
 function syncTimer() {
   $('#lobby-timer').textContent = timerEnabled
-    ? 'On · 2 min/course'
+    ? 'On · 2 min/hunt'
     : 'Off · No time limit';
   for (const control of document.querySelectorAll('[data-action="timer"]')) {
     control.setAttribute('aria-pressed', String(timerEnabled));
@@ -46,7 +46,8 @@ function syncTimer() {
   const state = $('#pause-timer-state');
   if (state) state.textContent = timerEnabled ? 'On' : 'Off';
 }
-const bestKey = (mode) => 'gobbler-foodfight-v1-' + mode;
+const bestKey = (mode) =>
+  mode === 'campaign' ? 'gobbler-trip-v2' : 'gobbler-foodfight-v1-' + mode;
 const startAction = (mode) =>
   ({
     campaign: 'start',
@@ -172,6 +173,7 @@ function guide(tab = 'dishes') {
   const tabs =
     '<div class="panel-tabs">' +
     [
+      ['trip', 'itinerary', 'Trip days'],
       ['dishes', 'guide', 'Side dishes'],
       ['desserts', 'desserts', 'Desserts'],
       ['controls', 'controls', 'Controls'],
@@ -185,10 +187,35 @@ function guide(tab = 'dishes') {
   const list = DISHES.filter((d) => !!d.dessert === (tab === 'desserts'))
     .map((d) => {
       const caught =
-        game?.active && game.targets.some((t) => t.id === d.id && t.caught);
+        game?.active && game.allTargets.some((t) => t.id === d.id && t.caught);
       return `<div class="target-row" style="--dish:${d.color}"><img src="/dishes/${d.id}.webp" alt=""><div><small>${caught ? 'CAPTURED' : d.dessert ? 'DESSERT' : 'SIDE DISH'}</small><strong>${d.name}</strong></div></div>`;
     })
     .join('');
+  if (tab === 'trip') {
+    show(
+      'guide',
+      heading('FIELD MANUAL', 'Six days in Colorado') +
+        tabs +
+        COURSES.map(
+          (day, i) =>
+            '<div class="field-note"><strong>Day ' +
+            (i + 1) +
+            ' · ' +
+            day.name +
+            '</strong><p>' +
+            day.menu +
+            '</p><ol>' +
+            day.hunts.map((hunt) => '<li>' + hunt.name + '</li>').join('') +
+            '</ol></div>'
+        ).join('') +
+        '<div class="panel-actions">' +
+        (game?.active
+          ? button('Back to hunt', 'resume', true)
+          : button('Start trip', 'start', true)) +
+        '</div>'
+    );
+    return;
+  }
   const touch = document.body.classList.contains('touch-mode');
   const rows = touch
     ? [
@@ -238,7 +265,7 @@ function guide(tab = 'dishes') {
       '<p class="panel-text">' +
       (isControls
         ? 'Cast when the reticle turns amber. Step sideways or flap when a dish winds up.'
-        : 'The main hunt serves four dishes at each of three Broomfield landmarks. Orange diamonds mark food. A mint cross marks an Emergency Gravy Boat.') +
+        : 'Each trip day has three hunts. Catch both dishes to start the next hunt. Orange diamonds mark food. A mint cross marks an Emergency Gravy Boat.') +
       '</p>' +
       tabs +
       (isControls
@@ -251,7 +278,7 @@ function guide(tab = 'dishes') {
           '</strong><p>' +
           (hasGrail()
             ? 'One of one. Your turkey found the prize in the Hall of Gravy.'
-            : 'The last course reveals a trail to 735 Dover St. You can also visit the cottage from the Greater Broomfield map.') +
+            : 'Follow the porch light to 735 Dover St on your first night. You can also visit the cottage from the Greater Broomfield map.') +
           '</p></div>') +
       '<div class="panel-actions">' +
       (game?.active
@@ -313,7 +340,9 @@ async function map(level) {
   // A timed park hunt always stays in the same course.
   const allowCity = !active || game.mode !== 'hunt';
   const tabs =
-    '<div class="panel-tabs"><button data-action="park-map" aria-pressed="' +
+    '<div class="panel-tabs">' +
+    (!active ? '<button data-action="itinerary">Trip days</button>' : '') +
+    '<button data-action="park-map" aria-pressed="' +
     !city +
     '">Community Park</button>' +
     (allowCity
@@ -504,11 +533,11 @@ function pause() {
         ? 'The balloons and their turkey crews will pick up where you left them.'
         : game.mode === 'roam'
           ? 'Your place in Broomfield is saved for this session.'
-          : game.count +
+          : game.huntCaptures +
             ' of ' +
             game.targets.length +
             ' dishes captured. ' +
-            (game.mode === 'campaign' ? game.course.name + '. ' : '') +
+            (game.mode === 'campaign' ? game.huntLabel + '. ' : '') +
             (timerEnabled
               ? 'The supper clock is paused.'
               : 'Play at your own pace.')) +
@@ -533,26 +562,25 @@ function pause() {
 }
 function courseMap() {
   const course = game.course,
-    origin = TRAVEL[course.stop],
     p = game.mapPosition;
-  const finale = game.doverFinale;
-  const parade = game.level === 0 ? game.localParade : null;
-  const route = finale
+  const porch = game.arrivalAtDover;
+  const parade = game.localParade;
+  const dest = game.pendingDestination;
+  const route = porch
     ? doverLeg(p, DOVER_ROUTE).points
-    : parade?.route.points || [];
-  const bounds = [
+    : dest
+      ? game.guide.route
+      : (parade?.route.points ?? []);
+  const places = porch ? [DOVER] : (game.venue?.data.places ?? [DOVER]);
+  const points = [
     p,
-    ...(finale
-      ? route
-      : [
-          origin,
-          ...game.targets.map((t) => t.model.position),
-          ...game.fight.pickups,
-          ...route,
-        ]),
+    ...places,
+    ...route,
+    ...game.fight.pickups,
+    ...game.targets.filter((t) => !t.caught).map((t) => t.model.position),
   ];
-  const xs = bounds.map((v) => v.x),
-    zs = bounds.map((v) => v.z);
+  const xs = points.map((v) => v.x),
+    zs = points.map((v) => v.z);
   const left = Math.min(...xs),
     right = Math.max(...xs),
     top = Math.min(...zs),
@@ -560,65 +588,68 @@ function courseMap() {
   show(
     'map',
     heading(
-      'COURSE ' + (game.level + 1) + ' OF ' + COURSES.length,
-      finale ? 'The Dover Street surprise' : course.name
+      'DAY ' + (game.level + 1) + ' OF ' + COURSES.length,
+      porch ? '735 Dover St after dark' : course.name
     ) +
-      '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Map of the current course"></canvas>' +
+      '<canvas class="zone-map" id="zone-map" width="660" height="356" aria-label="Map of the current day"></canvas>' +
       '<div class="map-key"><span><b class="start-marker"></b> You</span>' +
-      (finale
-        ? '<span class="dover-key">★ Cottage · gold trail</span>'
+      (porch || dest
+        ? '<span class="dover-key">★ Destination</span>'
         : '<span><b></b> Runaway dish</span><span class="gravy-key">✚ Emergency gravy</span>') +
       (parade ? '<span class="dover-key">★ Balloon parade</span>' : '') +
-      '</div>' +
-      (finale
-        ? '<p class="panel-text">Follow the trail from County Commons to 735 Dover St. Enter the cottage and inspect the display. ' +
-          (timerEnabled ? 'The supper clock is held.' : '') +
-          '</p>'
-        : '') +
-      '<div class="panel-actions">' +
-      button('Return to field', 'resume', true, 'focus') +
-      (finale && !game.house.inside
-        ? button('Travel to Dover St', 'travel', false, 'map')
-        : '') +
+      '</div><p class="panel-text">' +
+      (porch
+        ? 'Enter 735 Dover St and inspect the display.'
+        : dest
+          ? 'Follow the trail to ' + dest.name + '.'
+          : game.huntLabel) +
+      '</p><div class="panel-actions">' +
+      button('Return to trip', 'resume', true, 'focus') +
       '</div>'
   );
-  drawMap($('#zone-map'), game.regional ? game.region.data : game.data, {
+  drawMap($('#zone-map'), game.mapData, {
     x: (left + right) / 2,
     z: (top + bottom) / 2,
     width: Math.max(
-      game.regional && !finale ? 610 : 255,
-      right - left + 75,
-      ((bottom - top + 64) * 660) / 356
+      game.venue ? 65 : 110,
+      right - left + 22,
+      ((bottom - top + 18) * 660) / 356
     ),
     targets: game.targets,
-    pickups: finale ? [] : game.fight.pickups,
+    pickups: game.fight.pickups,
     player: p,
     yaw: game.yaw,
     labels: true,
     route,
-    destination: finale ? DOVER_ROUTE.at(-1) : parade?.leader,
-    places: finale ? [DOVER] : [origin],
+    destination: porch ? DOVER_ROUTE.at(-1) : (dest ?? parade?.leader),
+    places,
   });
 }
 function courseClear(bonus) {
   const next = COURSES[game.level + 1];
   show(
     'course-clear',
-    heading('COURSE ' + (game.level + 1) + ' CLEARED', game.course.name) +
-      '<p class="panel-text">All four dishes are on the table. ' +
+    heading('DAY ' + (game.level + 1) + ' COMPLETE', game.course.name) +
+      '<p class="panel-text">All ' +
+      game.course.hunts.length +
+      ' hunts complete. ' +
+      game.count +
+      ' dishes captured. ' +
       (bonus ? bonus + ' ' : '') +
-      'Next up is ' +
+      '</p><div class="field-note"><strong>Tomorrow · ' +
       next.name +
-      '.</p><div class="result-stats">' +
+      '</strong><p>' +
+      next.menu +
+      '</p></div><div class="result-stats">' +
       (timerEnabled
-        ? '<div class="result-cell"><small>COURSE TIME</small><strong>' +
+        ? '<div class="result-cell"><small>DAY TIME</small><strong>' +
           formatTime(game.elapsed) +
           '</strong></div>'
         : '') +
       '<div class="result-cell"><small>TURKEY HEALTH</small><strong>' +
       game.fight.health +
       ' / 100</strong></div></div><div class="panel-actions">' +
-      button('Continue to ' + next.name, 'next-course', true, 'map') +
+      button('Start Day ' + (game.level + 2), 'next-course', true, 'map') +
       button('Return to lobby', 'home') +
       '</div>'
   );
@@ -629,10 +660,10 @@ async function changeCourse(retry) {
   const next = COURSES[game.level + (retry ? 0 : 1)];
   show(
     'loading',
-    heading('ON THE MENU', next.name) +
+    heading('DAY ' + (COURSES.indexOf(next) + 1), next.name) +
       '<p class="panel-text">' +
       next.menu +
-      '. Setting the table…</p><div class="loading-line"></div>'
+      '</p><div class="loading-line"></div>'
   );
   try {
     if (retry) await game.retry();
@@ -665,10 +696,9 @@ function end({ won, time, shots, count, reason }) {
       record = true;
     } catch {}
   }
+  const total = game.mode === 'campaign' ? TRIP_CAPTURES : DISHES.length;
   const cells = [
-    ...(game.untimed
-      ? []
-      : [['DISHES CAPTURED', count + ' / ' + DISHES.length]]),
+    ...(game.untimed ? [] : [['DISHES CAPTURED', count + ' / ' + total]]),
     ...(game.paradeHits ? [['PURSUERS NETTED', game.paradeCaptures]] : []),
     ...(timerEnabled ? [['TIME AFIELD', formatTime(time)]] : []),
     ['NETS CAST', shots],
@@ -691,10 +721,8 @@ function end({ won, time, shots, count, reason }) {
     ) +
       '<p class="panel-text">' +
       (won
-        ? game.doverFinale
-          ? 'You brought home the ' +
-            RELIC +
-            ' from 735 Dover St.' +
+        ? game.mode === 'campaign'
+          ? 'All six days are complete. Tea is served in Boulder.' +
             (record ? ' New personal best!' : '')
           : record
             ? 'The full Thanksgiving menu is at the table. New personal best!'
@@ -706,7 +734,7 @@ function end({ won, time, shots, count, reason }) {
             : 'Supper started with ' +
               count +
               ' of ' +
-              DISHES.length +
+              total +
               ' dishes. The rest are still out there.') +
       '</p><div class="result-stats">' +
       cells
@@ -750,9 +778,17 @@ async function start(mode = 'campaign') {
     'loading',
     heading(
       'ENTERING THE FIELD',
-      mode === 'parade' ? 'Preparing the parade' : 'Loading terrain'
+      mode === 'parade'
+        ? 'Preparing the parade'
+        : mode === 'campaign'
+          ? 'Day 1 · Denver arrivals'
+          : 'Loading terrain'
     ) +
-      '<p class="panel-text">Preparing the Broomfield map and field photography…</p><div class="loading-line"></div>'
+      '<p class="panel-text">' +
+      (mode === 'campaign'
+        ? COURSES[0].menu
+        : 'Preparing the Broomfield map and field photography…') +
+      '</p><div class="loading-line"></div>'
   );
   try {
     if (!engineRequest)
@@ -832,6 +868,7 @@ const actions = {
   home,
   close: closePanel,
   guide: () => guide(),
+  itinerary: () => guide('trip'),
   desserts: () => guide('desserts'),
   controls: () => guide('controls'),
   map: () => map(),
@@ -854,13 +891,9 @@ const actions = {
   pause,
   credits,
   travel: async () => {
-    if (
-      loading ||
-      !game?.active ||
-      (!game.doverFinale && !['city', 'roam'].includes(game.mode))
-    )
+    if (loading || !game?.active || !['city', 'roam'].includes(game.mode))
       return;
-    const spot = game.doverFinale ? DOVER : destinations[selectedSpot];
+    const spot = destinations[selectedSpot];
     loading = true;
     show(
       'loading',
@@ -959,7 +992,8 @@ document.addEventListener(
   { capture: true, passive: true }
 );
 if (!document.fullscreenEnabled) $('[data-action="fullscreen"]').hidden = true;
-$('#lobby-total').textContent = DISHES.length + ' dishes · 3 courses';
+$('#lobby-total').textContent =
+  TRIP_HUNTS.length + ' hunts · ' + COURSES.length + ' days';
 fillIcons();
 syncTimer();
 syncSound();

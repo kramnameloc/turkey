@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Group, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { paradeRoute } from '../src/parade-route.js';
+import { doverCorners, paradeRoute } from '../src/parade-route.js';
 import { segmentDistanceSq, slideMove } from '../src/field.js';
 import { BODY_RADIUS } from '../src/turkey-scale.js';
 import { separateFromActors } from '../src/body-collision.js';
@@ -49,6 +49,17 @@ test('both rows of turkey handlers move forward inside the surveyed streets thro
       start = route.sample(0.015, side);
     assert.ok(Math.hypot(end.x - start.x, end.z - start.z) < 0.06);
   }
+});
+
+test('the Thanksgiving lead crew passes the cottage and loops along East 7th Avenue Circle', async () => {
+  const { roads } = JSON.parse(
+    await readFile(new URL('../public/geo/region.json', import.meta.url))
+  );
+  const route = paradeRoute(roads, doverCorners);
+  const leader = route.sample(66);
+  assert.ok(Math.hypot(leader.x - 1159, leader.z + 985.1) < 12);
+  assert.ok(route.points.some((p) => p.x > 1280));
+  assert.deepEqual(route.sample(0), route.sample(route.length));
 });
 
 async function loadParade(t) {

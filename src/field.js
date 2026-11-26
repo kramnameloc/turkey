@@ -528,7 +528,7 @@ export function drawMap(
     c.lineTo(w, b);
     c.stroke();
   }
-  if (labels && !data.tiles) {
+  if (labels && !data.tiles && !data.id) {
     c.font = '500 12px "IBM Plex Mono", monospace';
     c.fillStyle = '#c2c7b6';
     c.shadowColor = '#171c16';

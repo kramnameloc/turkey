@@ -1,56 +1,232 @@
-import { TRAVEL } from './field.js';
+import { DOVER } from './dover-location.js';
 
 export const COURSE_TIME = 120;
 export const COURSES = [
   {
-    stop: 0,
-    name: 'Community Park',
-    menu: 'First helping',
-    dishes: [
-      ['corn', -16, -4],
-      ['pumpkinPie', -42, -15],
-      ['mash', -29, -63],
-      ['cookie', -58, 25],
+    venue: 'airport',
+    name: 'Denver airport to Dover',
+    menu: 'Arrive at Jeppesen Terminal. Catch the dishes, board the shuttle and reach 735 Dover St after dark.',
+    spawn: { x: 0, z: 21 },
+    yaw: 0.64,
+    pitch: 0.09,
+    hunts: [
+      {
+        name: 'Terminal West',
+        dishes: [
+          ['corn', -5, -11],
+          ['cookie', -9, -19],
+        ],
+      },
+      {
+        name: 'Ground transportation',
+        dishes: [
+          ['mash', 2, -20],
+          ['cupcake', -7, -27],
+        ],
+      },
+      {
+        name: 'Shuttle island',
+        dishes: [
+          ['yams', 7, -38],
+          ['cinnamonRoll', -2, -45],
+        ],
+      },
     ],
     gravy: [
-      [-8, 8],
-      [-36, 10],
+      [-5, -4],
+      [3, -25],
+    ],
+    destination: {
+      name: 'Dover shuttle',
+      x: 7.6,
+      z: -19,
+      prompt: 'Ride to 735 Dover St',
+    },
+  },
+  {
+    name: 'Around 735 Dover St',
+    menu: 'Search the driveways and the turning circle on Dover Street.',
+    spawn: DOVER,
+    hunts: [
+      {
+        name: 'Dover driveways',
+        dishes: [
+          ['beans', -5, -7],
+          ['applePie', -4, 8],
+        ],
+      },
+      {
+        name: 'North sidewalk',
+        dishes: [
+          ['stuffing', 1, -32],
+          ['gingerbread', 3, -57],
+        ],
+      },
+      {
+        name: 'Turning circle',
+        dishes: [
+          ['berries', 3, 48],
+          ['pumpkinPie', 5, 68],
+        ],
+      },
+    ],
+    gravy: [
+      [0, -10],
+      [1, 41],
     ],
   },
   {
-    stop: 1,
-    name: 'Brunner Farmhouse',
-    menu: 'The leftovers strike back',
-    dishes: [
-      ['applePie', -16, -4],
-      ['beans', 32, 18],
-      ['stuffing', -66, -19],
-      ['gingerbread', 47, -45],
+    name: 'Thanksgiving on Dover',
+    menu: 'Catch Thanksgiving dinner while the balloon crews march past 735 Dover St.',
+    spawn: { x: 1148, z: -984 },
+    yaw: -0.91,
+    pitch: 0.23,
+    parade: true,
+    hunts: [
+      {
+        name: 'Thanksgiving curbside',
+        dishes: [
+          ['mash', 8, -37],
+          ['pumpkinPie', 12, -10],
+        ],
+      },
+      {
+        name: 'East 7th Avenue Circle',
+        dishes: [
+          ['corn', 35, 17],
+          ['applePie', 80, 17],
+        ],
+      },
+      {
+        name: 'Parade bend',
+        dishes: [
+          ['beans', 135, 0],
+          ['cookie', 137, -47],
+        ],
+      },
     ],
     gravy: [
-      [9, -11],
-      [42, 29],
+      [8, -9],
+      [8, 15],
     ],
   },
   {
-    stop: 2,
-    name: 'County Commons',
-    menu: 'The last supper roll',
-    dishes: [
-      ['yams', -16, -4],
-      ['cupcake', -58, 25],
-      ['berries', 47, -45],
-      ['cinnamonRoll', 74, 42],
+    venue: 'ice',
+    name: 'Black Friday at Gaylord Rockies',
+    menu: 'Hunt inside ICE! featuring The Nightmare Before Christmas, from Halloween Town to Christmas Town.',
+    spawn: { x: 0, z: 22 },
+    hunts: [
+      {
+        name: 'Halloween Town',
+        dishes: [
+          ['yams', -6, -15],
+          ['gingerbread', 7, -7],
+        ],
+      },
+      {
+        name: 'Spiral Hill',
+        dishes: [
+          ['beans', -6, -27],
+          ['cinnamonRoll', 5, -24],
+        ],
+      },
+      {
+        name: 'Christmas Town',
+        dishes: [
+          ['berries', -5, -39],
+          ['cupcake', 6, -38],
+        ],
+      },
     ],
     gravy: [
-      [-8, 8],
-      [34, -35],
+      [5, -5],
+      [-2, -30],
     ],
+  },
+  {
+    venue: 'springs',
+    name: 'Indian Hot Springs',
+    menu: 'Follow the steam through the mineral pool gardens in Idaho Springs.',
+    spawn: { x: 2, z: 2 },
+    yaw: 0.16,
+    pitch: -0.075,
+    hunts: [
+      {
+        name: 'Mineral pool',
+        dishes: [
+          ['stuffing', -11, -5],
+          ['cinnamonRoll', 6, -17],
+        ],
+      },
+      {
+        name: 'Palm garden',
+        dishes: [
+          ['yams', 5, 4],
+          ['pumpkinPie', -12, 6],
+        ],
+      },
+      {
+        name: 'Lodge walk',
+        dishes: [
+          ['corn', -16, 16],
+          ['gingerbread', -1, 21],
+        ],
+      },
+    ],
+    gravy: [
+      [3, 16],
+      [-10, -12],
+    ],
+  },
+  {
+    venue: 'pearl',
+    name: 'Pearl Street & the teahouse',
+    menu: 'Hunt along Boulder’s brick pedestrian mall, then meet for tea at the Dushanbe Teahouse.',
+    spawn: { x: -26, z: 0 },
+    yaw: -Math.PI / 2,
+    hunts: [
+      {
+        name: 'Pearl Street shops',
+        dishes: [
+          ['berries', 15, 1],
+          ['cookie', 23, -3],
+        ],
+      },
+      {
+        name: 'Brick mall',
+        dishes: [
+          ['mash', 46, 1],
+          ['applePie', 56, 3],
+        ],
+      },
+      {
+        name: 'Teahouse garden',
+        dishes: [
+          ['stuffing', 41, 17],
+          ['cupcake', 41, 24],
+        ],
+      },
+    ],
+    gravy: [
+      [7, -2],
+      [42, 14],
+    ],
+    destination: {
+      name: 'Dushanbe Teahouse',
+      x: 15,
+      z: 31,
+      prompt: 'Sit down for tea',
+    },
   },
 ];
+export const TRIP_HUNTS = COURSES.flatMap((day) => day.hunts);
+export const TRIP_CAPTURES = TRIP_HUNTS.reduce(
+  (total, hunt) => total + hunt.dishes.length,
+  0
+);
+
 export function coursePoint(course, dx, dz) {
-  const origin = TRAVEL[course.stop];
-  return { x: origin.x + dx, z: origin.z + dz };
+  return { x: course.spawn.x + dx, z: course.spawn.z + dz };
 }
 
 export const MAX_HEALTH = 100;

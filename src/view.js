@@ -10,7 +10,7 @@ export class ChaseView extends T.PerspectiveCamera {
     this.rotation.order = 'YXZ';
     this.distance = 0;
   }
-  follow(eye, yaw, pitch, dt, snap, blocked, ground, indoors) {
+  follow(eye, yaw, pitch, dt, snap, blocked, ground, indoors, ceiling = 3.26) {
     const tilt = T.MathUtils.clamp(pitch - 0.12, -1.28, 1.05);
     this.rotation.set(tilt, yaw, 0, 'YXZ');
     pivot.copy(eye);
@@ -30,7 +30,11 @@ export class ChaseView extends T.PerspectiveCamera {
       const x = pivot.x + offset.x * s,
         z = pivot.z + offset.z * s;
       const y = pivot.y + offset.y * s;
-      if (blocked(x, z) || y < ground(x, z) + 0.22 || (indoors && y > 3.26)) {
+      if (
+        blocked(x, z) ||
+        y < ground(x, z) + 0.22 ||
+        (indoors && y > ceiling)
+      ) {
         available = Math.max(0, ((step - 1) * length) / n - 0.08);
         break;
       }

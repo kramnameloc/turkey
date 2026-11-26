@@ -73,8 +73,8 @@ export class DishGuide {
     if (!this.manual) this.hide();
   }
   update(hunt, aimedTarget) {
-    if (hunt.trackingDover) {
-      this.trackDover(hunt);
+    if (hunt.trackingDover || hunt.pendingDestination) {
+      this.trackDestination(hunt);
       return;
     }
     if (hunt.house.inside || hunt.untimed) {
@@ -149,12 +149,15 @@ export class DishGuide {
       : meters + (this.route.length ? ' · Follow arrows' : ' · Check hunt map');
     this.placeArrows(hunt, p, this.route);
   }
-  trackDover(hunt) {
+  trackDestination(hunt) {
     const p = hunt.camera.position,
       inside = hunt.house.inside;
-    const leg = inside
-      ? { next: { x: 0, z: -1.45 }, distance: Math.hypot(p.x, p.z + 2.75) }
-      : doverLeg(p, DOVER_ROUTE);
+    const dest = hunt.pendingDestination;
+    const leg = dest
+      ? { next: dest, distance: Math.hypot(p.x - dest.x, p.z - dest.z) }
+      : inside
+        ? { next: { x: 0, z: -1.45 }, distance: Math.hypot(p.x, p.z + 2.75) }
+        : doverLeg(p, DOVER_ROUTE);
     if (hunt.elapsed >= this.nextRoute || inside !== this.wasInside) {
       this.route = walkingTrail(p, leg.next, hunt.isBlocked);
       this.nextRoute = hunt.elapsed + 0.85;
@@ -167,11 +170,12 @@ export class DishGuide {
       this.route.shift();
     const bearing = relativeBearing(p, this.route[0] || leg.next, hunt.yaw);
     this.panel.hidden = false;
-    this.name.textContent = inside ? 'The display pedestal' : '735 Dover St';
+    this.name.textContent =
+      dest?.name ?? (inside ? 'The display pedestal' : '735 Dover St');
     this.detail.textContent = inside
       ? 'Inspect the prize'
       : leg.distance < 4
-        ? 'Use the cottage door'
+        ? (dest?.prompt ?? 'Use the cottage door')
         : (leg.distance > 999
             ? (leg.distance / 1000).toFixed(1) + ' km'
             : Math.round(leg.distance) + ' m') + ' · Follow the gold trail';

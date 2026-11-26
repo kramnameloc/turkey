@@ -26,15 +26,20 @@ test('switching the timer pauses the deadline while the simulation continues, an
     assert.equal(hunt.elapsed, hunt.timeLimit + 400);
   }
 });
-test('free roam, parade visits and the Dover finale always allow time to pass freely', () => {
-  for (const mode of ['roam', 'parade', 'campaign']) {
+test('free roam, parade visits and the trip destination walks always allow time to pass freely', () => {
+  for (const state of [
+    { mode: 'roam' },
+    { mode: 'parade' },
+    { mode: 'campaign', arrivalAtDover: true },
+    { mode: 'campaign', pendingDestination: { name: 'Dover shuttle' } },
+    { mode: 'campaign', pendingDestination: { name: 'Dushanbe Teahouse' } },
+  ]) {
     const hunt = Object.assign(Object.create(Hunt.prototype), {
-      mode,
       elapsed: 0,
       countdownElapsed: 0,
       timedRun: true,
       timerEnabled: true,
-      doverFinale: mode === 'campaign',
+      ...state,
     });
     assert.equal(hunt.advanceClock(600), false);
     assert.equal(hunt.elapsed, 600);

@@ -1,6 +1,6 @@
 # Turkey Takeover
 
-Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set in Broomfield, Colorado. Play as a Bourbon Red turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
+Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js turkey hunt with first-person and over-the-shoulder cameras, set along Colorado’s Front Range. Play as a Bourbon Red turkey and use a net caster to round up six savory sides and six desserts, including lattice apple pie, a gingerbread runner, and a chocolate chunk cookie before supper.
 
 ## Play locally
 
@@ -15,7 +15,7 @@ Open the local URL printed by Vite in a WebGL 2 browser. The game bundles its ge
 
 To play on a phone or tablet, connect it to the same Wi-Fi as the computer. Run `npm run build` followed by `npm run play:lan` on the computer, then open the printed **Network** URL on the device. The controls adapt when you rotate the screen.
 
-- **Start hunt** opens a three-course campaign. Capture four dishes in two minutes at Community Park, then play Brunner Farmhouse and County Commons. Health and bonuses carry between courses. After the fourth capture at County Commons, the supper clock stops. Follow the gold trail to 735 Dover St or use **Travel to Dover St** on the course map. Enter the game’s cottage and inspect the pedestal to finish the campaign. The collectible stays in your field guide on this browser. If you run out of health or time, retry the current course from its starting checkpoint.
+- **Start trip** opens the six-day campaign. Play three hunts each day, with two dishes per hunt and 36 captures across the trip. Each pair you catch reveals the next pair at a new spot. The optional two-minute clock restarts for each hunt. At Denver arrivals, board the shuttle and follow the porch light to the display at 735 Dover St. Explore the block on Day 2 and hunt alongside its Thanksgiving balloon parade on Day 3. Spend Black Friday inside the Nightmare Before Christmas ice gallery at Gaylord Rockies, visit Indian Hot Springs in Idaho Springs, then finish with tea at the Boulder Dushanbe Teahouse off Pearl Street. The clock holds for the shuttle, cottage and tea stops. Health and bonuses carry between days. Retry a failed day from its starting checkpoint.
 - **Hunt timer** in the lobby or pause menu turns the countdown on or off. With it off you can finish every hunt and campaign course at your own pace. Turning it back on resumes the remaining time. The browser remembers your choice. Personal bests are recorded for runs played with the timer on.
 - **Watch parade** starts an untimed curbside visit. Four turkey handlers guide each of the 22 balloons around Main Street, 1st Avenue, and Community Park Road. Look for Snoopy carrying Woodstock, Finn riding Jake, Spider-Man, Pikachu, two Sonic designs, and a skating Ronald McDonald. The same procession runs during hunts and free roam near Community Park. Spectators and marching turkeys block your path. A net hit makes that participant chase you. They can tag you for damage. A second net catches the pursuer. Hitting a handler releases its balloon, and the rest of that crew keeps marching. The star on the park map marks the lead crew. In parade mode, choose any balloon on the map and select **Rejoin the parade** for a curbside view as it approaches.
 - **Hunt map → Park time trial** keeps the original twelve-dish, five-minute park challenge. Orange diamonds mark dishes. Get within 35 meters, aim until the reticle turns amber, and cast.
@@ -30,7 +30,7 @@ Dishes wind up and throw fossilized dinner rolls, jiggly cranberry cans, or gass
 
 Each capture has a 50% chance of a bonus. A third capture following two misses guarantees one. **Buttered boots** boost walking and sprint speed by 65% for 20 seconds. The **wishbone slinger** gives four faster, wider casts with a 52-meter reach. Both equip automatically and work with the regular controls.
 
-The November forecast rolls a 35% chance of flurries at each course start and on periodic weather changes during play. Reduced-motion settings thin and slow the snowfall.
+In the Broomfield outdoor scenes, the November forecast rolls a 35% chance of flurries at each course start and on periodic weather changes during play. Reduced-motion settings thin and slow the snowfall.
 
 ## Controls
 
@@ -47,11 +47,13 @@ The November forecast rolls a 35% chance of flurries at each course start and on
 | Map | M or minimap | Minimap |
 | Pause | Escape or P | Pause button |
 
-The arrow keys also move forward/back and turn. Q and E tilt the view. Pausing or switching away from the page stops the supper clock. After seven seconds without a nearby dish in sight, the compass arrow points to the nearest remaining dish. Ground arrows trace a walkable route around obstacles. For distant city targets, the hint names the landmark and the map preselects the stop. Each food-fight mode has its own personal best. The campaign record counts play time across its three completed courses.
+The arrow keys also move forward/back and turn. Q and E tilt the view. Pausing or switching away from the page stops the supper clock. After seven seconds without a nearby dish in sight, the compass arrow points to the nearest remaining dish. Ground arrows trace a walkable route around obstacles. For distant city targets, the hint names the landmark and the map preselects the stop. Each food-fight mode has its own personal best. The campaign record counts play time across all six days.
 
 ## Map and photography
 
 The detailed park map spans 1.36 × 1.36 km. The regional map spans 19.2 × 19.2 km around Broomfield, including surrounding communities. Building footprints, streets, paths, trees, and landmarks come from city GIS. Colorado DRAPP and USGS/USDA aerial photography cover the ground and rooftops. USGS elevation sampled on a 10-meter grid covers Community Park, Brunner Farmhouse, County Commons and the Dover area, transitioning to 150-meter regional coverage. Roof and tree heights use 2020 USGS lidar where supported. Other buildings and trees use estimates. Six neighborhood maps combine detailed aerial imagery, surveyed trails, streets, named amenities, building footprints and tree locations. The same aerials and trails appear underfoot. The portable soccer goals represent the Commons Blue Pod playing fields. The Dover cottage has an original game interior.
+
+The airport, ice gallery, mineral pool gardens and Pearl Street are compact, original game layouts. Their GLBs contain the scenery and the matching collision and map footprints. Rebuild them with `python3 scripts/export_trip_venues.py` using NumPy and Pillow 10.1 or later. Architectural references include the [Jeppesen Terminal](https://jobs.flydenver.com/about-den/facilities/), [Gaylord Rockies ICE!](https://tickets.gaylordrockies.com/eventperformances.asp?evt=105), [Indian Hot Springs](https://indianhotsprings.com/pool), and [Boulder Dushanbe Teahouse](https://www.boulderteahouse.com/explore-the-teahouse-2).
 
 At Community Park, the Library and Auditorium has its photographed brick entrance, park-facing gable and glazed lobby. Its roof and the roofs of the City and County Building, Municipal Court, U.S. Post Office and North Metro Fire Rescue Headquarters follow the 2020 lidar returns inside their city footprints. Brunner Farmhouse has yellow lap siding, two brick chimneys, a garden-facing dormer and a white wraparound porch. Players can walk under the garden pergola beside the house. The window arrangements and porch dimensions are approximate. Footprint-based neighborhood roofs that fit inside a detailed course aerial use the same photograph as the ground. [Landmark photographs and credits](public/scenery/sources.json)
 

@@ -1,5 +1,5 @@
 // Survey junctions around the Main Street and Community Park block, in marching order.
-const corners = [
+const parkCorners = [
   [-256.6, 15],
   [-255.4, 279.6],
   [-33.1, 280.1],
@@ -13,7 +13,15 @@ const mix = (a, b, t) => a + (b - a) * t;
 const between = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t)];
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-export function paradeRoute(roads) {
+// The neighborhood procession follows the mapped Dover / E 7th Avenue Circle block.
+export const doverCorners = [
+  [1160, -1056],
+  [1160, -967],
+  [1198, -967],
+  [1195, -1056],
+];
+
+export function paradeRoute(roads, corners = parkCorners) {
   const vertices = [];
   for (const [i, start] of corners.entries()) {
     const end = corners[(i + 1) % corners.length];

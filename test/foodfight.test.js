@@ -4,52 +4,125 @@ import { readFileSync } from 'node:fs';
 import * as T from 'three';
 import {
   COURSES,
+  TRIP_HUNTS,
+  TRIP_CAPTURES,
   captureBonus,
   coursePoint,
   rollSnow,
 } from '../src/courses.js';
-import { DISHES, TRAVEL, PARK_SIGNS, Obstacles } from '../src/field.js';
+import { DISHES, Obstacles } from '../src/field.js';
+import { doverParking } from '../src/dover-block.js';
+import { yardBarriers } from '../src/dover-yard.js';
 import { walkingTrail } from '../src/trail.js';
+import { Hunt } from '../src/game.js';
 import { FoodFight } from '../src/foodfight.js';
 import { TURKEY_EYE } from '../src/turkey-scale.js';
 
-test('all twelve distinct campaign dishes and gravy boats are reachable on the surveyed maps', () => {
-  const json = (url) =>
-    JSON.parse(readFileSync(new URL('../public' + url, import.meta.url)));
-  const park = new Obstacles(json('/geo/broomfield.json'), PARK_SIGNS),
-    region = json('/geo/region.json');
-  const names = [];
+test('all six days have walkable spawns, capture targets, gravy and destination prompts', () => {
+  const read = (url) =>
+    readFileSync(new URL('../public' + url, import.meta.url));
+  const region = JSON.parse(read('/geo/region.json'));
+  const names = new Set();
+  assert.equal(TRIP_HUNTS.length, 18);
+  assert.equal(TRIP_CAPTURES, 36);
+  assert.equal(COURSES.length, 6);
   for (const course of COURSES) {
-    const start = TRAVEL[course.stop];
-    const tiles = region.tiles
-      .filter(
-        ({ bounds: b }) =>
-          b.minX < start.x + 320 &&
-          b.maxX > start.x - 320 &&
-          b.minZ < start.z + 320 &&
-          b.maxZ > start.z - 320
-      )
-      .map(
-        (t) =>
-          new Obstacles({ ...json(t.url), water: [], bounds: region.bounds })
+    const start = course.spawn;
+    let solids;
+    if (course.venue) {
+      const glb = read('/models/trip-' + course.venue + '.glb');
+      const manifest = JSON.parse(
+        glb.toString('utf8', 20, 20 + glb.readUInt32LE(12))
       );
-    const blocked = (x, z) =>
-      park.occupied(x, z) || tiles.some((t) => t.occupied(x, z));
-    assert.equal(course.dishes.length, 4);
-    names.push(...course.dishes.map((d) => d[0]));
-    for (const [x, z] of [
-      ...course.dishes.map((d) => d.slice(1)),
-      ...course.gravy,
-    ]) {
-      const goal = coursePoint(course, x, z);
+      solids = new Obstacles(manifest.nodes[0].extras.plan);
+    } else {
+      const tiles = region.tiles
+        .filter(
+          ({ bounds: b }) =>
+            b.minX < start.x + 320 &&
+            b.maxX > start.x - 320 &&
+            b.minZ < start.z + 320 &&
+            b.maxZ > start.z - 320
+        )
+        .map((tile) => JSON.parse(read(tile.url)));
+      solids = new Obstacles({
+        bounds: region.bounds,
+        buildings: [
+          ...tiles.flatMap((t) => t.buildings),
+          ...doverParking,
+          ...yardBarriers,
+        ],
+        trees: tiles.flatMap((t) => t.trees),
+        water: [],
+      });
+    }
+    const blocked = (x, z) => solids.blocked(x, z);
+    assert.ok(!blocked(start.x, start.z), course.name + ' spawn');
+    assert.equal(course.hunts.length, 3);
+    const dayDishes = course.hunts.flatMap((hunt) => hunt.dishes);
+    const goals = [...dayDishes.map((d) => d.slice(1)), ...course.gravy].map(
+      ([x, z]) => coursePoint(course, x, z)
+    );
+    if (course.destination)
+      goals.push({ x: course.destination.x, z: course.destination.z });
+    for (const goal of goals) {
+      assert.ok(
+        !blocked(goal.x, goal.z),
+        course.name + ' ' + JSON.stringify(goal)
+      );
       assert.deepEqual(
         walkingTrail(start, goal, blocked).at(-1),
         goal,
         course.name
       );
     }
+    assert.equal(new Set(dayDishes.map(([id]) => id)).size, 6, course.name);
+    for (const hunt of course.hunts) {
+      assert.ok(hunt.name);
+      assert.equal(hunt.dishes.length, 2);
+      for (const [id] of hunt.dishes) names.add(id);
+    }
   }
-  assert.deepEqual(names.sort(), DISHES.map((d) => d.id).sort());
+  assert.deepEqual(names, new Set(DISHES.map((d) => d.id)));
+});
+test('each pair unlocks only the next hunt and the last pair unlocks the shuttle', () => {
+  const hunt = Object.assign(Object.create(Hunt.prototype), {
+    mode: 'campaign',
+    level: 0,
+    huntIndex: 0,
+    elapsed: 0,
+    timerEnabled: true,
+    pendingDestination: null,
+    height: () => 0,
+    toast() {},
+    setHUD() {},
+    guide: { reset() {} },
+    fight: { clearField() {} },
+    allTargets: DISHES.map(({ id }) => ({
+      id,
+      model: new T.Group(),
+      shadow: new T.Group(),
+      caught: false,
+    })),
+  });
+  hunt.spawnHunt();
+  for (const [i, round] of COURSES[0].hunts.entries()) {
+    assert.equal(hunt.huntIndex, i);
+    assert.equal(hunt.pendingDestination, null);
+    assert.equal(hunt.huntCaptures, 0);
+    assert.equal(hunt.countdownElapsed, 0);
+    assert.equal(hunt.allTargets.filter((t) => t.caught).length, 2 * i);
+    const expected = new Set(round.dishes.map(([id]) => id));
+    for (const t of hunt.allTargets) {
+      assert.equal(t.model.visible, expected.has(t.id));
+      assert.equal(t.shadow.visible, expected.has(t.id));
+    }
+    assert.equal(hunt.advanceClock(30), false);
+    for (const t of hunt.targets) t.caught = true;
+    hunt.completeHunt();
+  }
+  assert.equal(hunt.pendingDestination, COURSES[0].destination);
+  assert.equal(hunt.elapsed, 90);
 });
 test('capture rolls cover both upgrades, dry streak protection and clear or snowy weather', () => {
   assert.equal(

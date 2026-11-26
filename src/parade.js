@@ -91,17 +91,24 @@ function turkeyHandler(avatar, phase) {
   };
 }
 
+let balloonPack;
+
 export class Parade {
-  static async load(data, world, avatar, shadowMap) {
-    const { scene } = await new GLTFLoader().loadAsync(
-      '/models/parade-balloons.glb'
-    );
-    return new Parade(scene, data, world, avatar, shadowMap);
+  static async load(data, world, avatar, shadowMap, options) {
+    balloonPack ??= new GLTFLoader()
+      .loadAsync('/models/parade-balloons.glb')
+      .catch((error) => {
+        balloonPack = null;
+        throw error;
+      });
+    const { scene } = await balloonPack;
+    return new Parade(scene.clone(), data, world, avatar, shadowMap, options);
   }
-  constructor(pack, data, world, avatar, shadowMap) {
-    this.route = paradeRoute(data.roads);
+  constructor(pack, data, world, avatar, shadowMap, options = {}) {
+    this.route = paradeRoute(data.roads, options.corners);
+    this.startDistance = options.startDistance ?? startDistance;
     this.group = new T.Group();
-    this.group.name = 'Main Street balloon parade';
+    this.group.name = options.name ?? 'Main Street balloon parade';
     this.height = world.height;
     this.occupied = (x, z) => world.solids.occupied(x, z);
     this.time = 0;
@@ -120,35 +127,37 @@ export class Parade {
     const balloons = [...pack.children].sort(
       (a, b) => a.userData.paradeOrder - b.userData.paradeOrder
     );
-    this.floats = balloons.map((balloon, i) => {
-      const anchors = riggingPoints(balloon);
-      const size = balloon.geometry.boundingBox.getSize(new T.Vector3());
-      const shadow = new T.Mesh(shadowShape, shade);
-      shadow.scale.set(size.x * 1.1, 1, size.z * 1.1);
-      const handlers = crew.map((_, j) =>
-        turkeyHandler(avatar, (i * 4 + j) * 0.28)
-      );
-      for (const h of handlers) {
-        h.shadow = new T.Mesh(shadowShape, shade);
-        h.shadow.scale.set(0.95, 1, 1.05);
-        this.group.add(h.body, h.shadow);
-      }
-      this.group.add(balloon, shadow);
-      const float = {
-        label: balloon.userData.paradeLabel,
-        balloon,
-        anchors,
-        handlers,
-        shadow,
-        shadowSize: shadow.scale.clone(),
-      };
-      for (const h of handlers) h.float = float;
-      return float;
-    });
+    this.floats = balloons
+      .slice(0, options.count ?? balloons.length)
+      .map((balloon, i) => {
+        const anchors = riggingPoints(balloon);
+        const size = balloon.geometry.boundingBox.getSize(new T.Vector3());
+        const shadow = new T.Mesh(shadowShape, shade);
+        shadow.scale.set(size.x * 1.1, 1, size.z * 1.1);
+        const handlers = crew.map((_, j) =>
+          turkeyHandler(avatar, (i * 4 + j) * 0.28)
+        );
+        for (const h of handlers) {
+          h.shadow = new T.Mesh(shadowShape, shade);
+          h.shadow.scale.set(0.95, 1, 1.05);
+          this.group.add(h.body, h.shadow);
+        }
+        this.group.add(balloon, shadow);
+        const float = {
+          label: balloon.userData.paradeLabel,
+          balloon,
+          anchors,
+          handlers,
+          shadow,
+          shadowSize: shadow.scale.clone(),
+        };
+        for (const h of handlers) h.float = float;
+        return float;
+      });
     this.ropes = new T.InstancedMesh(
       new T.CylinderGeometry(0.022, 0.022, 1, 5),
       new T.MeshStandardMaterial({ color: 0xe1c29d, roughness: 0.99 }),
-      balloons.length * crew.length * ropeSteps
+      this.floats.length * crew.length * ropeSteps
     );
     this.ropes.name = 'Balloon tethers';
     this.ropes.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -162,7 +171,7 @@ export class Parade {
     return new T.Vector3(center.x, this.height(center.x, center.z), center.z);
   }
   get headDistance() {
-    return startDistance + this.time * marchSpeed;
+    return this.startDistance + this.time * marchSpeed;
   }
   viewpoint(index = 0) {
     const distance = this.headDistance - index * spacing;
