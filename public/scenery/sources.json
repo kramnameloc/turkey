@@ -1,4 +1,48 @@
 {
+  "street-asphalt.webp": {
+    "title": "Street",
+    "author": "Pasha",
+    "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Cropped and tiled the asphalt wear, adjusted the palette and added fine aggregate."
+  },
+  "street-concrete.webp": {
+    "title": "Street",
+    "author": "Pasha",
+    "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Sampled the weathered concrete, blended its edges for repetition, and added fine grain."
+  },
+  "street-ironwork.webp": {
+    "title": "Street",
+    "author": "Pasha",
+    "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Isolated the cast-iron cover and drain from the street hardware atlas, adjusted contrast and repacked the two decals."
+  },
+  "street-houses.webp": {
+    "title": "Residential masonry and window bays",
+    "credits": [
+      {
+        "title": "Street",
+        "author": "Pasha",
+        "source": "https://sketchfab.com/3d-models/street-00735f501b484e528717d6229a34232d",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "title": "Free Urban Textures: Buildings, Apartments, Shop Fronts — building_office12.png",
+        "author": "Scouser",
+        "source": "https://opengameart.org/content/free-urban-textures-buildings-apartments-shop-fronts",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    ],
+    "changes": "Scaled two brick finishes from Street to residential bays, cropped photographed window frames from the office facade, and added paneled entrances and sills."
+  },
   "/models/november-oaks.glb": {
     "title": "Oak trees pack (17var, LODs, seasons, gameready)",
     "author": "LOLIPOP",

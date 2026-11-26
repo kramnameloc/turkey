@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { pavement } from './surfaces.js';
+import { pavement, streetDetails } from './streets.js';
 import { bluePod } from './soccer.js';
 import { Obstacles, loadMapImage } from './field.js';
 
@@ -79,13 +79,35 @@ export async function courseMaps(scene, world, region) {
             const material = new T.MeshBasicMaterial({
               map: texture,
               polygonOffset: true,
-              polygonOffsetFactor: -1,
+              // Only break the depth tie with the underlying terrain. A slope
+              // bias pulls the photo over streets at grazing camera angles.
+              polygonOffsetFactor: 0,
               polygonOffsetUnits: -1,
             });
+            // A few map extents overlap. Assign their furnishings to one site.
+            const contains = (x, z) =>
+              !(Math.abs(x) < 680 && Math.abs(z) < 680) &&
+              sites.find(
+                ({ bounds: b }) =>
+                  x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ
+              ) === site;
             const mesh = new T.Group();
             mesh.add(
               new T.Mesh(world.groundPatch(site.bounds), material),
-              pavement(site.paths, world.terrain, true)
+              pavement(
+                site.paths,
+                world.terrain,
+                world.streets,
+                region.junctions,
+                { regional: true, crossingRoads: site.roads }
+              ),
+              streetDetails(
+                site.roads,
+                region.junctions,
+                world.terrain,
+                world.streets,
+                contains
+              )
             );
             if (site.id === 'commons') {
               const pitch = bluePod(site, world.height);

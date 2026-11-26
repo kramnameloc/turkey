@@ -1,5 +1,11 @@
 import * as T from 'three';
-import { parkFloor, pavement } from './surfaces.js';
+import { parkFloor } from './surfaces.js';
+import {
+  pavement,
+  streetJunctions,
+  streetMaterials,
+  streetDetails,
+} from './streets.js';
 import {
   Obstacles,
   plantParkSaplings,
@@ -28,10 +34,41 @@ function geometry(positions, uvs) {
   g.computeVertexNormals();
   return g;
 }
+function houseMaterial(map) {
+  const material = new T.MeshLambertMaterial({ map, side: T.DoubleSide });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute vec3 house; varying vec3 vHouse;'
+      )
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvHouse = house;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHouse;')
+      .replace(
+        '#include <map_fragment>',
+        `
+        // Six atlas rows: plain masonry, windows and a door bay for each finish.
+        float eave = max(vHouse.x, 1.0);
+        float storeys = max(1.0, floor(eave / 2.9 + .5));
+        vec2 bay = vec2(vMapUv.x, vMapUv.y * storeys / eave);
+        float row = 0.0;
+        if (vMapUv.y >= 0.0 && vMapUv.y < eave && vHouse.z > -.5) {
+          row = vHouse.z > .5 && bay.x < 1.0 && bay.y < 1.0 ? 2.0 : 1.0;
+        }
+        vec2 uv = vec2(bay.x, 1.0 - (floor(vHouse.y + .5) * 3.0 + row + 1.0 - fract(bay.y)) / 6.0);
+        vec2 scale = vec2(1.0, 1.0 / 6.0);
+        diffuseColor.rgb *= textureGrad(map, uv, dFdx(bay)*scale, dFdy(bay)*scale).rgb;`
+      );
+  };
+  return material;
+}
+
 function buildings(list, photo, bounds, elev, wallMats) {
   const group = new T.Group(),
-    walls = [[], []],
-    wallUV = [[], []],
+    walls = wallMats.map(() => []),
+    wallUV = wallMats.map(() => []),
+    houseStyles = [],
     roofs = [],
     roofUV = [];
   for (const b of list) {
@@ -39,17 +76,21 @@ function buildings(list, photo, bounds, elev, wallMats) {
     const pts = b.points.map((p) => new T.Vector2(...p));
     const levels = pts.map((p) => elev(p.x, p.y)).sort((a, b) => a - b);
     const base = levels[Math.floor(levels.length / 2)];
-    const kind = /Single Family|Townhome|Apartment/.test(b.type) ? 0 : 1;
+    const house = b.type === 'Single Family' || b.type === 'Townhome';
+    const kind = house ? 2 : b.type === 'Apartment' ? 0 : 1;
+    const finish = (Math.round(pts[0].x * 3) ^ Math.round(pts[0].y * 7)) & 1;
+    let entranceEdge = 0;
     // A gable follows the footprint's longest edge. Split triangles at the
     // ridge so that rectangular footprints retain pitched roofs as well.
     let ridge = null;
-    if (b.type === 'Single Family' || b.type === 'Townhome') {
+    if (house) {
       let longest = 0,
         normal;
       for (let i = 0; i < pts.length; i++) {
         const edge = pts[(i + 1) % pts.length].clone().sub(pts[i]);
         if (edge.lengthSq() > longest) {
           longest = edge.lengthSq();
+          entranceEdge = i;
           normal = new T.Vector2(-edge.y, edge.x).normalize();
         }
       }
@@ -82,7 +123,7 @@ function buildings(list, photo, bounds, elev, wallMats) {
     function crossing(a, d) {
       return a.clone().lerp(d, distance(a) / (distance(a) - distance(d)));
     }
-    function wall(a, d) {
+    function wall(a, d, edge) {
       const first = roofHeight(a),
         last = roofHeight(d),
         u = a.distanceTo(d) / 8;
@@ -107,6 +148,32 @@ function buildings(list, photo, bounds, elev, wallMats) {
         first,
         a.y
       );
+      if (house) {
+        const origin = pts[edge],
+          edgeLength = origin.distanceTo(pts[(edge + 1) % pts.length]);
+        const bays = Math.max(1, Math.round(edgeLength / 5.6));
+        const u0 = (origin.distanceTo(a) / (edgeLength || 1)) * bays;
+        const u1 = (origin.distanceTo(d) / (edgeLength || 1)) * bays;
+        const bottom = lower - base;
+        wallUV[kind].push(
+          u0,
+          bottom,
+          u1,
+          bottom,
+          u1,
+          last - base,
+          u0,
+          bottom,
+          u1,
+          last - base,
+          u0,
+          first - base
+        );
+        const openings = edgeLength < 2.8 ? -1 : Number(edge === entranceEdge);
+        for (let i = 0; i < 6; i++)
+          houseStyles.push(top - base, finish, openings);
+        return;
+      }
       const va = (first - lower) / 7,
         vb = (last - lower) / 7;
       wallUV[kind].push(0, 0, u, 0, u, vb, 0, 0, u, vb, 0, va);
@@ -125,9 +192,9 @@ function buildings(list, photo, bounds, elev, wallMats) {
         d = pts[(i + 1) % pts.length];
       if (distance(a) * distance(d) < 0) {
         const middle = crossing(a, d);
-        wall(a, middle);
-        wall(middle, d);
-      } else wall(a, d);
+        wall(a, middle, i);
+        wall(middle, d, i);
+      } else wall(a, d, i);
     }
     for (const tri of T.ShapeUtils.triangulateShape(pts, [])) {
       const corners = tri.map((i) => pts[i]);
@@ -149,9 +216,13 @@ function buildings(list, photo, bounds, elev, wallMats) {
       }
     }
   }
-  for (let i = 0; i < 2; i++)
-    if (walls[i].length)
-      group.add(new T.Mesh(geometry(walls[i], wallUV[i]), wallMats[i]));
+  for (let i = 0; i < walls.length; i++) {
+    if (!walls[i].length) continue;
+    const geo = geometry(walls[i], wallUV[i]);
+    if (i === 2)
+      geo.setAttribute('house', new T.Float32BufferAttribute(houseStyles, 3));
+    group.add(new T.Mesh(geo, wallMats[i]));
+  }
   if (roofs.length)
     group.add(
       new T.Mesh(
@@ -322,21 +393,34 @@ function water(scene, rings, height) {
   scene.add(new T.Mesh(geometry(positions), surface));
 }
 export async function buildWorld(scene, data) {
-  const [photo, grass, sky, brick, civic, treeTexture, oaks, fine, regional] =
-    await Promise.all([
-      texture(data.orthophoto.url),
-      texture('/scenery/grass.webp', true),
-      texture('/scenery/sky.webp'),
-      texture('/scenery/brick-facade.webp', true),
-      texture('/scenery/civic-facade.webp', true),
-      texture('/scenery/tree-materials.webp'),
-      loadOaks(),
-      fetch('/geo/park-elevation.json').then((r) => {
-        if (!r.ok) throw Error('The park elevation map could not load.');
-        return r.json();
-      }),
-      regionData(),
-    ]);
+  const [
+    photo,
+    grass,
+    sky,
+    brick,
+    civic,
+    treeTexture,
+    oaks,
+    fine,
+    regional,
+    streets,
+    houses,
+  ] = await Promise.all([
+    texture(data.orthophoto.url),
+    texture('/scenery/grass.webp', true),
+    texture('/scenery/sky.webp'),
+    texture('/scenery/brick-facade.webp', true),
+    texture('/scenery/civic-facade.webp', true),
+    texture('/scenery/tree-materials.webp'),
+    loadOaks(),
+    fetch('/geo/park-elevation.json').then((r) => {
+      if (!r.ok) throw Error('The park elevation map could not load.');
+      return r.json();
+    }),
+    regionData(),
+    streetMaterials(texture),
+    texture('/scenery/street-houses.webp', true),
+  ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
   scene.fog = new T.FogExp2('#b8c0ac', 0.00063);
@@ -347,6 +431,7 @@ export async function buildWorld(scene, data) {
   const walls = [brick, civic].map(
     (map) => new T.MeshLambertMaterial({ map, side: T.DoubleSide })
   );
+  walls.push(houseMaterial(houses));
   const terrain = makeTerrain(fine, regional.elevation, data.bounds);
   const { height } = terrain;
   const structures = buildings(
@@ -368,10 +453,14 @@ export async function buildWorld(scene, data) {
     new T.Mesh(terrain.parkGround(), groundMaterial(photo, grass)),
     structures
   );
+  const junctions = streetJunctions(data.roads);
   const signs = PARK_SIGNS.map((s) => parkSign(s, height));
   scene.add(
     parkFloor({ ...data, trees: plantings }, photo, height),
-    pavement([...data.roads, ...data.paths], terrain),
+    pavement([...data.roads, ...data.paths], terrain, streets, junctions, {
+      crossingRoads: data.roads,
+    }),
+    streetDetails(data.roads, junctions, terrain, streets),
     ...signs
   );
   parkFurniture(scene, data, height);
@@ -383,6 +472,7 @@ export async function buildWorld(scene, data) {
     terrain,
     height,
     groundPatch: terrain.groundPatch,
+    streets,
     trees,
     wallMaterials: walls,
   };
@@ -394,9 +484,12 @@ export async function addRegion(scene, world) {
     b = data.bounds,
     height = world.height;
   const material = groundMaterial(photo, world.grass);
+  const junctions = streetJunctions(data.roads);
   scene.add(
     ...world.terrain.regionGround().map((geo) => new T.Mesh(geo, material)),
-    pavement(data.roads, world.terrain, true)
+    pavement(data.roads, world.terrain, world.streets, junctions, {
+      regional: true,
+    })
   );
   const active = new Map();
   // A footprint belongs to its centroid's tile. Include features that extend
@@ -499,6 +592,7 @@ export async function addRegion(scene, world) {
     data,
     height,
     update,
+    junctions,
     mapTiles: () =>
       Array.from(active.values(), (e) => e.mapData).filter(Boolean),
     occludes: (ray) =>

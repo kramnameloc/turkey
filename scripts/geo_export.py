@@ -148,7 +148,10 @@ def export(cache, keep_image):
                 name = attrs['FULL_STREETNAME']
             for line in geom['paths']:
                 for part in clip_line(list(map(local, line))):
-                    data[collection].append({'points': part, 'type': kind, 'width': width, 'name': name or ''})
+                    road_or_path = {'points': part, 'type': kind, 'width': width, 'name': name or ''}
+                    if collection == 'roads' and attrs.get('ONE_WAY') in ('FT', 'TF'):
+                        road_or_path['oneWay'] = True
+                    data[collection].append(road_or_path)
     for attrs, geom in features('Forestry', cache):
         x, z = local([geom['x'], geom['y']])
         if inside((x, z)) and attrs['STATUS'] == 'Active':

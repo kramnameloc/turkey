@@ -96,6 +96,15 @@ const [maps, mountains, dem, turkey, oaks] = await Promise.all([
     /model\/gltf-binary|application\/octet-stream/
   ),
 ]);
+await Promise.all(
+  ['asphalt', 'concrete', 'ironwork', 'houses'].map(async (name) => {
+    const material = await asset(
+      '/scenery/street-' + name + '.webp',
+      /image\/webp/
+    );
+    assert.equal(material.toString('ascii', 8, 12), 'WEBP', name);
+  })
+);
 assert.equal(oaks.toString('ascii', 0, 4), 'glTF');
 assert.equal(oaks.readUInt32LE(8), oaks.length);
 // This model is required before a hunt starts. Check that the release contains

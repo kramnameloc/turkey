@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as T from 'three';
+import { pavement, streetJunctions } from '../src/streets.js';
 import { makeTerrain } from '../src/terrain.js';
 import { treeShape } from '../src/field.js';
 
@@ -73,4 +74,63 @@ test('survey roof and crown measurements preserve local meter scale', () => {
   assert.equal(treeShape(tallTree).height, tallTree.surveyHeight);
   const inventoryTree = park.trees.find((t) => !t.surveyHeight);
   assert.equal(treeShape(inventoryTree).height, inventoryTree.height);
+});
+
+test('surveyed crossing paint follows both carriageways and leaves their median open', () => {
+  const roads = [-5, 5].map((x) => ({
+    type: 'Minor Arterial',
+    width: 6,
+    oneWay: true,
+    points: [
+      [x, -30],
+      [x, 30],
+    ],
+  }));
+  const crossing = {
+    type: 'Cross-walk',
+    width: 3,
+    points: [
+      [-13, 0],
+      [13, 0],
+    ],
+  };
+  const meshes = pavement(
+    [crossing],
+    terrain,
+    { surface: material },
+    streetJunctions(roads),
+    { crossingRoads: roads }
+  ).children;
+  assert.ok(meshes.length);
+  const positions = meshes[0].geometry.attributes.position;
+  const sides = new Set();
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i),
+      y = positions.getY(i),
+      z = positions.getZ(i);
+    assert.ok(Math.abs(Math.abs(x) - 5) < 3);
+    assert.ok(Math.abs(y - terrain.height(x, z) - 0.042) < 0.0001);
+    sides.add(Math.sign(x));
+  }
+  assert.equal(sides.size, 2);
+});
+
+test('a neighborhood sidewalk meets the park boundary without duplicating the park section', () => {
+  const path = {
+    type: 'Attached Sidewalk',
+    width: 1.7,
+    points: [
+      [654, 0],
+      [699, 0],
+    ],
+  };
+  const meshes = pavement([path], terrain, { surface: material }, new Map(), {
+    regional: true,
+  }).children;
+  const positions = meshes[0].geometry.attributes.position;
+  const xs = Array.from({ length: positions.count }, (_, i) =>
+    positions.getX(i)
+  );
+  assert.equal(Math.min(...xs), 680);
+  assert.equal(Math.max(...xs), 699);
 });

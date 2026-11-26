@@ -21,7 +21,7 @@ INTERVAL = 150
 COLUMNS = 129
 DEM = 'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer'
 FIELDS = {
-    'BuildingFootprints': 'OBJECTID,BUILDING_TYPE,PLACE_NAME,STATUS', 'Streets': 'OBJECTID,FUNCTIONAL_CLASS,FULL_STREETNAME,STREET_STATUS',
+    'BuildingFootprints': 'OBJECTID,BUILDING_TYPE,PLACE_NAME,STATUS', 'Streets': 'OBJECTID,FUNCTIONAL_CLASS,FULL_STREETNAME,STREET_STATUS,ONE_WAY',
     'Forestry': 'OBJECTID,TYPE,COMMON_NAME,HEIGHT,STATUS', 'PlaceNames': 'OBJECTID,FEATURE_TYPE,LANDMARK_NAME,FLAG'}
 
 
@@ -57,7 +57,8 @@ def download_layer(cache, layer):
     result = []
     while True:
         params['resultOffset'] = len(result)
-        raw = download(cache, f'{layer}-{len(result)}.json', url, params)
+        cache_name = 'Streets-with-direction' if layer == 'Streets' else layer
+        raw = download(cache, f'{cache_name}-{len(result)}.json', url, params)
         page = json.loads(raw)
         result.extend(page['features'])
         if not page.get('exceededTransferLimit'):
@@ -171,7 +172,10 @@ def regional_roads(features):
             if len(set(map(tuple, points))) < 2:
                 continue
             for part in outside_core(points, polygon=False):
-                roads.append({'points':part, 'name':attrs['FULL_STREETNAME'] or '', 'type':kind, 'width':ROAD_WIDTHS.get(kind, 7)})
+                road = {'points':part, 'name':attrs['FULL_STREETNAME'] or '', 'type':kind, 'width':ROAD_WIDTHS.get(kind, 7)}
+                if attrs.get('ONE_WAY') in ('FT', 'TF'):
+                    road['oneWay'] = True
+                roads.append(road)
     return roads
 
 
