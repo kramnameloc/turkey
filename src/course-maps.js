@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { pavement, streetDetails } from './streets.js';
+import { groundMaterial } from './world.js';
 import { bluePod } from './soccer.js';
 import { Obstacles, loadMapImage } from './field.js';
 
@@ -76,8 +77,7 @@ export async function courseMaps(scene, world, region) {
             texture.colorSpace = T.SRGBColorSpace;
             texture.anisotropy = 4;
             texture.needsUpdate = true;
-            const material = new T.MeshBasicMaterial({
-              map: texture,
+            const material = groundMaterial(texture, world.grass, {
               polygonOffset: true,
               // Only break the depth tie with the underlying terrain. A slope
               // bias pulls the photo over streets at grazing camera angles.

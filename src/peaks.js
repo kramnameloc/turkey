@@ -1,7 +1,7 @@
 import * as T from 'three';
 
 // Same local metre projection and elevation datum as Community Park. The two
-// assets are generated together by scripts/geo_peaks.py from the National Map.
+// assets combine National Map terrain with relief and snow from Snowy Mountain.
 const WEST = -96900, NORTH = -87040, PARK_ELEVATION = 1624.7;
 const GRID = 512, STEP_X = 170, STEP_Z = 340;
 

@@ -1,4 +1,12 @@
 {
+  "/models/field-grasses.glb": {
+    "title": "grass",
+    "author": "Georgeous",
+    "source": "https://sketchfab.com/3d-models/grass-674d42354f6348a7a85fc06a7f004db5",
+    "license": "Sketchfab Standard",
+    "licenseUrl": "https://sketchfab.com/licenses",
+    "changes": "Selected short blades, dry grass and seed-head cards. Recentered their roots, normalized the three clumps and repacked selected color and alpha artwork for instancing at field scale."
+  },
   "street-asphalt.webp": {
     "title": "Street",
     "author": "Pasha",

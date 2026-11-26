@@ -15,6 +15,14 @@
     "source": "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer",
     "changes": "Resampled orthophotography, shaded with DEM slope and aspect, and illustrated high-elevation November snow cover."
   },
+  "alpineModel": {
+    "title": "Snowy Mountain",
+    "author": "James Lucas",
+    "source": "https://sketchfab.com/3d-models/snowy-mountain-09ed3babc1784b9a8a40b62d4f765f66",
+    "license": "CC BY-NC 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-nc/4.0/",
+    "changes": "Reconstructed the height field from eight mesh sections and registered its snow and rock artwork to the UVs. Rotated, rescaled and blended the relief and surface colors onto selected high-elevation Colorado summits."
+  },
   "registration": {
     "projection": "EPSG:3857, locally scaled by cosine of origin latitude; east is +X and south is +Z",
     "originLat": 39.9185,
@@ -22,6 +30,6 @@
     "originElevationMeters": 1624.7,
     "localBoundsMeters": {"west": -96900, "east": -9860, "north": -87040, "south": 87040},
     "verticalEmphasis": {"foothills":1.12, "highPeaks":1.82},
-    "notes": "Mesh vertices retain measured elevations. Distant-relief rendering applies curvature and a gradual 1.12× to 1.82× vertical emphasis for legibility at the game's wide field of view. Snow extent is seasonal artwork."
+    "notes": "USGS elevations anchor the summits, with up to 145 m of illustrative relief on their upper flanks. Distant-relief rendering applies curvature and a gradual 1.12× to 1.82× vertical emphasis for legibility at the game's wide field of view. Snow extent is seasonal artwork."
   }
 }

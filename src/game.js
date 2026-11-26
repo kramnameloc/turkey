@@ -1102,7 +1102,10 @@ export class Hunt {
       $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
     if (this.house.inside) this.house.animate(this.elapsed);
-    else this.world.trees.update(p.x, p.z, this.viewCamera);
+    else {
+      this.world.trees.update(p.x, p.z, this.viewCamera);
+      this.world.grasses.update(p.x, p.z, time * 0.001);
+    }
     this.renderer.render(
       this.house.inside ? this.house.scene : this.scene,
       this.viewCamera

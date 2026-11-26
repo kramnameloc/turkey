@@ -83,19 +83,26 @@ assert.equal(badge.toString('ascii', 1, 4), 'PNG');
 assert.equal(badge.readUInt32BE(16), 180);
 assert.equal(badge.readUInt32BE(20), 180);
 assert.equal(dish.toString('ascii', 8, 12), 'WEBP');
-const [maps, mountains, dem, turkey, oaks] = await Promise.all([
-  asset('/geo/courses/maps.json', /json/),
-  asset('/scenery/front-range.webp', /image\/webp/),
-  asset('/geo/park-elevation.json', /json/),
-  asset(
-    '/models/bourbon-red.glb',
-    /model\/gltf-binary|application\/octet-stream/
-  ),
-  asset(
-    '/models/november-oaks.glb',
-    /model\/gltf-binary|application\/octet-stream/
-  ),
-]);
+const [maps, mountains, dem, turkey, oaks, grasses, grassCover, rangeMesh] =
+  await Promise.all([
+    asset('/geo/courses/maps.json', /json/),
+    asset('/scenery/front-range.webp', /image\/webp/),
+    asset('/geo/park-elevation.json', /json/),
+    asset(
+      '/models/bourbon-red.glb',
+      /model\/gltf-binary|application\/octet-stream/
+    ),
+    asset(
+      '/models/november-oaks.glb',
+      /model\/gltf-binary|application\/octet-stream/
+    ),
+    asset(
+      '/models/field-grasses.glb',
+      /model\/gltf-binary|application\/octet-stream/
+    ),
+    asset('/scenery/grass-cover.png', /image\/png/),
+    asset('/scenery/front-range.mesh', /application\/octet-stream|model\/mesh/),
+  ]);
 await Promise.all(
   ['asphalt', 'concrete', 'ironwork', 'houses'].map(async (name) => {
     const material = await asset(
@@ -104,6 +111,20 @@ await Promise.all(
     );
     assert.equal(material.toString('ascii', 8, 12), 'WEBP', name);
   })
+);
+assert.equal(grasses.toString('ascii', 0, 4), 'glTF');
+assert.equal(grasses.readUInt32LE(8), grasses.length);
+const grassPack = JSON.parse(
+  grasses.toString('utf8', 20, 20 + grasses.readUInt32LE(12))
+);
+assert.deepEqual(
+  grassPack.nodes.map((n) => n.name),
+  ['Lawn', 'Dry', 'Reeds']
+);
+assert.equal(grassCover.toString('ascii', 1, 4), 'PNG');
+assert.equal(
+  rangeMesh.length,
+  8 + 6 * rangeMesh.readUInt32LE(0) + 2 * rangeMesh.readUInt32LE(4)
 );
 assert.equal(oaks.toString('ascii', 0, 4), 'glTF');
 assert.equal(oaks.readUInt32LE(8), oaks.length);

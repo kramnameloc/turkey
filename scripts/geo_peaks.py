@@ -1,6 +1,6 @@
 """Bake the western Front Range from USGS 1-arc-second DEMs and orthoimagery.
 
-Run with Pillow installed: python scripts/geo_peaks.py --cache /tmp/peaks-cache
+Run with Pillow and NumPy installed: python scripts/geo_peaks.py --cache /tmp/peaks-cache
 The cache holds about 200 MB of source data. Only the compact results ship.
 """
 from argparse import ArgumentParser
@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 from urllib.request import urlretrieve
 
 from PIL import Image
+from alpine_surface import fit_summits
 from geo_export import BASE, USGS, R, mx, my, scale
 
 SCENERY = BASE.parent / "scenery"
@@ -76,7 +77,7 @@ def grid_mesh(dem):
                           for y in range(GRID) for x in range(GRID)))
     # Keep the photographed skyline and visible faces detailed at five
     # viewpoints spanning the playable city. Valleys behind them can use
-    # longer triangles. Elevations of retained vertices always stay measured.
+    # longer triangles. Retain extra samples along the visible skyline.
     tolerance = bytearray([190]) * (GRID*GRID)
     for view_x, view_z in ((0,0),(-8500,-15300),(10500,3700),
                            (-8500,3700),(10500,-15300)):
@@ -154,7 +155,7 @@ def clamp(value):
     return max(0, min(1, value))
 
 
-def surface(cache, dem):
+def surface(cache, dem, alpine_color, alpine_mask):
     east, south = WEST+(WIDTH-1)*STEP, NORTH+(HEIGHT-1)*STEP
     bbox = ",".join(f"{v:.4f}" for v in
                     (mx+WEST/scale, my-south/scale, mx+east/scale, my-NORTH/scale))
@@ -185,6 +186,7 @@ def surface(cache, dem):
             for c in range(3):
                 raster[i+c] = round(min(255, rock[c]*shade*(1-snow)+ice[c]*snow))
     image = Image.frombytes("RGB", (1024,2048), bytes(raster))
+    image.paste(alpine_color, mask=alpine_mask)
     image.save(SCENERY/"front-range.webp", quality=90, method=6)
 
 
@@ -193,6 +195,6 @@ if __name__ == "__main__":
     parser.add_argument("--cache", required=True, type=Path)
     cache = parser.parse_args().cache
     cache.mkdir(exist_ok=True, parents=True)
-    dem = reproject_dem(cache)
+    dem, color, mask = fit_summits(reproject_dem(cache), STEP)
     grid_mesh(dem)
-    surface(cache, dem)
+    surface(cache, dem, color, mask)

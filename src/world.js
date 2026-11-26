@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { FieldGrasses, loadGrasses } from './grass.js';
 import { parkFloor } from './surfaces.js';
 import {
   pavement,
@@ -300,8 +301,8 @@ function parkFurniture(scene, data, height) {
   });
   scene.add(m);
 }
-function groundMaterial(photo, grass) {
-  const mat = new T.MeshBasicMaterial({ map: photo });
+export function groundMaterial(photo, grass, options = {}) {
+  const mat = new T.MeshBasicMaterial({ ...options, map: photo });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.detailTile = { value: grass };
     shader.vertexShader =
@@ -405,6 +406,7 @@ export async function buildWorld(scene, data) {
     regional,
     streets,
     houses,
+    grassModels,
   ] = await Promise.all([
     texture(data.orthophoto.url),
     texture('/scenery/grass.webp', true),
@@ -420,6 +422,7 @@ export async function buildWorld(scene, data) {
     regionData(),
     streetMaterials(texture),
     texture('/scenery/street-houses.webp', true),
+    loadGrasses(),
   ]);
   sky.mapping = T.EquirectangularReflectionMapping;
   scene.background = sky;
@@ -443,6 +446,8 @@ export async function buildWorld(scene, data) {
   );
   const solids = new Obstacles(data, PARK_SIGNS);
   const plantings = [...data.trees, ...plantParkSaplings(data, solids)];
+  const grasses = new FieldGrasses(scene, grassModels, height);
+  grasses.update(SPAWN.x, SPAWN.z);
   const trees = new TreeStand(scene, treeTexture, oaks);
   trees.add(
     'park',
@@ -456,7 +461,7 @@ export async function buildWorld(scene, data) {
   const junctions = streetJunctions(data.roads);
   const signs = PARK_SIGNS.map((s) => parkSign(s, height));
   scene.add(
-    parkFloor({ ...data, trees: plantings }, photo, height),
+    parkFloor({ ...data, trees: plantings }, height),
     pavement([...data.roads, ...data.paths], terrain, streets, junctions, {
       crossingRoads: data.roads,
     }),
@@ -474,6 +479,7 @@ export async function buildWorld(scene, data) {
     groundPatch: terrain.groundPatch,
     streets,
     trees,
+    grasses,
     wallMaterials: walls,
   };
 }
