@@ -62,7 +62,8 @@ test('the walking rig leads with its head and holds its tether at the beak on ev
   await avatar.load(new Group(), new Group());
   const world = { height: () => 0, solids: { occupied: () => false } };
   const parade = await Parade.load(park, world, avatar, new Texture());
-  assert.equal(parade.floats.length, 8);
+  assert.equal(parade.floats.length, 22);
+  assert.equal(new Set(parade.floats.map((f) => f.label)).size, 22);
   assert.ok(parade.floats.every((f) => f.handlers.length === 4));
   const before = new Vector3(),
     after = new Vector3(),

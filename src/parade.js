@@ -4,16 +4,6 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { paradeRoute } from './parade-route.js';
 import { paradeCrowd } from './parade-crowd.js';
 
-const characters = [
-  ['Jett', 'Jett from Super Wings'],
-  ['Elf', 'The Elf on the Shelf'],
-  ['Thomas', 'Thomas the Tank Engine'],
-  ['Chase', 'Chase from PAW Patrol'],
-  ['Goku', 'Goku'],
-  ['CharlieBrown', 'Charlie Brown'],
-  ['Scrat', 'Scrat and his Acorn'],
-  ['Sonic', 'Sonic (1993)'],
-];
 const spacing = 26,
   marchSpeed = 0.74,
   startDistance = 207;
@@ -106,8 +96,10 @@ export class Parade {
     this.crowd = paradeCrowd(this.route, data, world, shade);
     this.group.add(this.crowd.group);
     const shadowShape = new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    this.floats = characters.map(([name, label], i) => {
-      const balloon = pack.getObjectByName(name);
+    const balloons = [...pack.children].sort(
+      (a, b) => a.userData.paradeOrder - b.userData.paradeOrder
+    );
+    this.floats = balloons.map((balloon, i) => {
       const anchors = riggingPoints(balloon);
       const size = balloon.geometry.boundingBox.getSize(new T.Vector3());
       const shadow = new T.Mesh(shadowShape, shade);
@@ -121,12 +113,12 @@ export class Parade {
         this.group.add(h.body, h.shadow);
       }
       this.group.add(balloon, shadow);
-      return { label, balloon, anchors, handlers, shadow };
+      return { label: balloon.userData.paradeLabel, balloon, anchors, handlers, shadow };
     });
     this.ropes = new T.InstancedMesh(
       new T.CylinderGeometry(0.022, 0.022, 1, 5),
       new T.MeshStandardMaterial({ color: 0xe1c29d, roughness: 0.99 }),
-      characters.length * crew.length * ropeSteps
+      balloons.length * crew.length * ropeSteps
     );
     this.ropes.name = 'Balloon tethers';
     this.ropes.instanceMatrix.setUsage(T.DynamicDrawUsage);

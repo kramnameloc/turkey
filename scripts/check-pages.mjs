@@ -120,16 +120,21 @@ assert.equal(balloons.readUInt32LE(8), balloons.length);
 const paradePack = JSON.parse(
   balloons.toString('utf8', 20, 20 + balloons.readUInt32LE(12))
 );
-assert.deepEqual(paradePack.nodes.map((n) => n.name).sort(), [
-  'CharlieBrown',
-  'Chase',
-  'Elf',
-  'Goku',
-  'Jett',
-  'Scrat',
-  'Sonic',
-  'Thomas',
+const lineup = paradePack.nodes.toSorted((a, b) => a.extras.paradeOrder - b.extras.paradeOrder);
+assert.deepEqual(lineup.map((node) => node.name), [
+  'Jett', 'Elf', 'Thomas', 'Chase', 'Goku', 'CharlieBrown', 'Scrat', 'Sonic',
+  'SnoopyWoodstock', 'JimmyNeutron', 'SkatingRonald', 'Paddington', 'SpiderMan',
+  'Doughboy', 'Eruptor', 'GregHeffley', 'SonicModern', 'FinnJake', 'RedRanger',
+  'Pikachu', 'RonaldMcDonald', 'SuperGrover',
 ]);
+for (const [i, node] of lineup.entries()) {
+  assert.equal(node.extras.paradeOrder, i);
+  assert.ok(node.extras.paradeLabel, node.name);
+  const [primitive] = paradePack.meshes[node.mesh].primitives;
+  const { baseColorTexture } = paradePack.materials[primitive.material].pbrMetallicRoughness;
+  const image = paradePack.textures[baseColorTexture.index].extensions.EXT_texture_webp.source;
+  assert.equal(paradePack.images[image].mimeType, 'image/webp', node.name);
+}
 assert.equal(grasses.toString('ascii', 0, 4), 'glTF');
 assert.equal(grasses.readUInt32LE(8), grasses.length);
 const grassPack = JSON.parse(
