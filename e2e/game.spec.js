@@ -85,18 +85,29 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
     timeout: 90_000,
   });
   await expect(page.locator('#panel')).not.toBeVisible();
-  await expect(page.locator('#scene')).toBeFocused();
-  // Sample the scene during a frame, before WebGL discards the drawing buffer.
   const scene = page.locator('#scene');
+  await expect(scene).toBeFocused();
   const frameColors = () => scene.evaluate(async (canvas) => {
-    await new Promise(requestAnimationFrame);
-    const sample = new OffscreenCanvas(16, 16).getContext('2d');
-    sample.drawImage(canvas, 0, 0, 16, 16);
-    const pixels = sample.getImageData(0, 0, 16, 16).data;
-    return new Set(new Uint32Array(pixels.buffer)).size;
+    // A canvas stream receives painted frames before WebGL discards the drawing buffer.
+    const stream = canvas.captureStream();
+    const video = document.createElement('video');
+    video.muted = true;
+    video.srcObject = stream;
+    try {
+      await video.play();
+      const sample = new OffscreenCanvas(16, 16).getContext('2d');
+      sample.drawImage(video, 0, 0, 16, 16);
+      const pixels = sample.getImageData(0, 0, 16, 16).data;
+      return new Set(new Uint32Array(pixels.buffer)).size;
+    } finally {
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+    }
   });
-  await expect.poll(frameColors, { message: 'Day 1 draws scenery into the WebGL canvas' })
-    .toBeGreaterThan(1);
+  await expect.poll(frameColors, {
+    message: 'Day 1 draws scenery into the WebGL canvas',
+    timeout: 30_000,
+  }).toBeGreaterThan(1);
   await page.keyboard.press('v');
   await expect(page.locator('#view-name')).toHaveText('Chase cam');
   await page.keyboard.press('m');
