@@ -277,15 +277,87 @@ def airport_shuttle(s):
     s.box("Steel", (10.6, 0.58, -15.02), (2.55, 0.15, 0.13))
 
 
+def arrivals_drive(s):
+    # Two lanes run south past the shuttle, curving back into the garage
+    # at both ends. Station zero is halfway along the terminal curb.
+    straight, radius = 24, 13
+    bend_end = straight + radius * pi / 2
+    end = bend_end + 25
+
+    def point(station, inset, height):
+        beyond = abs(station) - straight
+        if beyond <= 0:
+            return (12 + inset, height, station)
+        angle = min(beyond / radius, pi / 2)
+        x = 25 - (radius - inset) * cos(angle) + max(0, abs(station) - bend_end)
+        z = straight + (radius - inset) * sin(angle)
+        return (x, height, z if station > 0 else -z)
+
+    def ribbon(mat, start, stop, left, right, h0, h1):
+        # Split exactly at the tangents so paint and curb follow the asphalt.
+        tangents = (-bend_end, -straight, straight, bend_end)
+        cuts = [start, *(v for v in tangents if start < v < stop), stop]
+        for low, high in zip(cuts, cuts[1:]):
+            stations = np.linspace(low, high, max(2, int(np.ceil((high - low) / 1.5)) + 1))
+            for a, b in zip(stations, stations[1:]):
+                s.face(
+                    mat,
+                    [point(a, left, h0), point(b, left, h0), point(b, right, h1), point(a, right, h1)],
+                    [(left / 3, a / 3), (left / 3, b / 3), (right / 3, b / 3), (right / 3, a / 3)],
+                )
+
+    s.paint("Verge", "trail-gravel.webp", ("#504c41", "#9c957c"))
+    s.pad("Verge", 10, 0, 210, 190, -0.04)
+    ribbon("Road", -end, end, -4, 4, 0, 0)
+    ribbon("Paving", -end, end, 4, 4, -0.04, 0.16)
+    ribbon("Paving", -end, end, 4, 4.45, 0.16, 0.16)
+    ribbon("Paving", -end, end, 4.45, 4.45, 0.16, -0.04)
+    for start in range(-65, 66, 5):
+        ribbon("Linen", start, start + 2.2, -0.07, 0.07, 0.014, 0.014)
+    for z in (-10, 14):
+        for x in (10, 14):
+            s.pad("Linen", x, z, 0.16, 1.9, 0.015)
+            s.face("Linen", [(x - 0.46, 0.015, z + 0.95), (x, 0.015, z + 2),
+                             (x + 0.46, 0.015, z + 0.95)])
+    route = [point(v, 0, 0) for v in np.linspace(-end, end, 81)]
+    s.plan["roads"].append(dict(points=[[x, z] for x, _, z in route], width=8))
+
+    # Floor slabs, recessed lights and open bays give the two portals depth.
+    for y in (4.3, 7.6):
+        s.box("Paving", (46, y, 0), (17, 0.5, 87))
+        s.box("Silver", (37.6, y + 0.53, 0), (0.32, 0.85, 87))
+    s.block("Ink", 50, 0, 0.6, 87, 8)
+    for z in (-43, -31, -20, -10, 0, 10, 20, 31, 43):
+        s.block("Steel", 38.2, z, 0.75, 0.85, 7.6)
+        s.box("Glow", (40, 4, z * 0.88), (2.6, 0.09, 0.24))
+    for z, label in [(-37, "Terminal West"), (37, "Airport exit")]:
+        s.box("Ink", (37.47, 4.73, z), (0.16, 1.2, 8.7))
+        s.sign(label, 37.37, 4.73, z, 8.5, 1.12, yaw=-pi / 2)
+    # The elevator lobby breaks up the open deck and marks pedestrian access.
+    s.block("Steel", 38.8, 3, 4.5, 6, 10.2)
+    for y in (1.8, 5.2, 8.5):
+        for z in (1.2, 3, 4.8):
+            s.box("Glass", (36.52, y, z), (0.12, 2.85, 1.67))
+        s.box("Glow", (36.41, y + 1.4, 3), (0.12, 0.1, 5.5))
+    s.sign("P", 36.39, 7.1, 3, 2.4, 2.4, "#225181", yaw=-pi / 2)
+    # Catch the driver's eye before the southbound lanes turn left.
+    s.tube("Steel", (18, 0, 23.5), (18, 6.2, 23.5), 0.14)
+    s.box("Steel", (15.2, 5.95, 23.5), (5.7, 0.17, 0.22))
+    s.box("Steel", (13, 5.45, 23.5), (5.9, 1.3, 0.18))
+    s.sign("Exit to Denver", 13, 5.45, 23.39, 5.8, 1.2, "#235446", yaw=pi, sub="ALL LANES")
+    for z in (-21, -8, 7, 22):
+        s.plan["trees"].append(dict(x=24, z=z, height=4.6, type="Coniferous", species="Spruce"))
+
+
 def airport():
-    s = Venue("airport", (-13, 13, -30, 27))
+    s = Venue("airport", (-13, 16, -30, 27))
     s.paint("Road", "street-asphalt.webp")
     s.paint("Paving", "street-concrete.webp", ("#414957", "#b4b9c0"))
     s.extras["furniture"] = []
     for z in (-20, -6, 7, 20):
         s.extras["furniture"].append(["Bench", -11.7, z, pi / 2])
         s.barrier(-11.7, z, 0.9, 2)
-    s.pad("Road", 0, 0, 170, 160)
+    arrivals_drive(s)
     s.pad("Paving", -3, 0, 22, 62, 0.015)
     s.way([[0, 24], [0, -20], [7.6, -19]], 6)
     # West terminal curtain wall, a bank of sliding doors and scalloped tent bays.
@@ -357,10 +429,10 @@ def airport():
         s.box("Ink", (x, 1.46, z), (0.4, 0.08, 0.08))
         for j in range(4):
             s.box("Steel", (x - 0.27 + j * 0.18, 0.65, z + 0.245), (0.03, 0.75, 0.025))
-    for z in (-37, -12, 13, 38):
-        s.tube("Silver", (16, 0, z), (16, 8, z), 0.10)
-        s.box("Steel", (15.1, 8, z), (2.1, 0.13, 0.34))
-        s.box("Glow", (14.5, 7.91, z), (0.82, 0.05, 0.3))
+    for z in (-23, -7, 9, 23):
+        s.tube("Silver", (16.7, 0, z), (16.7, 8, z), 0.10)
+        s.box("Steel", (15.8, 8, z), (2.1, 0.13, 0.34))
+        s.box("Glow", (15.2, 7.91, z), (0.82, 0.05, 0.3))
     s.sign(
         "DENVER INTERNATIONAL AIRPORT",
         -13.2,
@@ -378,10 +450,9 @@ def airport():
     s.box("Steel", (0, 5.95, -29.8), (18.15, 3.2, 0.3))
     for x in (-8, 8):
         s.block("Silver", x, -29.8, 0.3, 0.3, 5)
-    for z in range(-27, 30, 5):
-        s.pad("Linen", 11, z, 0.14, 2.2, 0.02)
     airport_shuttle(s)
     s.sign("Ground transportation", 1, 3.8, 5, 6.8, 1.15, sub="SHUTTLES   /   ISLAND 5")
+    s.sign("Ground transportation", 1, 3.8, 4.96, 6.8, 1.15, yaw=pi, sub="SHUTTLES   /   ISLAND 5")
     for x in (-2.25, 4.25):
         s.block("Steel", x, 4.93, 0.13, 0.13, 4.4)
     s.place("Terminal West", -10, 10)

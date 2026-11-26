@@ -997,8 +997,11 @@ document.querySelector('.brand').addEventListener('click', (e) => {
   home();
 });
 const coarsePointer = matchMedia('(pointer: coarse)');
-const setTouchMode = (enabled) =>
+const setTouchMode = (enabled) => {
+  if (!enabled && document.body.classList.contains('touch-mode'))
+    game?.clearTouch();
   document.body.classList.toggle('touch-mode', enabled);
+};
 setTouchMode(coarsePointer.matches);
 coarsePointer.addEventListener('change', (e) => setTouchMode(e.matches));
 document.addEventListener(

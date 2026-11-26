@@ -720,14 +720,18 @@ export class Hunt {
     this.clearTouch();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
   }
-  clearTouch() {
+  resetStick() {
     this.joy = { x: 0, z: 0 };
-    this.touchId = null;
     this.stickId = null;
+    this.stickType = null;
+    $('#stick b').style.transform = '';
+  }
+  clearTouch() {
+    this.resetStick();
+    this.touchId = null;
     this.castId = null;
     this.flapId = null;
     $('#touch-flap').classList.remove('held');
-    $('#stick b').style.transform = '';
     $('#touch-fire').classList.remove('held');
   }
   stop() {
@@ -797,8 +801,8 @@ export class Hunt {
     if (this.subscribed) return;
     this.subscribed = true;
     this.abort = new AbortController();
-    const on = (obj, name, fn) =>
-      obj.addEventListener(name, fn, { signal: this.abort.signal });
+    const on = (obj, name, fn, capture = false) =>
+      obj.addEventListener(name, fn, { signal: this.abort.signal, capture });
     on(window, 'resize', () => this.resize());
     this.viewportObserver = new ResizeObserver(() => {
       if (this.canvas.clientWidth && this.canvas.clientHeight) this.resize();
@@ -905,6 +909,10 @@ export class Hunt {
     const stick = $('#stick');
     const stickMove = (e) => {
       if (e.pointerId !== this.stickId) return;
+      if (!e.buttons) {
+        this.resetStick();
+        return;
+      }
       const rect = stick.getBoundingClientRect(),
         radius = Math.max(
           1,
@@ -922,22 +930,30 @@ export class Hunt {
         'px)';
     };
     on(stick, 'pointerdown', (e) => {
-      if (!this.playing || this.stickId != null) return;
+      if (!this.playing || e.button !== 0) return;
+      // A fresh press can reclaim the stick after an interrupted gesture.
       this.stickId = e.pointerId;
-      stick.setPointerCapture(e.pointerId);
+      this.stickType = e.pointerType;
       stickMove(e);
     });
-    on(stick, 'pointermove', stickMove);
+    on(window, 'pointermove', stickMove, true);
     const stopStick = (e) => {
-      if (e.pointerId === this.stickId) {
-        this.joy = { x: 0, z: 0 };
-        this.stickId = null;
-        stick.firstElementChild.style.transform = '';
-      }
+      if (e.pointerId === this.stickId) this.resetStick();
     };
-    on(stick, 'pointerup', stopStick);
-    on(stick, 'pointercancel', stopStick);
+    on(window, 'pointerup', stopStick, true);
+    on(window, 'pointercancel', stopStick, true);
     on(stick, 'lostpointercapture', stopStick);
+    // Touch targets stay tied to where each finger landed, including when
+    // another finger is still aiming or casting and pointerup was missed.
+    const checkStickTouches = (e) => {
+      if (
+        this.stickType === 'touch' &&
+        !Array.from(e.touches).some((touch) => stick.contains(touch.target))
+      )
+        this.resetStick();
+    };
+    on(window, 'touchend', checkStickTouches, true);
+    on(window, 'touchcancel', checkStickTouches, true);
     on($('#view-toggle'), 'click', () => this.toggleView());
     on($('#interact'), 'click', () => this.interact());
     on($('#compass'), 'click', () => this.findDish());
