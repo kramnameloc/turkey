@@ -61,6 +61,6 @@ The production build is written to `dist/`. The included Python scripts regenera
 
 ## GitHub Pages
 
-The Pages workflow tests pull requests to `main`, builds the Vite site with Node 24, and checks the bundled game and share-image assets. A push to `main` or a manual run on `main` deploys the verified `dist/` artifact to the `github-pages` environment. The last job requests the live custom domain and checks that it serves the new JavaScript entry, geographic data, and social artwork.
+The Pages workflow tests pull requests to `main`, builds the Vite site with Node 24, and checks the bundled game and share-image assets. A push to `main` or a manual run on `main` deploys the verified `dist/` artifact to the `github-pages` environment. The last job confirms the deployed commit and domain using the GitHub API, then requests the public game, map, and social artwork. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. You can repeat the public check from another network using `node scripts/check-pages.mjs --live`.
 
 Repository Pages settings use **GitHub Actions** and the custom domain `turkey.kramnameloc.com`. The deployment environment allows `main`. The share button sends this canonical URL. Static Open Graph tags in `index.html` identify the JPEG preview and the square Apple touch icon in `public/social/`. The public link and artwork are available to preview crawlers without running the game.

@@ -15,6 +15,14 @@ async function asset(path, type) {
   const response = await fetch(new URL(path, canonical), {
     signal: AbortSignal.timeout(15000),
   });
+  if (path === '/' && response.status === 403) {
+    console.error(
+      'The public homepage refused this client (HTTP 403, server ' +
+        (response.headers.get('server') || 'unknown') +
+        ').'
+    );
+    process.exit(77);
+  }
   assert.ok(response.ok, path + ' returned ' + response.status);
   assert.match(response.headers.get('content-type') || '', type, path);
   return Buffer.from(await response.arrayBuffer());

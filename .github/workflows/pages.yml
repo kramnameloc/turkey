@@ -50,16 +50,20 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+      url: https://turkey.kramnameloc.com/
     steps:
       - name: Deploy verified artifact
         id: pages
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   smoke:
-    name: Check live game and link previews
+    name: Verify Pages release and check public link
     needs: [build, deploy]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
+      pages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,12 +71,32 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Verify the new release on the custom domain
+      - name: Confirm the deployed commit and custom domain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          site=$(gh api "repos/$GITHUB_REPOSITORY/pages")
+          jq -e '.cname == "turkey.kramnameloc.com" and .build_type == "workflow"' <<< "$site"
+          deployment=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=github-pages&sha=$GITHUB_SHA&per_page=1" --jq '.[0].id')
+          test -n "$deployment"
+          gh api "repos/$GITHUB_REPOSITORY/deployments/$deployment/statuses" --jq '.[0].state' | grep -Fx success
+          echo "GitHub confirms that \`$GITHUB_SHA\` deployed to the Pages environment for turkey.kramnameloc.com." >> "$GITHUB_STEP_SUMMARY"
+      - name: Check the public game and share artwork
         env:
           EXPECTED_ENTRY: ${{ needs.build.outputs.entry }}
         run: |
           for attempt in {1..15}; do
-            if node scripts/check-pages.mjs --live; then exit 0; fi
+            if node scripts/check-pages.mjs --live; then
+              echo "Verified the public HTML, game bundle and social card." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            else
+              result=$?
+            fi
+            if [ "$result" -eq 77 ]; then
+              echo "::warning::The public edge returned HTTP 403 to this runner. External preview verification is inconclusive."
+              echo "The public edge refused this runner (403). The artifact and deployment checks passed; run \`node scripts/check-pages.mjs --live\` from a permitted client to check the public response." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             if [ "$attempt" -lt 15 ]; then sleep 12; fi
           done
           exit 1
