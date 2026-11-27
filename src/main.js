@@ -1,4 +1,6 @@
 import './ui/style.css';
+import './ui/hud.css';
+import './ui/hud-layouts.css';
 import { render } from 'lit-html';
 import { COURSES, TRIP_HUNTS } from './gameplay/courses.js';
 import { SPAWN, fieldData, formatTime } from './maps/field-data.js';
@@ -15,7 +17,7 @@ import {
   resultsPanel,
   startAction,
 } from './ui/hunt-panels.js';
-import { button, loadingPanel, messagePanel } from './ui/panel.js';
+import { button, hudLayoutPicker, loadingPanel, messagePanel } from './ui/panel.js';
 
 const $ = (q) => document.querySelector(q),
   panel = $('#panel'),
@@ -28,6 +30,13 @@ let game,
   selectedSpot = 0,
   previousFocus = null;
 let timerEnabled = playerStorage.timer.get();
+
+function syncHudLayout() {
+  const layout = playerStorage.hudLayout.get();
+  $('.hud').dataset.layout = layout;
+  for (const picker of document.querySelectorAll('select[name="hud-layout"]'))
+    picker.value = layout;
+}
 
 function syncTimer() {
   $('#lobby-timer').textContent = timerEnabled
@@ -407,6 +416,12 @@ document.addEventListener('click', (e) => {
   if (a && !a.disabled && Object.hasOwn(actions, a.dataset.action))
     actions[a.dataset.action]();
 });
+document.addEventListener('change', (event) => {
+  if (event.target.name === 'hud-layout') {
+    playerStorage.hudLayout.set(event.target.value);
+    syncHudLayout();
+  }
+});
 panel.addEventListener('cancel', (e) => {
   e.preventDefault();
   closePanel();
@@ -449,6 +464,8 @@ if (!document.fullscreenEnabled) $('[data-action="fullscreen"]').hidden = true;
 $('#lobby-total').textContent =
   TRIP_HUNTS.length + ' hunts · ' + COURSES.length + ' days';
 fillIcons();
+render(hudLayoutPicker(), $('#lobby-hud-picker'));
+syncHudLayout();
 syncTimer();
 syncSound();
 syncFull();

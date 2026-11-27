@@ -41,11 +41,24 @@ test('blocked storage still allows settings and discoveries for this session', (
   assert.equal(player.timer.get(), true);
   assert.equal(player.mute.get(), false);
   player.timer.set(false);
+  player.hudLayout.set('supper-ticket');
   player.grail.collect();
   assert.equal(player.timer.get(), false);
+  assert.equal(player.hudLayout.get(), 'supper-ticket');
   assert.equal(player.grail.has(), true);
   assert.equal(player.best('hunt'), 0);
   assert.equal(player.recordBest('hunt', 42), false);
+});
+
+test('HUD layout defaults to Field Kit and remembers only supported layouts', () => {
+  const storage = browserStorage();
+  const player = createPlayerStorage(() => storage);
+  assert.equal(player.hudLayout.get(), 'field-kit');
+  storage.setItem('gobbler-hud-layout', 'unknown-layout');
+  assert.equal(player.hudLayout.get(), 'field-kit');
+  player.hudLayout.set('trail-atlas');
+  player.hudLayout.set('unknown-layout');
+  assert.equal(createPlayerStorage(() => storage).hudLayout.get(), 'trail-atlas');
 });
 
 test('a failed write keeps a setting usable and never announces an unsaved record', () => {

@@ -1,0 +1,522 @@
+#arena {
+  height: 100dvh;
+  width: 100%;
+  position: fixed;
+  inset: 0;
+  background: #769597;
+  touch-action: none;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+#scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: 0;
+}
+
+.hud {
+  --edge: clamp(12px, 2.2vmin, 28px);
+  --spruce: #142a23f2;
+  --brass: #ffc365;
+  --rim: #d3c5a16b;
+  --mint: #a3dfb8;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: 'objective nav clock' auto '. . .' 1fr 'map . kit' auto
+    / minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: max(var(--edge), env(safe-area-inset-top))
+    max(var(--edge), env(safe-area-inset-right))
+    max(var(--edge), env(safe-area-inset-bottom))
+    max(var(--edge), env(safe-area-inset-left));
+  pointer-events: none;
+  color: #fff4d9;
+}
+.hud button, .touch > * { pointer-events: auto; }
+.hud-mission, .hud-wayfinding { display: contents; }
+.hud-plate, #current-street {
+  border: 1px solid var(--rim);
+  border-radius: 5px;
+  background: var(--spruce);
+  box-shadow: 0 2px 5px #0b160f35;
+}
+.hud button.hud-plate:hover:enabled,
+.hud button.hud-plate:focus-visible { border-color: var(--brass); }
+.hud button:disabled { opacity: 1; cursor: default; }
+.hud kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1px solid #d7d7b966;
+  color: #f5efd9;
+  background: #ffffff0d;
+  font: 500 10px/15px var(--mono);
+  letter-spacing: 0;
+}
+.hud-objective {
+  grid-area: objective;
+  justify-self: start;
+  width: min(100%, 218px);
+  overflow: hidden;
+}
+.objective-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: #e9bd76;
+  color: #1a2a22;
+  font: 700 13px/1.1 var(--cond);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.objective-heading i { font-size: 12px; }
+.objective-body { padding: 7px 12px 10px; }
+#hunt-name {
+  display: block;
+  margin-bottom: 3px;
+  color: #e0e8d9;
+  font: 600 16px/1.05 var(--cond);
+}
+.capture-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+#counter, #time {
+  font: 800 34px/1 var(--cond);
+  font-variant-numeric: tabular-nums;
+}
+#capture-label {
+  max-width: 8ch;
+  align-self: center;
+  color: #d5dccb;
+  font: 500 11px/1.05 Barlow, sans-serif;
+}
+#progress-pips { display: flex; gap: 3px; margin-top: 6px; }
+#progress-pips b { flex: 1; height: 4px; border-radius: 1px; background: #5e7062; }
+#progress-pips b.filled { background: var(--brass); }
+
+.hud-navigation {
+  grid-area: nav;
+  position: relative;
+  justify-self: center;
+}
+#compass {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 46px;
+  padding: 5px 12px 5px 8px;
+  text-align: left;
+}
+.compass-dial {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 31px;
+  height: 31px;
+  border: 1px solid #d8c98f99;
+  border-radius: 50%;
+  background: #0e211b;
+}
+#compass-needle {
+  width: 7px;
+  height: 24px;
+  background: linear-gradient(var(--brass) 50%, #82968b 50%);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+#bearing { display: block; font: 700 17px/1.1 var(--cond); letter-spacing: .065em; }
+.compass-find { color: #e8c58d; font: 500 12px/1 Barlow, sans-serif; }
+.compass-find kbd { margin-left: 3px; }
+#compass[aria-pressed='true'] { border-color: var(--brass); }
+#compass:disabled .compass-find { display: none; }
+#trail-hint {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(34vw, 292px);
+  padding: 7px 10px;
+}
+.trail-dial {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--brass);
+  border: 1px solid var(--rim);
+  border-radius: 50%;
+}
+.trail-needle { width: 18px; height: 18px; }
+#trail-hint strong { display: block; font: 600 17px/1.1 var(--cond); }
+#trail-hint small { color: #f0cd93; font: 500 12px/1.15 Barlow, sans-serif; }
+
+.clock-box {
+  grid-area: clock;
+  justify-self: end;
+  margin-inline-end: 49px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+}
+.clock-box i { color: var(--brass); }
+#clock-label {
+  display: block;
+  color: #dedfc9;
+  font: 600 11px/1 var(--cond);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+#time { display: block; font-size: 29px; }
+.clock-box.urgent { border-color: #ffad88; background: #542d25f5; }
+.clock-box.urgent i, .clock-box.urgent #time { color: #ffd0a7; }
+.hud-pause { grid-area: clock; justify-self: end; display: grid; place-items: center; width: 44px; height: 46px; }
+
+.map-controls {
+  grid-area: map;
+  position: relative;
+  justify-self: start;
+  align-self: end;
+  display: grid;
+  gap: 4px;
+  width: min(100%, 150px);
+}
+.radar { display: block; overflow: hidden; text-align: left; }
+.map-face { display: block; }
+.map-cardinals, #gear-icon { display: none; }
+.radar canvas { display: block; width: 100%; height: auto; }
+.map-caption, #view-toggle, #current-street, #interact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 14px/1.1 var(--cond);
+}
+.map-caption, #view-toggle { padding: 5px 8px; }
+.map-caption { border-top: 1px solid var(--rim); }
+.map-caption b { font-weight: 700; letter-spacing: .055em; }
+.radar i, #view-toggle i, #current-street i, #interact i { color: var(--brass); }
+.radar kbd, #view-toggle kbd { margin-left: auto; }
+#view-toggle { text-align: left; }
+#view-toggle[aria-pressed='true'] i { color: var(--mint); }
+#current-street {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  width: max-content;
+  max-width: min(255px, 50vw);
+  padding: 4px 8px;
+}
+
+.hud-kit {
+  grid-area: kit;
+  align-self: end;
+  justify-self: end;
+  display: grid;
+  gap: 4px;
+  width: min(100%, 202px);
+}
+#vitals { display: flex; align-items: center; gap: 5px; padding: 4px 10px; color: var(--mint); }
+#vitals i { font-size: 12px; }
+#health-value { font: 700 18px/1 var(--cond); font-variant-numeric: tabular-nums; }
+#health-unit { font: 600 11px/1 var(--cond); text-transform: uppercase; }
+#health-meter {
+  flex: 1;
+  width: 0;
+  height: 5px;
+  margin-left: 4px;
+  overflow: hidden;
+  appearance: none;
+  border: 0;
+  border-radius: 3px;
+  background: #476055;
+  color: inherit;
+}
+#health-meter::-webkit-progress-bar { background: #476055; }
+#health-meter::-webkit-progress-value { background: currentColor; }
+#health-meter::-moz-progress-bar { background: currentColor; }
+#vitals.low { color: #ffae98; border-color: currentColor; }
+.equipment { display: grid; gap: 5px; padding: 9px 12px; text-align: left; }
+.gear-line, .weapon-stats { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+#gear-name { min-width: 0; overflow-wrap: anywhere; font: 700 24px/1 var(--cond); }
+.equipment:disabled kbd { display: none; }
+.weapon-stats { font: 500 11px/1.2 var(--mono); color: #d6ded0; }
+#net-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mint);
+  font-weight: 500;
+}
+#net-state::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+#net-state.recasting { color: var(--brass); }
+#switch-hint { padding-top: 5px; border-top: 1px solid #bfd2bf38; color: #dfd7bb; font: 500 12px/1.15 Barlow, sans-serif; }
+#switch-hint:empty { display: none; }
+#boosts { padding: 4px 8px; color: var(--brass); font: 600 14px/1.1 var(--cond); }
+
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid #fff9e1e0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #10201888;
+}
+#crosshair b { width: 3px; height: 3px; border-radius: 50%; background: #fff9e1; }
+#crosshair.aim { border: 2px solid var(--brass); background: #d98b2850; }
+.hud-prompts, #notice, #in-world-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.hud-prompts {
+  top: calc(50% + 22px);
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: max-content;
+  max-width: 80%;
+}
+#incoming, #interact, #notice:not(:empty), #in-world-label {
+  padding: 5px 10px;
+  border-radius: 4px;
+  line-height: 1.15;
+}
+#incoming { color: #332415; background: #ffcd86; font: 700 16px/1.15 var(--cond); }
+#interact { justify-content: center; border-color: var(--brass); }
+#notice, #in-world-label { background: var(--spruce); color: #fff4db; }
+#notice {
+  bottom: max(12%, 56px);
+  width: max-content;
+  max-width: min(46%, 620px);
+  font: 600 clamp(16px, 2vmin, 21px)/1.15 var(--cond);
+}
+#notice:not(:empty) { border-left: 3px solid var(--brass); }
+#in-world-label {
+  transform: translate(-50%, calc(-100% - 6px));
+  max-width: min(80%, 290px);
+  font: 600 15px/1.15 var(--cond);
+}
+#hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 42%,
+    #bc3c298f 78%,
+    #9d2d20 100%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  #hit-flash {
+    display: none;
+  }
+}
+
+.touch-mode {
+  --thumb-left: max(clamp(16px, 4.5vmin, 40px), env(safe-area-inset-left));
+  --thumb-right: max(clamp(16px, 4.5vmin, 40px), env(safe-area-inset-right));
+  --thumb-bottom: max(
+    clamp(14px, 4vmin, 34px),
+    calc(env(safe-area-inset-bottom) + 6px)
+  );
+  --stick-size: clamp(78px, 22vmin, 128px);
+  --cast-size: clamp(62px, 17vmin, 91px);
+  --flap-size: clamp(46px, 12vmin, 60px);
+  --radar-size: clamp(70px, 19vmin, 112px);
+  --hud-edge: clamp(8px, 2vmin, 19px);
+}
+.touch {
+  display: none;
+}
+body.touch-mode .touch {
+  display: block;
+}
+#stick,
+#touch-fire,
+#touch-flap {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid #f1ead299;
+  background: #19211cc9;
+  color: var(--cream);
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+#stick {
+  left: var(--thumb-left);
+  bottom: var(--thumb-bottom);
+  width: var(--stick-size);
+  height: var(--stick-size);
+  background: radial-gradient(
+    circle at center,
+    #bcc5aa16 0 48%,
+    #101c1480 49% 64%,
+    #263023a6 65%
+  );
+}
+#stick b {
+  width: 43%;
+  height: 43%;
+  pointer-events: none;
+  background: #eee9d49e;
+  border: 1px solid #f3efd9aa;
+  border-radius: 50%;
+}
+#touch-fire {
+  bottom: var(--thumb-bottom);
+  right: var(--thumb-right);
+  width: var(--cast-size);
+  height: var(--cast-size);
+  border-color: #ffce88d9;
+  background: #4a3622dd;
+  color: #ffe0a8;
+  font-size: clamp(20px, 5vmin, 28px);
+}
+#touch-flap {
+  bottom: calc(var(--thumb-bottom) + var(--cast-size) + 9px);
+  right: calc(var(--thumb-right) + 3px);
+  width: var(--flap-size);
+  height: var(--flap-size);
+  font-size: clamp(14px, 3vmin, 19px);
+}
+#touch-controls button span {
+  font: 700 clamp(10px, 2.4vmin, 13px)/1 var(--cond);
+  text-transform: uppercase;
+  letter-spacing: 0.095em;
+  margin-top: 2px;
+}
+#touch-flap.held,
+#touch-fire.held,
+#touch-flap:active {
+  color: #261c13;
+  background: #e6ad6c;
+}
+
+/* Thumb controls occupy the lower corners. Keep the map near the objective
+   and put the equipment switch in the space between the two hands. */
+.touch-mode .hud {
+  --edge: var(--hud-edge);
+  grid-template-areas: 'objective nav clock' 'map . .' '. . .' 'kit kit kit';
+  grid-template-rows: auto auto 1fr auto;
+  padding-bottom: var(--thumb-bottom);
+}
+.touch-mode .hud kbd { display: none; }
+.touch-mode .hud button { min-height: 44px; }
+.touch-mode .map-controls { align-self: start; width: var(--radar-size); }
+.touch-mode .map-caption, .touch-mode #view-toggle {
+  justify-content: center;
+  padding: 4px 2px;
+  gap: 4px;
+  font-size: 12px;
+}
+.touch-mode #current-street { top: calc(100% + 4px); bottom: auto; }
+.touch-mode .hud-kit {
+  justify-self: center;
+  width: min(202px, calc(100vw - 2 * max(var(--thumb-left) + var(--stick-size), var(--thumb-right) + var(--cast-size)) - 16px));
+  gap: 3px;
+}
+.touch-mode .equipment { gap: 4px; padding: 6px 8px; }
+.touch-mode #gear-name { font-size: 19px; }
+.touch-mode .weapon-stats { font-size: 10px; }
+.touch-mode #switch-hint { padding-top: 3px; font-size: 11px; }
+.touch-mode #notice { bottom: calc(var(--thumb-bottom) + 122px); max-width: min(70%, 460px); }
+
+@media (max-width: 650px) {
+  .hud {
+    grid-template: 'objective clock' auto 'nav nav' auto '. .' 1fr 'map kit' auto
+      / minmax(0, 1fr) auto;
+    gap: 5px;
+  }
+  .touch-mode .hud {
+    grid-template: 'objective clock' auto 'map nav' auto '. .' 1fr 'kit kit' auto
+      / minmax(0, 1fr) auto;
+  }
+  .hud-objective { width: min(100%, 180px); }
+  .objective-heading { padding: 4px 8px; font-size: 11px; gap: 5px; }
+  .objective-body { padding: 4px 8px 6px; }
+  #hunt-name { font-size: 14px; }
+  .capture-line { gap: 7px; }
+  #counter { font-size: 26px; }
+  #progress-pips { margin-top: 4px; gap: 2px; }
+  #progress-pips b { height: 3px; }
+  .clock-box { min-height: 44px; gap: 5px; padding: 4px 8px; }
+  #time { font-size: 24px; }
+  .hud-pause { height: 44px; }
+  .touch-mode .hud-navigation { justify-self: end; }
+  .touch-mode #trail-hint {
+    left: auto;
+    right: 0;
+    transform: none;
+    max-width: min(62vw, 250px);
+  }
+  .hud-kit { width: min(42vw, 175px); }
+  .map-controls { width: min(100%, 108px); }
+  .touch-mode #vitals { padding: 3px 6px; }
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  .hud { --edge: 8px; gap: 4px; }
+  .objective-heading { padding-block: 3px; }
+  .objective-body { padding-block: 4px; }
+  #counter, #time { font-size: 24px; }
+  .map-controls { width: 100px; }
+  .touch-mode .map-controls {
+    grid-template-columns: var(--radar-size) auto;
+    width: max-content;
+    align-items: start;
+  }
+  .touch-mode #view-toggle { flex-direction: column; min-width: 44px; max-width: 64px; }
+  .touch-mode .hud-kit {
+    grid-area: auto;
+    position: absolute;
+    left: 50%;
+    bottom: var(--thumb-bottom);
+    transform: translateX(-50%);
+    width: min(328px, calc(100vw - 2 * (var(--thumb-right) + var(--cast-size) + var(--flap-size) + 16px)));
+    grid-template-columns: minmax(80px, .7fr) minmax(0, 1.65fr);
+    align-items: stretch;
+  }
+  .touch-mode #vitals {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-content: center;
+    gap: 3px;
+    padding: 4px 6px;
+  }
+  .touch-mode #health-meter { grid-column: 1 / -1; width: 100%; margin: 3px 0 0; }
+  .touch-mode #vitals[hidden] + .equipment, .touch-mode #boosts { grid-column: 1 / -1; }
+  .touch-mode #touch-flap {
+    bottom: calc(var(--thumb-bottom) + var(--cast-size) * .56);
+    right: calc(var(--thumb-right) + var(--cast-size) + 10px);
+  }
+  .touch-mode #notice {
+    bottom: calc(var(--thumb-bottom) + 104px);
+    max-width: 45%;
+    font-size: 15px;
+  }
+}

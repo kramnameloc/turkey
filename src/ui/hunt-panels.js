@@ -2,7 +2,7 @@ import { html, nothing } from 'lit-html';
 import { COURSES, TRIP_CAPTURES } from '../gameplay/courses.js';
 import { DISHES, formatTime } from '../maps/field-data.js';
 import { icon } from './icons.js';
-import { button, heading } from './panel.js';
+import { button, heading, hudLayoutPicker } from './panel.js';
 
 export function startAction(mode) {
   return {
@@ -27,6 +27,7 @@ export function pausePanel(game, timerEnabled) {
           : 'Play at your own pace.');
   return html`${heading('FIELD BREAK', parade ? 'Parade paused' : 'Hunt paused')}
     <p class="panel-text">${text}</p>
+    ${hudLayoutPicker()}
     <div class="panel-actions">${button('Resume', 'resume', true, 'focus')}
       <button class="secondary" data-action="timer" aria-label="Hunt timer">${icon('clock')}
         Hunt timer · <span id="pause-timer-state"></span></button>

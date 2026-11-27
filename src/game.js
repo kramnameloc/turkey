@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { render } from 'lit-html';
 import { addRegion, buildWorld } from './world.js';
 import { courseMaps } from './world/course-maps.js';
 import { streetLocator } from './maps/street-location.js';
@@ -18,6 +19,7 @@ import { downstairsHeadroom } from './world/dover/downstairs.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './world/dover/location.js';
 import { CORNUCOPIA, WEAPONS, dealDamage } from './gameplay/weapons.js';
 import { EnemyHealthBars } from './ui/enemy-health-bars.js';
+import { icon } from './ui/icons.js';
 import { FoodFight } from './gameplay/foodfight.js';
 import { Flurries } from './world/flurries.js';
 import { COURSES, COURSE_TIME, MAX_HEALTH, coursePoint, rollSnow } from './gameplay/courses.js';
@@ -1130,15 +1132,24 @@ export class Hunt {
   setHUD() {
     const untimed = this.untimed,
       parade = this.mode === 'parade';
-    $('#progress-pips').hidden = untimed;
+    const dest = this.pendingDestination;
+    const onRoute = this.arrivalAtDover || !!dest;
+    const capturing = !untimed && !onRoute;
+    const captures = this.huntCaptures;
+    $('#progress-pips').hidden = !capturing;
     this.pips.forEach((pip, i) => {
       pip.hidden = i >= this.targets.length;
-      pip.classList.toggle('filled', !!this.targets[i]?.caught);
+      pip.classList.toggle('filled', i < captures);
     });
     const toolId = this.fight.wide && this.weapon.id === 'net' ? 'wide' : this.weapon.id;
     for (const tool of Object.values(this.tools)) tool.visible = tool.name === toolId;
     for (const tool of this.avatar.gear.children) tool.visible = tool.name === toolId;
     const gearName = toolId === 'wide' ? 'Wishbone slinger' : this.weapon.name;
+    const gearIcon = $('#gear-icon');
+    if (gearIcon.dataset.tool !== toolId) {
+      render(icon(toolId), gearIcon);
+      gearIcon.dataset.tool = toolId;
+    }
     $('#gear-name').textContent = gearName;
     $('#weapon-damage').textContent = this.weapon.damage + ' DMG';
     const switcher = $('#weapon-switch');
@@ -1149,9 +1160,14 @@ export class Hunt {
     $('#switch-hint').textContent = [switcher.disabled ? '' : 'Switch', nextHint]
       .filter(Boolean).join(' · ');
     $('#vitals').hidden =
-      untimed && !this.streetParade?.chasers.size && this.fight.health === 100;
+      untimed && !this.streetParade?.chasers.size && this.fight.health === MAX_HEALTH;
     $('#health-value').textContent = this.fight.health;
-    $('#vitals').classList.toggle('low', this.fight.health <= 35);
+    $('#health-meter').value = this.fight.health;
+    const lowHealth = this.fight.health <= 35;
+    $('#vitals').classList.toggle('low', lowHealth);
+    $('#health-unit').textContent = lowHealth ? 'HP · Low' : 'HP';
+    $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
+    $('#net-state').classList.toggle('recasting', !!this.cooldown);
     const bonuses = [
       this.fight.wide ? 'Wide casts ×' + this.fight.wide : '',
       this.fight.speed ? 'Boots ' + Math.ceil(this.fight.speed) + 's' : '',
@@ -1166,36 +1182,38 @@ export class Hunt {
         : this.fight.warning();
     $('#incoming').textContent = warning;
     $('#incoming').hidden = !warning;
-    $('#counter').previousElementSibling.textContent = untimed
-      ? 'MODE'
-      : this.mode === 'campaign'
-        ? 'DAY ' +
-          (this.level + 1) +
-          ' · HUNT ' +
-          (this.huntIndex + 1) +
-          '/' +
-          this.course.hunts.length
-        : 'DISHES CAPTURED';
-    $('#counter').textContent = untimed
-      ? parade
-        ? 'Balloon parade'
-        : 'Free roam'
-      : this.huntCaptures + ' / ' + this.targets.length;
-    $('.clock-box').hidden = !this.timerEnabled;
-    $('#time').previousElementSibling.textContent = untimed
-      ? 'TIME AFIELD'
-      : 'SUPPER IN';
-    $('#time').textContent = formatTime(
-      untimed
-        ? this.elapsed
-        : Math.max(0, Math.ceil(this.timeLimit - this.countdownElapsed))
-    );
+    const hunt = this.currentHunt;
+    const huntName = $('#hunt-name');
+    huntName.hidden = !capturing || !hunt;
+    if (!huntName.hidden) huntName.textContent = hunt.name;
+    $('#capture-label').hidden = !capturing;
+    const objective = $('#objective-label');
+    const counter = $('#counter');
+    if (onRoute) {
+      objective.textContent = 'Destination';
+      counter.textContent = dest?.name ?? '735 Dover St';
+    } else if (untimed) {
+      objective.textContent = 'Mode';
+      counter.textContent = parade ? 'Balloon parade' : 'Free roam';
+    } else {
+      objective.textContent = hunt
+        ? `Day ${this.level + 1} · Hunt ${this.huntIndex + 1}/${this.course.hunts.length}`
+        : this.mode === 'city' ? 'Citywide hunt' : 'Community Park';
+      counter.textContent = captures + ' / ' + this.targets.length;
+    }
+    const remaining = Math.max(0, Math.ceil(this.timeLimit - this.countdownElapsed));
+    const clock = $('.clock-box');
+    clock.hidden = !this.timerEnabled;
+    clock.classList.toggle('urgent', capturing && remaining <= 20);
+    $('#clock-label').textContent = onRoute ? 'Supper clock' : untimed ? 'Time afield' : 'Supper in';
+    $('#time').textContent = onRoute ? 'Held' : formatTime(untimed ? this.elapsed : remaining);
     const bearing = ((((-this.yaw * 180) / Math.PI) % 360) + 360) % 360;
     $('#bearing').textContent =
       directions[Math.round(bearing / 45) % 8] +
       '  ' +
       String(Math.round(bearing) % 360).padStart(3, '0') +
       '°';
+    $('#compass-needle').style.transform = 'rotate(' + this.yaw + 'rad)';
     const p = this.camera.position;
     const bounds = this.data.bounds;
     const inPark =
@@ -1214,7 +1232,6 @@ export class Hunt {
       this.streetText.textContent = street;
       this.streetLabel.hidden = !street;
     }
-    const dest = this.pendingDestination;
     const prompt =
       dest && Math.hypot(p.x - dest.x, p.z - dest.z) <= 3
         ? dest.prompt
@@ -1223,12 +1240,6 @@ export class Hunt {
     $('#interact-name').textContent = prompt;
     $('#compass').disabled =
       !!dest || this.trackingDover || this.house.inside || untimed;
-    if (this.arrivalAtDover || dest) {
-      $('#time').previousElementSibling.textContent = 'SUPPER CLOCK';
-      $('#time').textContent = 'Held';
-      $('#counter').previousElementSibling.textContent = 'DESTINATION';
-      $('#counter').textContent = dest?.name ?? '735 Dover St';
-    }
     if (this.house.inside) {
       this.house.drawRadar($('#radar'), p, this.yaw);
       return;
@@ -1481,7 +1492,6 @@ export class Hunt {
           ' m · ' + target.health + '/' + target.maxHealth + ' HP';
       }
       this.guide.update(this, target?.isParadeParticipant ? null : target);
-      $('#net-state').textContent = this.cooldown ? 'RECASTING' : 'READY';
     }
     this.healthBars.update(this.targets, this.streetParade?.chasers, p, this.viewCamera);
     if (this.venue && !this.house.inside) this.venue.update?.(this.elapsed);

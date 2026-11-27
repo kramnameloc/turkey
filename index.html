@@ -131,6 +131,7 @@
               <i data-i="controller"></i>How to play
             </button>
           </div>
+          <div id="lobby-hud-picker"></div>
         </div>
       </section>
       <section class="intel" aria-label="Hunt information">
@@ -171,80 +172,84 @@
         aria-label="Three-dimensional Colorado hunting grounds"
       ></canvas>
       <div id="hit-flash" aria-hidden="true"></div>
-      <div class="hud">
-        <div class="hud-top">
-          <div class="hud-box">
-            <small>DISHES CAPTURED</small><strong id="counter"></strong>
-            <div id="progress-pips" aria-hidden="true"></div>
-            <div id="vitals" aria-label="Health">
-              <span aria-hidden="true">♥</span>
-              <span id="health-value">100</span> HP
+      <div class="hud" data-layout="field-kit">
+        <div class="hud-mission">
+          <div class="hud-objective hud-plate">
+            <div class="objective-heading">
+              <i data-i="flag"></i><span id="objective-label"></span>
             </div>
-            <span id="boosts" hidden></span>
+            <div class="objective-body">
+              <span id="hunt-name" hidden></span>
+              <div class="capture-line">
+                <strong id="counter"></strong><span id="capture-label">Dishes captured</span>
+              </div>
+              <div id="progress-pips" aria-hidden="true"></div>
+            </div>
           </div>
-          <button
-            id="compass"
-            class="hud-btn"
-            aria-label="Show navigation arrows to the next dish"
-            aria-pressed="false"
-            title="Find the next dish (H)"
-          >
-            <span id="bearing">N</span
-            ><span class="compass-find">FIND DISH</span>
-          </button>
-          <div class="hud-box clock-box">
-            <small>SUPPER IN</small><strong id="time">5:00</strong>
+          <div class="clock-box hud-plate">
+            <i data-i="clock"></i>
+            <div><small id="clock-label">Supper in</small><strong id="time">5:00</strong></div>
           </div>
-          <button
-            class="icon-button hud-btn"
-            data-action="pause"
-            aria-label="Pause hunt"
-          >
-            <i data-i="pause"></i>
-          </button>
         </div>
-        <div id="trail-hint" hidden>
-          <span class="trail-dial" aria-hidden="true"
-            ><svg class="trail-needle" viewBox="0 0 32 32">
-              <path d="M16 2 27 27 16 21 5 27Z" fill="currentColor" /></svg
-          ></span>
-          <div><strong></strong><small></small></div>
-        </div>
-        <div id="crosshair" aria-hidden="true"><b></b></div>
-        <div id="in-world-label" hidden></div>
-        <div id="incoming" hidden></div>
-        <div id="notice" role="status"></div>
-        <button id="interact" hidden>
-          <i data-i="door"></i><span id="interact-name"></span><kbd>G</kbd>
+        <button class="hud-pause hud-plate" data-action="pause" aria-label="Pause hunt" title="Pause (P)">
+          <i data-i="pause"></i>
         </button>
-        <div class="hud-bottom">
+        <div class="hud-wayfinding">
+          <div class="hud-navigation">
+            <button id="compass" class="hud-plate" aria-label="Show navigation arrows to the next dish"
+              aria-describedby="bearing" aria-pressed="false" title="Find the next dish (H)">
+              <span class="compass-dial" aria-hidden="true"><b id="compass-needle"></b></span>
+              <span class="compass-readout"><strong id="bearing">N</strong>
+                <span class="compass-find">Find dish <kbd>H</kbd></span>
+              </span>
+            </button>
+            <div id="trail-hint" class="hud-plate" hidden>
+              <span class="trail-dial" aria-hidden="true">
+                <svg class="trail-needle" viewBox="0 0 32 32">
+                  <path d="M16 2 27 27 16 21 5 27Z" fill="currentColor" />
+                </svg>
+              </span>
+              <div><strong></strong><small></small></div>
+            </div>
+          </div>
           <div class="map-controls">
             <div id="current-street" role="status" aria-label="Current street" hidden>
               <i data-i="pin"></i><span></span>
             </div>
-            <button
-              class="radar"
-              data-action="map"
-              title="Open hunt map"
-              aria-label="Open hunt map"
-            >
-              <canvas id="radar" width="200" height="160"></canvas
-              ><span><i data-i="map"></i> <b id="radar-label">HUNT MAP</b> <kbd>M</kbd></span>
+            <button class="radar hud-plate" data-action="map" title="Open hunt map" aria-label="Open hunt map">
+              <span class="map-face">
+                <canvas id="radar" width="200" height="160"></canvas>
+                <span class="map-cardinals" aria-hidden="true"><b>N</b><b>E</b><b>S</b><b>W</b></span>
+              </span>
+              <span class="map-caption"><i data-i="map"></i> <b id="radar-label">HUNT MAP</b> <kbd>M</kbd></span>
             </button>
-            <button
-              id="view-toggle"
-              aria-pressed="false"
-              title="Switch camera (V)"
-            >
-              <i data-i="camera"></i><span id="view-name">First person</span
-              ><kbd>V</kbd>
+            <button id="view-toggle" class="hud-plate" aria-pressed="false" title="Switch camera (V)">
+              <i data-i="camera"></i><span id="view-name">First person</span><kbd>V</kbd>
             </button>
           </div>
-          <button class="equipment" id="weapon-switch" title="Switch capture weapon (R)">
-            <strong id="gear-name">Harvest Net</strong>
-            <span class="weapon-stats"><b id="weapon-damage">24 DMG</b> · <span id="net-state">READY</span></span>
-            <small><span id="switch-hint">Next at 2 captures</span> <kbd>R</kbd></small>
+        </div>
+        <div id="crosshair" aria-hidden="true"><b></b></div>
+        <div id="in-world-label" hidden></div>
+        <div class="hud-prompts">
+          <div id="incoming" hidden></div>
+          <button id="interact" class="hud-plate" hidden>
+            <i data-i="door"></i><span id="interact-name"></span><kbd>G</kbd>
           </button>
+        </div>
+        <div id="notice" role="status"></div>
+        <div class="hud-kit">
+          <div id="vitals" class="hud-plate">
+            <i data-i="heart"></i><strong id="health-value">100</strong>
+            <span id="health-unit">HP</span>
+            <progress id="health-meter" aria-label="Health" max="100" value="100"></progress>
+          </div>
+          <button class="equipment hud-plate" id="weapon-switch" title="Switch capture weapon (R)">
+            <i id="gear-icon" aria-hidden="true"></i>
+            <span class="gear-line"><strong id="gear-name">Harvest Net</strong><kbd>R</kbd></span>
+            <span class="weapon-stats"><span id="weapon-damage">24 DMG</span><b id="net-state">Ready</b></span>
+            <small id="switch-hint">Next at 2 captures</small>
+          </button>
+          <span id="boosts" class="hud-plate" hidden></span>
         </div>
         <div class="touch" id="touch-controls">
           <div id="stick" role="group" aria-label="Movement joystick">

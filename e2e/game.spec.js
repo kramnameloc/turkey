@@ -84,6 +84,9 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
   await expect(page.locator('#counter')).toHaveText('0 / 2', {
     timeout: 90_000,
   });
+  await expect(page.locator('#objective-label')).toHaveText('Day 1 · Hunt 1/3');
+  await expect(page.locator('#hunt-name')).toHaveText('Terminal West');
+  await expect(page.locator('#progress-pips b:visible')).toHaveCount(2);
   await expect(page.locator('#panel')).not.toBeVisible();
   const scene = page.locator('#scene');
   await expect(scene).toBeFocused();
@@ -121,6 +124,7 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
   await dialog.getByRole('button', { name: 'Mute audio' }).click();
   await expect(dialog.getByRole('button', { name: 'Enable audio' })).toHaveAttribute('aria-pressed', 'false');
   await dialog.getByRole('button', { name: 'Hunt timer' }).click();
+  await expect(page.locator('.clock-box')).toBeHidden();
   await expect(
     dialog.getByRole('button', { name: 'Hunt timer' })
   ).toBeFocused();
@@ -151,6 +155,8 @@ test('a failed player model can be retried into a working parade visit', async (
   await expect(page.locator('#counter')).toHaveText('Balloon parade', {
     timeout: 90_000,
   });
+  await expect(page.locator('#capture-label')).toBeHidden();
+  await expect(page.locator('#progress-pips')).toBeHidden();
   await expect(dialog).toHaveCount(0);
   await page.keyboard.press('m');
   const balloons = dialog.getByRole('combobox', { name: 'WATCH A BALLOON' });

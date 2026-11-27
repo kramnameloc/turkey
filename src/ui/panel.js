@@ -1,5 +1,18 @@
 import { html, nothing } from 'lit-html';
 import { icon } from './icons.js';
+import { HUD_LAYOUTS, playerStorage } from '../player/storage.js';
+
+export function hudLayoutPicker() {
+  const selected = playerStorage.hudLayout.get();
+  return html`<label class="hud-picker">
+    <span>HUD layout</span>
+    <select name="hud-layout">
+      ${Object.entries(HUD_LAYOUTS).map(([id, name]) =>
+        html`<option value=${id} ?selected=${selected === id}>${name}</option>`
+      )}
+    </select>
+  </label>`;
+}
 
 export function heading(kicker, title) {
   return html`<div class="panel-kicker"><span class="dash"></span>${kicker}</div>

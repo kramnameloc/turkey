@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turkey Takeover HUD layouts</title>
+  <style>
+    :root { color-scheme: dark; background: #13231e; color: #f7eed8; font-family: Barlow, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { max-width: 1600px; margin: auto; padding: clamp(16px, 3vw, 44px); }
+    header { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid #475a4b; }
+    h1, h2 { font-family: "Barlow Condensed", "Avenir Next Condensed", sans-serif; margin: 0; line-height: 1; }
+    h1 { font-size: clamp(2rem, 4.5vw, 3.5rem); }
+    header p { margin: 8px 0 0; color: #c8d1bf; }
+    fieldset { display: flex; gap: 4px; margin: 0; padding: 0; border: 0; }
+    label { display: grid; place-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #708476; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    input:checked + label { background: #eabe78; color: #1b3027; border-color: #eabe78; }
+    input:focus-visible + label, a:focus-visible, summary:focus-visible { outline: 3px solid #ffcc84; outline-offset: 3px; }
+    .concepts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: clamp(12px, 2vw, 28px); padding: 20px 0; background: #13231e; }
+    figure { margin: 0; min-width: 0; }
+    figcaption { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0 0 10px; }
+    h2 { font-size: clamp(1.4rem, 2.5vw, 2rem); }
+    figcaption small { font-size: .77rem; color: #cfceb8; }
+    .shot { display: grid; place-items: center; padding: 8px; background: #1c3028; border: 1px solid #495a4c; border-radius: 5px; }
+    .shot:hover { border-color: #eabe78; }
+    .shot img { display: block; width: 100%; object-fit: contain; }
+    .phone img { height: min(58vh, 600px); }
+    .landscape, .desktop { display: none; }
+    body:has(#landscape:checked, #desktop:checked) .phone { display: none; }
+    body:has(#landscape:checked) .landscape { display: grid; }
+    body:has(#desktop:checked) .desktop { display: grid; }
+    figure p, details p { margin: 9px 0; color: #d0d8c9; font-size: .92rem; line-height: 1.45; }
+    a { color: #ffd591; }
+    .notes { border-top: 1px solid #475a4b; padding-top: 14px; color: #c5cfbf; }
+    summary { cursor: pointer; width: fit-content; font-size: .88rem; }
+    .notes details { margin: 8px 0; }
+    pre { padding: 12px; background: #1c3028; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+    @media (max-width: 690px) {
+      .concepts { grid-template-columns: minmax(0,1fr); gap: 24px; }
+      .phone img { height: min(68vh, 640px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Turkey Takeover HUD</h1><p>In-game views from Community Park</p></div>
+    <fieldset aria-label="Preview size">
+      <input id="phone" name="size" type="radio" checked><label for="phone">Portrait</label>
+      <input id="landscape" name="size" type="radio"><label for="landscape">Landscape</label>
+      <input id="desktop" name="size" type="radio"><label for="desktop">Desktop</label>
+    </fieldset>
+  </header>
+  <main>
+    <section class="concepts" aria-label="HUD designs">
+      <figure>
+        <figcaption><h2>Field Kit</h2><small>Default</small></figcaption>
+        <a class="shot phone" href="playable/field-kit-portrait.jpg"><img src="playable/field-kit-portrait.jpg" alt="Field Kit in portrait. Health and Harvest Net sit between the movement stick and Cast."></a>
+        <a class="shot landscape" href="playable/field-kit-landscape.jpg"><img src="playable/field-kit-landscape.jpg" alt="Field Kit on a landscape phone. The radar and camera sit below the objective."></a>
+        <a class="shot desktop" href="playable/field-kit-desktop.jpg"><img src="playable/field-kit-desktop.jpg" alt="Field Kit on desktop. The objective, compass and supper clock sit along the top."></a>
+        <p>The gold header marks the objective. A green health bar sits beside the equipped tool.</p>
+      </figure>
+      <figure>
+        <figcaption><h2>Trail Atlas</h2></figcaption>
+        <a class="shot phone" href="playable/trail-atlas-portrait.jpg"><img src="playable/trail-atlas-portrait.jpg" alt="Trail Atlas in portrait. A circular map and compass share the upper left corner."></a>
+        <a class="shot landscape" href="playable/trail-atlas-landscape.jpg"><img src="playable/trail-atlas-landscape.jpg" alt="Trail Atlas on a landscape phone. The dish finder and camera sit to the right of the circular map."></a>
+        <a class="shot desktop" href="playable/trail-atlas-desktop.jpg"><img src="playable/trail-atlas-desktop.jpg" alt="Trail Atlas on desktop, with a circular map on the left and a cream scorecard on the right."></a>
+        <p>The circular map groups your bearing, dish finder, and camera control in one place.</p>
+      </figure>
+      <figure>
+        <figcaption><h2>Supper Ticket</h2></figcaption>
+        <a class="shot phone" href="playable/supper-ticket-portrait.jpg"><img src="playable/supper-ticket-portrait.jpg" alt="Supper Ticket in portrait. A cream diner ticket pairs the supper clock and capture count."></a>
+        <a class="shot landscape" href="playable/supper-ticket-landscape.jpg"><img src="playable/supper-ticket-landscape.jpg" alt="Supper Ticket on a landscape phone. A cranberry equipment card sits between the movement stick and the action buttons."></a>
+        <a class="shot desktop" href="playable/supper-ticket-desktop.jpg"><img src="playable/supper-ticket-desktop.jpg" alt="Supper Ticket on desktop, with a cranberry equipment card in the lower right corner."></a>
+        <p>A diner order slip pairs dishes captured with time until supper. The equipment card uses cranberry ink.</p>
+      </figure>
+    </section>
+    <details class="notes">
+      <summary>Original mockups and capture notes</summary>
+      <p>All nine views show the playable game. Phone captures use a 390 × 844 viewport in both orientations. Desktop captures use a 1440 × 810 viewport.</p>
+      <p>Original design studies · <a href="mobile-comparison.jpg">Phone comparison</a> · <a href="trail-atlas.png">Trail Atlas desktop</a> · <a href="supper-ticket.png">Supper Ticket desktop</a></p>
+      <details><summary>Trail Atlas, desktop</summary><pre>Use case: ui-mockup. Make one polished, shippable desktop game HUD over Image 1, the exact 16:9 gameplay frame from Turkey Takeover. Image 2 is the actual radar and supplies its map pixels and orange diamond markers. The idea is “Trail Atlas”: an asymmetric, map-first HUD inspired by printed Colorado orienteering maps and a handheld trail compass. Do not print the concept name. Lock the entire underlying 3D frame, crop, original pixel style, turkey, cartoon corn, balloons, horizon, greenery and light. Render every UI piece flat and straight-on at actual gameplay scale. The central 65% of the image stays clear except for a tiny white ring reticle at the exact center and the compact one-line hazard below it, “Brussels toot ahead · Dodge!”.
+Top left, a compact 160px circular north-up woodland-green cartographic instrument, thin parchment survey rings with discreet cardinal marks, actual aerial radar inside, small cream player arrow, orange diamond pins. Immediately below the dial is a two-line narrow dark navigation tab, first “W 284°” with “Find dish [H]”, then “Hunt map [M]” and “Chase cam [V]”. Use little drawn keycaps, not literal square brackets. Top right, a very compact map-legend style plate, deep spruce ink on warm ivory, orange flag, “Dishes captured” and large “0 / 12” with a subordinate row for “Supper in 4:15”. Adjacent pause icon. Lower right, a compact spruce panel with pale letters and mint health stripe “100 HP”, “Harvest Net”, “24 DMG · READY” and “Next at 2 captures”. Use excellent small typography: condensed legible sans values, cartographic micro-labels. Restrained angular contours, a consistent 26px edge inset, confident hairlines. Retain all specified controls once. No concept title, no extra labels, no tutorial, no external presentation border, no new characters, no modifications to the actual gameplay world. Frame ratio must be 16:9.</pre></details>
+      <details><summary>Supper Ticket, desktop</summary><pre>Use case: ui-mockup. Create one finished desktop game HUD over Image 1, a locked 16:9 Turkey Takeover gameplay screenshot. Image 2 supplies the actual radar pixels. Concept: a 1950s American diner order ticket for a Thanksgiving food fight, cheerful and easy to scan. Never display the concept name. Use the exact same unaltered screenshot composition, 3D low-poly turkey and corn, distant balloons and sky as Image 1. Flat head-up overlay only. No changes to the terrain or game art. Upper left, a little horizontally oriented cream order slip with cranberry-red ink, perforated bottom edge, slim red rule and two typographic columns: “Dishes captured” above a bold “0 / 12”, “Supper in” above bold “4:15”. An index-card feel, large condensed athletic numbers, without shiny chrome or fake wood. Upper middle just a modest forest-green horizontal lozenge “W 284°” and “Find dish [H]”; upper right one small cream pause button. Lower left, small rectangular actual aerial minimap from Image 2 in a slim cream ticket frame with orange dish diamonds and a player arrow; footers “Hunt map [M]” and “Chase cam [V]”. Lower right, deep cranberry equipment tab, a simple illustrated harvest-net silhouette beside “Harvest Net”, “24 DMG · READY” and discreet “Next at 2 captures” with a narrow pale top strip for “100 HP” and a small full health meter. Center: a tiny white reticle ring and a very short ochre warning below, reading “Brussels toot ahead · Dodge!”. Make keyboard letters in real little outlined keycaps. Text must be spelled exactly. Keep all panels close to corners with a generous, uncluttered view for the turkey; each peripheral grouping should occupy less than a fifth of the frame width. Quality: restrained, polished, tactile screenprint design with tiny ink details. No scene redesign, no title, no invented copy or counters, no jokes or other HUD items, no board framing. 16:9 landscape.</pre></details>
+      <details><summary>Trail Atlas, phone</summary><pre>Use case: ui-mockup. Deliver a single full-bleed vertical 390:844 phone screenshot of a 3D turkey game. Image 1 is the actual HUD-free portrait phone playfield; preserve its exact pixel composition, colors, low-poly art, horizon, central cartoon corn, rear-view turkey and position of the turkey. Image 2 is the matching DESKTOP art direction; adapt its visual vocabulary for a PHONE. Image 3 is a phone layout reference for the size and location of the touch controls. The phone frame is the output; do not draw a physical device or a presentation background. Every control must fit within the screenshot edges. Large thumb joystick bottom-left, two separate round buttons 'Flap' and 'Cast' lower-right, a single compact equipment readout between the two hands reading '100 HP', 'Harvest Net', '24 DMG · READY', 'Next at 2 captures'. The small reticle is centered and most of the screen is open. No desktop keyboard letters or keycaps anywhere. Keep every requested HUD element once and only once. No invented labels, no promotional headline. All graphics are 2D overlays. Adapt the orienteering compass concept. Upper left: one small circular spruce-and-cream north-up aerial map with orange diamond dish markers, a precise cream compass ring and cardinal letters. Its compact tabs below read 'W 284°', 'Find dish', 'Hunt map' and 'Chase cam'. Top right: a modest cream map-legend card with orange flag icon, 'Dishes captured' and '0 / 12', and a smaller 'Supper in 4:15' row. Give Pause its own identifiable touch button. The bottom kit is green and cream with a mint health indicator. Match the desktop concept's subtle angular edges and cartographic linework; make controls feel usable by thumb. Accurate saturated warm ivory and deep spruce colors. Preserve the portrait crop and resolution ratio.</pre></details>
+      <details><summary>Supper Ticket, phone</summary><pre>Use case: ui-mockup. Deliver a single full-bleed vertical 390:844 phone screenshot of a 3D turkey game. Image 1 is the actual HUD-free portrait phone playfield; preserve its exact pixel composition, colors, low-poly art, horizon, central cartoon corn, rear-view turkey and position of the turkey. Image 2 is the matching DESKTOP art direction; adapt its visual vocabulary for a PHONE. Image 3 is a phone layout reference for the size and location of the touch controls. The phone frame is the output; do not draw a physical device or a presentation background. Every control must fit within the screenshot edges. Large thumb joystick bottom-left, two separate round buttons 'Flap' and 'Cast' lower-right, a single compact equipment readout between the two hands reading '100 HP', 'Harvest Net', '24 DMG · READY', 'Next at 2 captures'. The small reticle is centered and most of the screen is open. No desktop keyboard letters or keycaps anywhere. Keep every requested HUD element once and only once. No invented labels, no promotional headline. All graphics are 2D overlays. Adapt the diner's order-slip concept. Upper left: a small perforated cream slip with cranberry-red type in two columns reading 'Dishes captured', '0 / 12', 'Supper in', '4:15'. Pause control top right. Below the order slip: left, a small cream-framed north-up aerial radar with orange dish diamonds, with 'Hunt map' and 'Chase cam' tap targets; right, a small evergreen compass lozenge with 'W 284°' and 'Find dish'. Keep these elements above the horizon for portrait mobile. Bottom center gear card is cranberry and cream with a mint health stripe and the simple net illustration from Image 2. Make the joystick and separate Cast and Flap buttons fit the same warm diner palette. Use expressive headline lettering only for the largest numerals and highly readable letters for controls, including their capitalization. Preserve the portrait crop and resolution ratio.</pre></details>
+    </details>
+  </main>
+</body>
+</html>
