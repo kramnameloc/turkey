@@ -4,7 +4,7 @@ Play at [turkey.kramnameloc.com](https://turkey.kramnameloc.com/). A Three.js tu
 
 ## Play locally
 
-Use Node.js 22.12+ or a newer supported release.
+Use Node.js 24 to match GitHub Actions. With nvm, run `nvm install` in the project directory to select the version in `.nvmrc`.
 
 ```sh
 npm ci
@@ -105,19 +105,25 @@ Grass by Georgeous supplies three clumps for mown lawns, dormant meadow grass, a
 
 ## Build and test
 
+To preview the verified Pages build locally, run
+
 ```sh
-npm run build
+npm run build:pages
 npm run preview
 ```
 
-For the full local check, install the test browsers once after `npm ci`. The exporter tests use the Python 3 standard library.
+Use `npm run check:quick` while developing. It lints, runs the Node and Python tests, builds `dist/` and verifies the production assets. The exporter tests need only the Python 3 standard library.
+
+For the full check, install the Playwright browsers after `npm ci` and again when the Playwright version changes. On a fresh Linux machine, use `npm run browsers:install -- --with-deps` to install the system libraries as well.
 
 ```sh
-npx playwright install chromium webkit
+npm run browsers:install
 npm run check
 ```
 
-`npm run check` runs Oxlint, the Node suite, and the Python suite before building and verifying the production assets. Playwright then starts a dedicated loopback preview and exercises that build in desktop Chromium and mobile-emulated WebKit. Failures retain a trace in `test-results/`. For shorter iterations, use `npm test` for JavaScript and DOM tests or `npm run test:exporters` for the Python suite. Run `npm run build && npm run test:e2e` to check browser flows alone.
+`npm run check` adds desktop Chromium and mobile-emulated WebKit tests against the build from `check:quick`. Playwright starts its own loopback preview. To run a single browser against a fresh build, use `npm run test:e2e -- --project=mobile-webkit`. When iterating on a spec against an existing build, use `npm run test:e2e:built -- e2e/game.spec.js`.
+
+Failures keep a trace in `test-results/`. On GitHub Actions, download the `playwright-failures-<attempt>` artifact from the failed run within seven days. Open an extracted trace locally with `npx playwright show-trace path/to/trace.zip`.
 
 The security review covers browser rendering, release verification, the offline importers and workflow permissions. [Security review](docs/security-review.md)
 
@@ -127,6 +133,8 @@ To rebuild the seven landmark models, run `python3 scripts/geo_scale.py --cache 
 
 ## GitHub Pages
 
-The Pages workflow lints and tests pull requests to `main`, builds the Vite site with Node 24, verifies the bundled assets and runs Playwright. A push to `main` or a manual run on `main` deploys the verified `dist/` artifact to the `github-pages` environment. The last job confirms the deployed commit and domain using the GitHub API, then requests the public game, map, and social artwork. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. You can repeat the public check from another network using `node scripts/check-pages.mjs --live`.
+Pull requests to `main` run the same checks as `npm run check`. A push or manual run on `main` deploys the exact `dist/` build that passed Playwright. CI stamps its commit SHA into the HTML so the public check can identify an asset-only release even when its JavaScript filename stays the same.
+
+After deployment, the workflow confirms the commit and custom domain through the GitHub API. It then checks the public homepage, all JavaScript and CSS listed in Vite’s `asset-manifest.json`, and the game and social assets. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. Repeat the public check with `node scripts/check-pages.mjs --live`. To check a specific deployment, set `EXPECTED_REVISION` to its full commit SHA.
 
 Repository Pages settings use **GitHub Actions** and the custom domain `turkey.kramnameloc.com`. The deployment environment allows `main`. The share button sends this canonical URL. Static Open Graph tags in `index.html` identify the JPEG preview and the square Apple touch icon in `public/social/`. The public link and artwork are available to preview crawlers without running the game.

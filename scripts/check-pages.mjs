@@ -29,6 +29,14 @@ function attribute(tags, name, value, key) {
 
 const html = (await asset('/', /text\/html/)).toString();
 const tags = html.match(/<(?:meta|link|script|img)\b[^>]*>/gi) || [];
+const expectedRevision = process.env.EXPECTED_REVISION || process.env.GITHUB_SHA;
+if (expectedRevision) {
+  assert.equal(
+    attribute(tags, 'name', 'release-revision', 'content'),
+    expectedRevision,
+    'The homepage must serve the expected commit'
+  );
+}
 assert.equal(attribute(tags, 'rel', 'canonical', 'href'), canonical);
 assert.equal(attribute(tags, 'property', 'og:url', 'content'), canonical);
 assert.ok(
@@ -72,16 +80,35 @@ if (process.env.EXPECTED_ENTRY)
   );
 const css = attribute(tags, 'rel', 'stylesheet', 'href');
 assert.match(css || '', /^\/assets\/[\w-]+\.css$/);
-const [js, sheet, photo, badge, geo, dish, faviconImage] = await Promise.all([
-  asset(entry, /javascript/),
-  asset(css, /text\/css/),
+const manifest = JSON.parse(await asset('/asset-manifest.json', /json/));
+const lobby = manifest['index.html'];
+assert.equal(
+  lobby?.file, entry.slice(1), 'The manifest must match the homepage script'
+);
+assert.ok(
+  lobby.css?.includes(css.slice(1)),
+  'The manifest must include the homepage stylesheet'
+);
+const bundles = new Set();
+for (const chunk of Object.values(manifest)) {
+  if (/\.(js|css)$/.test(chunk.file)) bundles.add(chunk.file);
+  for (const stylesheet of chunk.css ?? []) bundles.add(stylesheet);
+}
+await Promise.all(
+  [...bundles].map(async (file) => {
+    const type = file.endsWith('.css') ? /text\/css/ : /javascript/;
+    const bytes = await asset('/' + file, type);
+    assert.ok(bytes.length, file + ' is empty');
+  })
+);
+const [photo, badge, geo, dish, faviconImage] = await Promise.all([
   asset(cardPath, /image\/jpeg/),
   asset(touchIcon.pathname, /image\/png/),
   asset('/geo/region.json', /json/),
   asset('/dishes/pumpkinPie.webp', /image\/webp/),
   asset(favicon.pathname, /image\/png/),
 ]);
-assert.ok(js.length && sheet.length && JSON.parse(geo).tiles.length);
+assert.ok(JSON.parse(geo).tiles.length);
 assert.equal(photo.readUInt16BE(0), 0xffd8);
 assert.ok(photo.length < 1_000_000, 'Keep the social JPEG lightweight');
 for (const [iconImage, size] of [[badge, 180], [faviconImage, 32]]) {

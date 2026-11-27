@@ -1,6 +1,4 @@
 import './ui/style.css';
-import './ui/hud.css';
-import './ui/hud-layouts.css';
 import { render } from 'lit-html';
 import { COURSES, TRIP_HUNTS } from './gameplay/courses.js';
 import { SPAWN, fieldData, formatTime } from './maps/field-data.js';
@@ -24,6 +22,7 @@ const $ = (q) => document.querySelector(q),
   content = $('#panel-content');
 let game,
   engineRequest,
+  startupFileError,
   screen = '',
   loading = false,
   modalOrigin = 'home',
@@ -249,12 +248,17 @@ async function start(mode = 'campaign') {
     )
   );
   try {
+    if (startupFileError) throw startupFileError;
     if (!engineRequest)
       engineRequest = (async () => {
-        const { Hunt } = await import('./game.js');
+        const [{ Hunt }, data] = await Promise.all([
+          import('./game.js'),
+          fieldData(),
+          import('./ui/hud-layouts.css'),
+        ]);
         const g = new Hunt({ pause, map: () => map(), end, courseClear });
         try {
-          await g.init();
+          await g.init(data);
           return g;
         } catch (e) {
           g.dispose();
@@ -281,16 +285,20 @@ async function start(mode = 'campaign') {
     loading = false;
     $('#arena').hidden = true;
     $('#lobby').hidden = false;
+    let message = 'A game asset could not load. Check your connection and retry.';
+    if (startupFileError) message = 'Reload the page to fetch the current game files.';
+    else if (/WebGL|context/i.test(error?.message))
+      message = 'The field needs WebGL 2. Enable graphics acceleration in your browser and try again.';
     show(
       'error',
       messagePanel(
         'FIELD CONNECTION',
         'Unable to start',
-        /WebGL|context/i.test(error?.message)
-          ? 'The field needs WebGL 2. Enable graphics acceleration in your browser and try again.'
-          : 'A game asset could not load. Check your connection and retry.',
+        message,
         [
-          button('Retry', startAction(mode), true),
+          startupFileError
+            ? button('Reload game', 'reload-game', true)
+            : button('Retry', startAction(mode), true),
           button('Back to lobby', 'home'),
         ]
       )
@@ -322,6 +330,7 @@ async function copyLink() {
   }
 }
 const actions = {
+  'reload-game': () => window.location.reload(),
   share: shareGame,
   'copy-link': copyLink,
   'dismiss-share': () => $('#share-link').close(),
@@ -439,6 +448,10 @@ panel.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('fullscreenchange', syncFull);
+// An open lobby keeps its build's hashed JS and CSS URLs until the page reloads.
+window.addEventListener('vite:preloadError', (event) => {
+  if (!game) startupFileError = event.payload;
+});
 document.querySelector('.brand').addEventListener('click', (e) => {
   e.preventDefault();
   home();
@@ -470,4 +483,3 @@ syncTimer();
 syncSound();
 syncFull();
 refreshBest();
-fieldData().catch(() => {});

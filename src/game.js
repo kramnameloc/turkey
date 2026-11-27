@@ -32,7 +32,6 @@ import {
   LIMIT,
   dishSpawn,
   slideMove,
-  fieldData,
   formatTime,
   drawMap,
   loadMapImage,
@@ -170,11 +169,10 @@ export class Hunt {
     this.playing = false;
     this.active = false;
   }
-  async init() {
-    const [data, wing] = await Promise.all([
-      fieldData(),
-      this.avatar.load(...Object.values(this.tools).map((tool) => tool.clone())),
-    ]);
+  async init(data) {
+    const wing = await this.avatar.load(
+      ...Object.values(this.tools).map((tool) => tool.clone())
+    );
     this.data = data;
     this.parkStreetAt = streetLocator(data);
     this.tool.add(wing);

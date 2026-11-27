@@ -13,18 +13,42 @@ const policy = [
 ].join('; ');
 
 export default defineConfig({
+  build: {
+    manifest: 'asset-manifest.json',
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              debugName: 'Three.js',
+              test: /[\\/]node_modules[\\/]three[\\/]/,
+              name: (id) =>
+                id.endsWith('three.core.js') ? 'three-core' : 'three-renderer',
+            },
+          ],
+        },
+      },
+    },
+  },
   plugins: [
     {
-      name: 'production-content-security-policy',
+      name: 'pages-metadata',
       apply: 'build',
       transformIndexHtml() {
-        return [
+        const tags = [
           {
             tag: 'meta',
             attrs: { 'http-equiv': 'Content-Security-Policy', content: policy },
             injectTo: 'head-prepend',
           },
         ];
+        if (process.env.GITHUB_SHA) {
+          tags.push({
+            tag: 'meta',
+            attrs: { name: 'release-revision', content: process.env.GITHUB_SHA },
+          });
+        }
+        return tags;
       },
     },
   ],

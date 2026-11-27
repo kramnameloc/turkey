@@ -3,6 +3,12 @@ import { expect, test } from './fixtures.js';
 test('the field guide opens from the lobby, switches sections and restores keyboard focus', async ({
   page,
 }) => {
+  const huntRequests = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (/^\/(geo\/|models\/|assets\/(game|three|hud-layouts)-)/.test(pathname))
+      huntRequests.push(pathname);
+  });
   await page.goto('/');
   await expect(
     page.locator('meta[http-equiv="Content-Security-Policy"]')
@@ -21,6 +27,23 @@ test('the field guide opens from the lobby, switches sections and restores keybo
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(guide).toBeFocused();
+  expect(huntRequests).toEqual([]);
+});
+
+test('an open lobby can reload when its hunt stylesheet is unavailable', async ({ page }) => {
+  await page.route('**/assets/hud-layouts-*.css', (route) => route.fulfill({ status: 404 }), {
+    times: 1,
+  });
+  await page.goto('/');
+  const start = page.getByRole('button', { name: 'Start trip' });
+  const reload = page.getByRole('button', { name: 'Reload game' });
+  await start.click();
+  await expect(reload).toBeVisible();
+  await page.getByRole('button', { name: 'Back to lobby' }).click();
+  await start.click();
+  await Promise.all([page.waitForEvent('domcontentloaded'), reload.click()]);
+  await start.click();
+  await expect(page.locator('.hud')).toHaveCSS('display', 'grid');
 });
 
 test('timer and audio choices survive a reload', async ({ page }) => {

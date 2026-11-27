@@ -26,18 +26,24 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run test:exporters
-      - run: npm run build
-      - name: Verify game and social preview assets
+      - name: Check code, build and verify the production site
         id: verify
-        run: node scripts/check-pages.mjs
-      - run: npx --no-install playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+        run: npm run check:quick
+      - run: npm run browsers:install -- --with-deps
+      - name: Run browser tests on the verified build
+        id: browser
+        run: npm run test:e2e:built
+      - name: Save browser failure traces
+        if: failure() && steps.browser.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-failures-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Package the production site
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -72,9 +78,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          sparse-checkout: |
+            /.nvmrc
+            /scripts/check-pages.mjs
+            /scripts/release-assets.mjs
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
+          package-manager-cache: false
       - name: Confirm the deployed commit and custom domain
         env:
           GH_TOKEN: ${{ github.token }}
@@ -91,7 +103,7 @@ jobs:
         run: |
           for attempt in {1..15}; do
             if node scripts/check-pages.mjs --live; then
-              echo "Verified the public HTML, game bundle and social card." >> "$GITHUB_STEP_SUMMARY"
+              echo "Verified the public HTML for \`$GITHUB_SHA\`, its game bundles and the social card." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             else
               result=$?
