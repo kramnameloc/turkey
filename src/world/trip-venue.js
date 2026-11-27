@@ -65,7 +65,7 @@ function venueTrees(sites, library) {
   return group;
 }
 
-export async function loadVenue(id, world, sky) {
+export async function loadVenue(id, { trees, streetModels, sky }) {
   const ice = id === 'ice',
     airport = id === 'airport';
   const scene = new T.Scene();
@@ -103,7 +103,10 @@ export async function loadVenue(id, world, sky) {
   scene.add(light);
   // 13th and Pearl, in metres relative to the Community Park DEM origin.
   if (id === 'pearl') await addPeaks(scene, new T.Vector3(-17900, 6, -11000));
-  if (data.trees.length) scene.add(venueTrees(data.trees, world.trees.levels));
+  if (data.trees.length) {
+    await trees.prepare(data.trees);
+    scene.add(venueTrees(data.trees, trees.levels));
+  }
   const walls = [];
   model.traverse((mesh) => {
     if (!mesh.isMesh) return;
@@ -142,7 +145,7 @@ export async function loadVenue(id, world, sky) {
     }
   });
   for (const [name, x, z, yaw] of furniture) {
-    for (const part of world.streetModels.get(name)) {
+    for (const part of streetModels.get(name)) {
       const mesh = new T.Mesh(part.geometry, part.material);
       mesh.position.set(x, 0.03, z);
       mesh.rotation.y = yaw;

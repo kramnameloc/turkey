@@ -28,7 +28,7 @@ function attribute(tags, name, value, key) {
 }
 
 const html = (await asset('/', /text\/html/)).toString();
-const tags = html.match(/<(?:meta|link|script|img)\b[^>]*>/gi) || [];
+const tags = html.match(/<(?:meta|link|script|img|source)\b[^>]*>/gi) || [];
 const expectedRevision = process.env.EXPECTED_REVISION || process.env.GITHUB_SHA;
 if (expectedRevision) {
   assert.equal(
@@ -111,6 +111,14 @@ const [photo, badge, geo, dish, faviconImage] = await Promise.all([
 assert.ok(JSON.parse(geo).tiles.length);
 assert.equal(photo.readUInt16BE(0), 0xffd8);
 assert.ok(photo.length < 1_000_000, 'Keep the social JPEG lightweight');
+const posters = attribute(tags, 'type', 'image/avif', 'srcset')
+  .split(',').map((candidate) => candidate.trim().split(/\s+/));
+assert.deepEqual(posters.map(([, width]) => width), ['720w', '1200w']);
+await Promise.all(posters.map(async ([path]) => {
+  const bytes = await asset(path, /image\/avif/);
+  assert.equal(bytes.toString('ascii', 4, 12), 'ftypavif', path);
+  assert.ok(bytes.length < photo.length, path + ' must be smaller than the fallback');
+}));
 for (const [iconImage, size] of [[badge, 180], [faviconImage, 32]]) {
   assert.equal(iconImage.toString('ascii', 1, 4), 'PNG');
   assert.equal(iconImage.readUInt32BE(16), size);

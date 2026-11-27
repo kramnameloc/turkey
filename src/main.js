@@ -1,7 +1,7 @@
 import './ui/style.css';
 import { render } from 'lit-html';
 import { COURSES, TRIP_HUNTS } from './gameplay/courses.js';
-import { SPAWN, fieldData, formatTime } from './maps/field-data.js';
+import { SPAWN, formatTime } from './maps/field-data.js';
 import { isMuted, toggleAudio, wakeAudio } from './player/audio.js';
 import { fillIcons, icon } from './ui/icons.js';
 import { renderPearlMap } from './ui/pearl-map.js';
@@ -186,6 +186,23 @@ function pause() {
 function courseClear(bonus) {
   show('course-clear', courseClearPanel(game, bonus, timerEnabled));
 }
+async function rideShuttle() {
+  if (loading || game?.pendingDestination !== COURSES[0].destination) return;
+  loading = true;
+  openFromGame();
+  show('loading', loadingPanel('DAY 1', 'Riding to Dover', 'Preparing 735 Dover Street…'));
+  try {
+    await game.rideShuttle();
+    resume();
+  } catch {
+    show('travel-error', messagePanel(
+      'DOVER SHUTTLE', 'Travel interrupted', 'Your hunt is paused at the airport.',
+      [button('Retry shuttle', 'ride-shuttle', true), button('Return to airport', 'resume')]
+    ));
+  } finally {
+    loading = false;
+  }
+}
 async function changeCourse(retry) {
   if (loading) return;
   loading = true;
@@ -251,14 +268,13 @@ async function start(mode = 'campaign') {
     if (startupFileError) throw startupFileError;
     if (!engineRequest)
       engineRequest = (async () => {
-        const [{ Hunt }, data] = await Promise.all([
+        const [{ Hunt }] = await Promise.all([
           import('./game.js'),
-          fieldData(),
           import('./ui/hud-layouts.css'),
         ]);
-        const g = new Hunt({ pause, map: () => map(), end, courseClear });
+        const g = new Hunt({ pause, map: () => map(), end, courseClear, shuttle: rideShuttle });
         try {
-          await g.init(data);
+          await g.init();
           return g;
         } catch (e) {
           g.dispose();
@@ -347,6 +363,7 @@ const actions = {
   'park-trial': () => start('hunt'),
   'next-course': () => changeCourse(false),
   'retry-course': () => changeCourse(true),
+  'ride-shuttle': rideShuttle,
   'city-hunt': () => start('city'),
   explore: () => start('roam'),
   parade: () => start('parade'),

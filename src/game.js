@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { render } from 'lit-html';
-import { addRegion, buildWorld } from './world.js';
+import { addRegion, buildWorld, loadSharedScenery } from './world.js';
 import { courseMaps } from './world/course-maps.js';
 import { streetLocator } from './maps/street-location.js';
 import { DOVER_ROUTE } from './world/dover/route.js';
@@ -13,7 +13,6 @@ import { ChaseView, TURKEY_EYE } from './player/chase-camera.js';
 import { TurkeyAvatar } from './player/turkey-avatar.js';
 import { BODY_RADIUS, CASTER_SCALE, TURKEY_HEIGHT } from './player/turkey-scale.js';
 import { overlapsBody, separateFromActors } from './gameplay/body-collision.js';
-import { addPeaks } from './world/peaks.js';
 import { DoverCottage } from './world/dover/cottage.js';
 import { downstairsHeadroom } from './world/dover/downstairs.js';
 import { DOVER, PORCH, RELIC, hasGrail } from './world/dover/location.js';
@@ -34,7 +33,7 @@ import {
   slideMove,
   formatTime,
   drawMap,
-  loadMapImage,
+  fieldData,
 } from './field.js';
 import { bindHuntInput, lockPointer } from './player/input.js';
 import { sound, stopAmbience, updateAmbience, wakeAudio } from './player/audio.js';
@@ -169,22 +168,14 @@ export class Hunt {
     this.playing = false;
     this.active = false;
   }
-  async init(data) {
-    const wing = await this.avatar.load(
-      ...Object.values(this.tools).map((tool) => tool.clone())
-    );
-    this.data = data;
-    this.parkStreetAt = streetLocator(data);
-    this.tool.add(wing);
-    this.world = await buildWorld(this.scene, this.data);
-    this.daySky = this.scene.background;
-    [this.sky] = await Promise.all([
-      loadCourseSky(this.daySky),
-      addPeaks(this.scene),
-      loadMapImage(this.data),
+  async init() {
+    const [wing, scenery] = await Promise.all([
+      this.avatar.load(...Object.values(this.tools).map((tool) => tool.clone())),
+      loadSharedScenery(this.scene),
     ]);
-    this.scene.background = null;
-    this.sky.show(this.scene, 'park');
+    this.tool.add(wing);
+    this.scenery = scenery;
+    this.sky = await loadCourseSky(scenery.sky);
     this.groundShadow = shadowTexture();
     this.residents = new Residents(this.groundShadow);
     const shade = new T.MeshBasicMaterial({
@@ -196,7 +187,7 @@ export class Hunt {
     shadowPlane.rotateX(-Math.PI / 2);
     this.weather = new Flurries(this.scene);
     this.allTargets = DISHES.map((d, i) => {
-      const model = foodModel(d.id, this.daySky),
+      const model = foodModel(d.id, scenery.sky),
         shadow = new T.Mesh(shadowPlane, shade);
       this.scene.add(model, shadow);
       return {
@@ -223,31 +214,35 @@ export class Hunt {
     );
     this.scene.add(this.fieldActors);
     this.bindInput();
-    this.resize();
-    this.camera.position.set(
-      SPAWN.x,
-      this.height(SPAWN.x, SPAWN.z) + TURKEY_EYE,
-      SPAWN.z
-    );
-    this.camera.rotation.y = Math.atan2(16, 4);
-    await this.renderer.compileAsync(this.scene, this.camera);
-    this.renderer.render(this.scene, this.camera);
     this.renderer.setAnimationLoop((time) => this.frame(time));
   }
-  async ensureRegion() {
+  ensurePark() {
+    this.parkRequest ??= (async () => {
+      const data = await fieldData();
+      this.world = await buildWorld(this.scene, data, this.scenery);
+      this.data = data;
+      this.parkStreetAt = streetLocator(data);
+    })().catch((error) => {
+      this.parkRequest = null;
+      throw error;
+    });
+    return this.parkRequest;
+  }
+  async prepareRegionAt({ x, z }) {
     this.regionRequest ??= (async () => {
+      await this.ensurePark();
       this.region ??= await addRegion(this.scene, this.world);
-      [this.maps] = await Promise.all([
-        courseMaps(this.scene, this.world, this.region),
-        loadMapImage(this.region.data),
-      ]);
+      this.maps = await courseMaps(this.scene, this.world, this.region);
       this.regionStreetAt = streetLocator(this.region.data);
       return this.region;
     })().catch((e) => {
       this.regionRequest = null;
       throw e;
     });
-    return this.regionRequest;
+    const region = await this.regionRequest;
+    await region.prepareAt(x, z);
+    await this.maps.prepare(x, z);
+    return region;
   }
   resize() {
     const w = this.canvas.clientWidth || window.innerWidth,
@@ -338,26 +333,12 @@ export class Hunt {
       const { x, z } = this.pendingDestination;
       const p = this.camera.position;
       if (Math.hypot(p.x - x, p.z - z) > 3) return;
-      this.pendingDestination = null;
       if (this.course.venue === 'airport') {
-        this.useVenue(null);
-        this.arrivalAtDover = true;
-        this.restoreDaylight = lightDoverPorch(this.scene, this.ground);
-        this.sky.show(this.scene, 'night');
-        this.arrive({ x: 1160, z: -1015 });
-        this.yaw = Math.atan2(
-          this.camera.position.x - PORCH.x,
-          this.camera.position.z - PORCH.z
-        );
-        this.pitch = 0.045;
-        this.syncView(0, true);
-        this.guide.reset(this.elapsed);
-        this.toast(
-          '735 Dover St · Follow the porch light and inspect the display.',
-          5
-        );
-        this.setHUD();
-      } else this.completeCourse();
+        this.events.shuttle();
+      } else {
+        this.pendingDestination = null;
+        this.completeCourse();
+      }
       return;
     }
     if (!this.house.prompt(this.camera.position, this.arrivalAtDover)) return;
@@ -451,6 +432,14 @@ export class Hunt {
   get mapData() {
     return this.venue?.data ?? (this.regional ? this.region.data : this.data);
   }
+  currentStreet(p) {
+    if (this.house.inside) return '';
+    if (this.venue) return this.venue.placeAt(p);
+    const b = this.data.bounds;
+    const inPark = p.x >= b.minX && p.x <= b.maxX && p.z >= b.minZ && p.z <= b.maxZ;
+    const locate = this.regional && !inPark ? this.regionStreetAt : this.parkStreetAt;
+    return locate(p.x, p.z, this.streetText.textContent);
+  }
   useVenue(venue) {
     this.venue = venue;
     const scene = venue?.scene ?? this.scene;
@@ -470,9 +459,6 @@ export class Hunt {
     );
     this.updateViewControls();
     this.nextParadeAttempt = 0;
-    if (mode === 'parade') {
-      await this.loadParade();
-    }
     this.level = 0;
     this.bankedTime = 0;
     this.timedRun = true;
@@ -480,26 +466,22 @@ export class Hunt {
     this.shots = 0;
     this.saved = { shots: 0 };
     await this.beginCourse(0, mode === 'campaign' ? COURSES[0].spawn : spot);
+    const scene = this.venue?.scene ?? this.scene;
+    await this.renderer.compileAsync(scene, this.viewCamera);
+    this.renderer.render(scene, this.viewCamera);
   }
   async beginCourse(level, spot = COURSES[level].spawn) {
     const campaign = this.mode === 'campaign';
     const course = COURSES[level];
-    const regionalSpot = campaign && course.venue === 'airport' ? DOVER : spot;
     let venue = null;
     if (campaign && course.venue) {
       venue = this.venues.get(course.venue);
       if (!venue) {
-        venue = await loadVenue(course.venue, this.world, this.daySky);
+        venue = await loadVenue(course.venue, this.scenery);
         this.venues.set(course.venue, venue);
       }
-    }
-    if (
-      ['city', 'roam'].includes(this.mode) ||
-      (campaign && (!venue || course.venue === 'airport'))
-    ) {
-      const region = await this.ensureRegion();
-      await region.prepareAt(regionalSpot.x, regionalSpot.z);
-      await this.maps.prepare(regionalSpot.x, regionalSpot.z);
+    } else if (campaign || this.mode === 'city' || this.mode === 'roam') {
+      const region = await this.prepareRegionAt(spot);
       if (campaign && course.parade && !this.doverParade) {
         const site = region.data.detailMaps.find((s) => s.id === 'dover');
         const { Parade } = await import('./world/parade/parade.js');
@@ -522,6 +504,9 @@ export class Hunt {
         this.doverParade.group.visible = false;
         this.scene.add(this.doverParade.group);
       }
+    } else {
+      await this.ensurePark();
+      if (this.mode === 'parade') await this.loadParade();
     }
     this.leaveCottage();
     this.weather.setSnowing(false);
@@ -720,23 +705,39 @@ export class Hunt {
     await this.beginCourse(this.level);
   }
   async teleport(spot) {
-    await this.region.prepareAt(spot.x, spot.z);
-    await this.maps.prepare(spot.x, spot.z);
+    await this.prepareRegionAt(spot);
     const landing = this.openSpot(spot);
     if (this.mode === 'city') this.stockGravy(spot);
     this.arrive(spot, landing);
     this.guide.reset(this.elapsed);
   }
-  openSpot(spot) {
+  async rideShuttle() {
+    const stop = { x: 1160, z: -1015 };
+    await this.prepareRegionAt(stop);
+    const landing = this.openSpot(stop, (x, z) => this.regionBlocked(x, z));
+    this.pendingDestination = null;
+    this.useVenue(null);
+    this.arrivalAtDover = true;
+    this.restoreDaylight = lightDoverPorch(this.scene, this.ground);
+    this.sky.show(this.scene, 'night');
+    this.arrive(stop, landing);
+    this.yaw = Math.atan2(this.camera.position.x - PORCH.x, this.camera.position.z - PORCH.z);
+    this.pitch = 0.045;
+    this.syncView(0, true);
+    this.guide.reset(this.elapsed);
+    this.toast('735 Dover St · Follow the porch light and inspect the display.', 5);
+    this.setHUD();
+  }
+  openSpot(spot, blocked = (x, z) => this.fieldBlocked(x, z)) {
     let x = spot.x,
       z = spot.z;
-    for (let i = 0; i < 100 && this.fieldBlocked(x, z); i++) {
+    for (let i = 0; i < 100 && blocked(x, z); i++) {
       const a = i * 2.4,
         d = 3 * Math.sqrt(i + 1);
       x = spot.x + Math.cos(a) * d;
       z = spot.z + Math.sin(a) * d;
     }
-    if (this.fieldBlocked(x, z)) throw Error('No open landing near this landmark.');
+    if (blocked(x, z)) throw Error('No open landing near this landmark.');
     return { x, z };
   }
   arrive(spot, landing = this.openSpot(spot)) {
@@ -812,6 +813,9 @@ export class Hunt {
   fieldBlocked(x, z) {
     if (this.venue) return this.venue.solids.blocked(x, z);
     if (!this.regional) return this.world.solids.blocked(x, z);
+    return this.regionBlocked(x, z);
+  }
+  regionBlocked(x, z) {
     return (
       this.world.solids.occupied(x, z) ||
       this.region.blocked(x, z) ||
@@ -1213,19 +1217,7 @@ export class Hunt {
       '°';
     $('#compass-needle').style.transform = 'rotate(' + this.yaw + 'rad)';
     const p = this.camera.position;
-    const bounds = this.data.bounds;
-    const inPark =
-      p.x >= bounds.minX &&
-      p.x <= bounds.maxX &&
-      p.z >= bounds.minZ &&
-      p.z <= bounds.maxZ;
-    const streetAt =
-      this.regional && !inPark ? this.regionStreetAt : this.parkStreetAt;
-    const street = this.house.inside
-      ? ''
-      : this.venue
-        ? this.venue.placeAt(p)
-        : streetAt(p.x, p.z, this.streetText.textContent);
+    const street = this.currentStreet(p);
     if (this.streetText.textContent !== street) {
       this.streetText.textContent = street;
       this.streetLabel.hidden = !street;
@@ -1396,7 +1388,7 @@ export class Hunt {
       actualSpeed,
       travelYaw
     );
-    this.world.updateSignals(this.elapsed);
+    if (!this.venue) this.world.updateSignals(this.elapsed);
     if (hunting) {
       this.fight.update(dt, delta);
       if (!this.fight.health) {

@@ -62,7 +62,7 @@
     <main id="lobby">
       <header class="mast">
         <a class="brand" href="#lobby" aria-label="Gobbler Ops hunt lobby"
-          ><img src="/social/apple-touch-icon.png" alt="" /><span
+          ><img src="/src/assets/gobbler-icon.webp" alt="" /><span
             >GOBBLER<span class="brand-light">OPS</span></span
           ></a
         >
@@ -100,14 +100,21 @@
       <section class="hero" aria-labelledby="title">
         <figure class="menu-poster">
           <h1 id="title">
-            <img
-              class="cover-art"
-              src="/social/turkey-takeover-card.jpg"
-              alt="Turkey Takeover"
-              width="1200"
-              height="630"
-              fetchpriority="high"
-            />
+            <picture>
+              <source
+                type="image/avif"
+                srcset="/src/assets/poster-720.avif 720w, /src/assets/poster-1200.avif 1200w"
+                sizes="(max-width: 620px) calc(100vw - 40px), (max-width: 850px) and (orientation: portrait) 90vw, 65vw"
+              />
+              <img
+                class="cover-art"
+                src="/social/turkey-takeover-card.jpg"
+                alt="Turkey Takeover"
+                width="1200"
+                height="630"
+                fetchpriority="high"
+              />
+            </picture>
           </h1>
           <figcaption>
             <span>Player breed · Bourbon Red turkey</span>
@@ -266,7 +273,7 @@
     <dialog id="panel">
       <div class="panel-head">
         <div class="panel-brand">
-          <img alt="" src="/social/apple-touch-icon.png" /> GOBBLER OPS
+          <img alt="" src="/src/assets/gobbler-icon.webp" /> GOBBLER OPS
         </div>
         <button
           data-action="close"
@@ -281,7 +288,7 @@
     <dialog id="share-link" aria-labelledby="share-title">
       <div class="panel-head">
         <div class="panel-brand">
-          <img src="/social/apple-touch-icon.png" alt="" /> GOBBLER OPS
+          <img src="/src/assets/gobbler-icon.webp" alt="" /> GOBBLER OPS
         </div>
         <button
           type="button"

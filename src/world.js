@@ -25,7 +25,8 @@ import {
 } from './field.js';
 import { loadLandmarks } from './world/landmarks.js';
 import { makeTerrain } from './world/terrain.js';
-import { loadOaks, TreeStand } from './world/trees.js';
+import { addPeaks } from './world/peaks.js';
+import { TreeStand } from './world/trees.js';
 const loader = new T.TextureLoader();
 function texture(url, repeat = false) {
   return loader.loadAsync(url).then((t) => {
@@ -394,31 +395,34 @@ function water(scene, rings, height) {
   });
   scene.add(new T.Mesh(geometry(positions), surface));
 }
-export async function buildWorld(scene, data) {
+export async function loadSharedScenery(scene) {
+  const [sky, treeTexture, streetModels] = await Promise.all([
+    texture('/scenery/sky.webp'),
+    texture('/scenery/tree-materials.webp'),
+    loadStreetscape(),
+  ]);
+  sky.mapping = T.EquirectangularReflectionMapping;
+  return { sky, trees: new TreeStand(scene, treeTexture), streetModels };
+}
+
+export async function buildWorld(scene, data, { trees, streetModels }) {
   const [
     photo,
     grass,
-    sky,
     brick,
     civic,
-    treeTexture,
-    oaks,
     fine,
     regional,
     streets,
     houses,
     doverHouses,
     grassModels,
-    streetModels,
     landmarks,
   ] = await Promise.all([
-    texture(data.orthophoto.url),
+    coursePhoto(data),
     texture('/scenery/grass.webp', true),
-    texture('/scenery/sky.webp'),
     texture('/scenery/brick-facade.webp', true),
     texture('/scenery/civic-facade.webp', true),
-    texture('/scenery/tree-materials.webp'),
-    loadOaks(),
     fetch('/geo/park-elevation.json').then((r) => {
       if (!r.ok) throw Error('The park elevation map could not load.');
       return r.json();
@@ -428,11 +432,10 @@ export async function buildWorld(scene, data) {
     texture('/scenery/street-houses.webp', true),
     texture('/scenery/dover-houses.webp', true),
     loadGrasses(),
-    loadStreetscape(),
     loadLandmarks(),
+    trees.prepare(data.trees),
   ]);
-  sky.mapping = T.EquirectangularReflectionMapping;
-  scene.background = sky;
+  await addPeaks(scene);
   scene.fog = new T.FogExp2('#b8c0ac', 0.00063);
   scene.add(new T.HemisphereLight('#fff4da', '#a8997b', 1.7));
   const sun = new T.DirectionalLight('#fff0cd', 2.1);
@@ -460,7 +463,6 @@ export async function buildWorld(scene, data) {
   const plantings = [...data.trees, ...plantParkSaplings(data, solids)];
   const grasses = new FieldGrasses(scene, grassModels, height);
   grasses.update(SPAWN.x, SPAWN.z);
-  const trees = new TreeStand(scene, treeTexture, oaks);
   trees.add(
     'park',
     plantings.map((t) => ({ ...t, ground: height(t.x, t.z) }))
@@ -512,7 +514,7 @@ export async function buildWorld(scene, data) {
 
 export async function addRegion(scene, world) {
   const data = await regionData(),
-    photo = await texture(data.orthophoto.url),
+    photo = await coursePhoto(data),
     b = data.bounds,
     height = world.height;
   const material = groundMaterial(photo, world.grass);

@@ -135,6 +135,8 @@ To rebuild the seven landmark models, run `python3 scripts/geo_scale.py --cache 
 
 Pull requests to `main` run the same checks as `npm run check`. A push or manual run on `main` deploys the exact `dist/` build that passed Playwright. CI stamps its commit SHA into the HTML so the public check can identify an asset-only release even when its JavaScript filename stays the same.
 
+The lobby serves a responsive AVIF poster with a JPEG fallback. Starting the trip loads the airport scenery. Boarding the Day 1 shuttle loads the Broomfield terrain and Dover imagery, which later courses reuse. Starting a park or city mode loads its scenery directly. Vite gives the lobby artwork, scripts, styles and fonts in `/assets/` content-hashed filenames. The HTML, `asset-manifest.json` and files copied from `public/` use stable URLs that may change contents on deployment.
+
 After deployment, the workflow confirms the commit and custom domain through the GitHub API. It then checks the public homepage, all JavaScript and CSS listed in Vite’s `asset-manifest.json`, and the game and social assets. If the public homepage refuses the hosted runner with HTTP 403, the job records that limitation in its summary. Repeat the public check with `node scripts/check-pages.mjs --live`. To check a specific deployment, set `EXPECTED_REVISION` to its full commit SHA.
 
 Repository Pages settings use **GitHub Actions** and the custom domain `turkey.kramnameloc.com`. The deployment environment allows `main`. The share button sends this canonical URL. Static Open Graph tags in `index.html` identify the JPEG preview and the square Apple touch icon in `public/social/`. The public link and artwork are available to preview crawlers without running the game.

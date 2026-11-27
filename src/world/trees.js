@@ -316,7 +316,7 @@ export class TreeStand {
       alphaTest: 0.43,
       side: T.DoubleSide,
     });
-    this.levels = oakLibrary(oaks);
+    this.levels = oaks ? oakLibrary(oaks) : new Map();
     this.levels.set(
       'pine',
       [0, 1, 2].map((detail) => ({
@@ -341,6 +341,19 @@ export class TreeStand {
     this.dirty = true;
   }
   async prepare(trees) {
+    // The airport uses procedural spruce. Load the oak pack at the first site that needs it.
+    if (trees.some((tree) => !this.levels.has(treeShape(tree).variety))) {
+      this.oakRequest ??= loadOaks().then((oaks) => {
+        for (const [form, levels] of oakLibrary(oaks)) {
+          this.levels.set(form, levels);
+          this.batches.push(...levels);
+        }
+      }).catch((error) => {
+        this.oakRequest = null;
+        throw error;
+      });
+      await this.oakRequest;
+    }
     const forms = new Set(
       trees.filter((t) => t.fullLeaf).map((t) => treeShape(t).variety)
     );

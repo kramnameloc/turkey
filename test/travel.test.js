@@ -28,6 +28,7 @@ function insideCottage() {
     updateViewControls() {},
     syncView() {},
   });
+  hunt.regionRequest = Promise.resolve(hunt.region);
   hunt.fight = new FoodFight(hunt);
   hunt.camera.position.set(1, 2, 3);
   hunt.house.scene.add(hunt.camera, hunt.avatar);

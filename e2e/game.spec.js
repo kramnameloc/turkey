@@ -10,6 +10,11 @@ test('the field guide opens from the lobby, switches sections and restores keybo
       huntRequests.push(pathname);
   });
   await page.goto('/');
+  const poster = await page.locator('.cover-art').evaluate(async (image) => {
+    await image.decode();
+    return new URL(image.currentSrc).pathname;
+  });
+  expect(poster).toMatch(/^\/assets\/poster-720-[\w-]+\.avif$/);
   await expect(
     page.locator('meta[http-equiv="Content-Security-Policy"]')
   ).toHaveAttribute('content', /script-src 'self';/);
@@ -102,6 +107,12 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
 }) => {
   // A fresh software WebGL context compiles the actual scene and loads the Colorado assets.
   test.setTimeout(120_000);
+  const parkRequests = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith('/geo/') || pathname === '/models/november-oaks.glb')
+      parkRequests.push(pathname);
+  });
   await page.goto('/');
   await page.getByRole('button', { name: 'Start trip' }).click();
   await expect(page.locator('#counter')).toHaveText('0 / 2', {
@@ -139,6 +150,7 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
   await page.keyboard.press('m');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('Map of the current day')).toBeVisible();
+  expect(parkRequests).toEqual([]);
   await dialog.getByRole('button', { name: 'Return to trip' }).click();
   await page.keyboard.press('p');
   await expect(
@@ -157,6 +169,44 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
   await expect(
     page.getByRole('button', { name: 'Hunt timer' })
   ).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('the airport shuttle can retry the Dover scenery and continue the same hunt', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.route('**/geo/region-aerial.jpg', (route) => route.fulfill({ status: 503 }), { times: 1 });
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const manifest = await (await fetch('/asset-manifest.json')).json();
+    const { Hunt } = await import('/' + manifest['src/game.js'].file);
+    // Advance the three airport hunts to the shuttle checkpoint on the first resume.
+    const resume = Hunt.prototype.resume;
+    Hunt.prototype.resume = function (...args) {
+      Hunt.prototype.resume = resume;
+      resume.apply(this, args);
+      for (let round = 0; round < this.course.hunts.length; round++) {
+        for (const target of this.targets) {
+          target.caught = true;
+          target.model.visible = target.shadow.visible = false;
+          this.count++;
+        }
+        this.completeHunt();
+      }
+      this.camera.position.x = this.pendingDestination.x;
+      this.camera.position.z = this.pendingDestination.z;
+      this.setHUD();
+    };
+  });
+  await page.getByRole('button', { name: 'Start trip' }).click();
+  await expect(page.locator('#interact-name')).toHaveText('Ride to 735 Dover St', { timeout: 90_000 });
+  await page.keyboard.press('g');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Travel interrupted' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#counter')).toHaveText('Dover shuttle');
+  await dialog.getByRole('button', { name: 'Retry shuttle' }).click();
+  await expect(page.locator('#counter')).toHaveText('735 Dover St', { timeout: 60_000 });
+  await expect(page.locator('#scene')).toBeFocused();
+  await page.keyboard.press('m');
+  await expect(dialog.getByRole('heading', { name: '735 Dover St after dark' })).toBeVisible();
 });
 
 test('a failed player model can be retried into a working parade visit', async ({
