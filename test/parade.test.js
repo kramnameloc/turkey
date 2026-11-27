@@ -253,3 +253,23 @@ test('participants block a sprint, chase only when hit, and a released balloon l
   assert.ok(float.balloon.visible && float.shadow.visible && !float.release);
   assert.ok(float.balloon.position.distanceTo(release) < 0.001);
 });
+
+test('spectators walk together to a clear viewing spot, watch, and return before repeating', async (t) => {
+  const { parade } = await loadParade(t);
+  const walker = parade.crowd.people.find((p) => p.outing.reach > 2);
+  assert.ok(walker);
+  const family = parade.crowd.people.filter((p) => p.outing === walker.outing);
+  const { wait, reach, watch } = walker.outing;
+  const travel = reach / 0.92;
+  parade.update(wait + travel * 0.5, walker.home);
+  for (const member of family) {
+    assert.ok(Math.abs(member.model.position.distanceTo(member.home) - reach / 2) < 0.001);
+    assert.ok(parade.blocks(member.model.position.x, member.model.position.z));
+  }
+  parade.update(wait + travel + watch * 0.5, walker.home);
+  assert.equal(walker.stride, 0);
+  assert.ok(Math.abs(walker.model.position.distanceTo(walker.home) - reach) < 0.001);
+  parade.update(wait + travel * 2 + watch + 1, walker.home);
+  assert.ok(walker.model.position.equals(walker.home));
+  assert.equal(parade.chasers.size, 0);
+});

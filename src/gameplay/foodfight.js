@@ -10,7 +10,7 @@ import {
   WIDE_CASTS,
 } from './courses.js';
 import { clearTrail, relativeBearing } from './trail.js';
-import { sound } from '../player/audio.js';
+import { sound, stereoPosition } from '../player/audio.js';
 
 const kinds = Object.keys(THROWS);
 const crumbColors = {
@@ -124,7 +124,7 @@ export class FoodFight {
     obj.scale.multiplyScalar(1.3);
     this.group.add(obj);
     this.attack = { dish, kind, obj, target, wind: 1.05 };
-    sound('windup');
+    sound('windup', stereoPosition(obj.position, g.camera.position, g.yaw));
   }
   interrupt(dish) {
     if (this.attack?.dish !== dish) return false;
@@ -143,7 +143,8 @@ export class FoodFight {
     });
     this.attack = null;
     this.lull = Math.max(1.7, 3.9 - this.hunt.level * 0.55) + Math.random() * 2;
-    sound(a.kind === 'sprout' ? 'toot' : 'toss');
+    sound(a.kind === 'sprout' ? 'toot' : 'toss',
+      stereoPosition(start, this.hunt.camera.position, this.hunt.yaw));
   }
   tickDamage(dt) {
     this.invulnerable = Math.max(0, this.invulnerable - dt);

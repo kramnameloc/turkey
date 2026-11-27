@@ -118,11 +118,14 @@ test('the campaign renders Day 1, switches camera, opens the map and pauses', as
   await expect(
     dialog.getByRole('heading', { name: 'Hunt paused' })
   ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Mute audio' }).click();
+  await expect(dialog.getByRole('button', { name: 'Enable audio' })).toHaveAttribute('aria-pressed', 'false');
   await dialog.getByRole('button', { name: 'Hunt timer' }).click();
   await expect(
     dialog.getByRole('button', { name: 'Hunt timer' })
   ).toBeFocused();
   await dialog.getByRole('button', { name: 'Return to lobby' }).click();
+  await expect(page.getByRole('button', { name: 'Enable audio' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start trip' })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Hunt timer' })

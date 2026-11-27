@@ -30,6 +30,7 @@ export function pausePanel(game, timerEnabled) {
     <div class="panel-actions">${button('Resume', 'resume', true, 'focus')}
       <button class="secondary" data-action="timer" aria-label="Hunt timer">${icon('clock')}
         Hunt timer · <span id="pause-timer-state"></span></button>
+      <button class="secondary" data-action="sound"><i></i> Audio · <span></span></button>
       ${button(parade ? 'Parade map' : 'Hunt map', 'map', false, 'map')}
       ${parade ? nothing : button('Field guide', 'guide', false, 'book')}
       ${button('Return to lobby', 'home')}

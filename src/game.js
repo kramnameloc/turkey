@@ -7,6 +7,7 @@ import { loadCourseSky } from './world/course-sky.js';
 import { loadVenue, lightDoverPorch } from './world/trip-venue.js';
 import { doverCorners } from './world/parade/route.js';
 import { doverLeg } from './world/dover/guide.js';
+import { Residents } from './world/residents.js';
 import { ChaseView, TURKEY_EYE } from './player/chase-camera.js';
 import { TurkeyAvatar } from './player/turkey-avatar.js';
 import { BODY_RADIUS, CASTER_SCALE, TURKEY_HEIGHT } from './player/turkey-scale.js';
@@ -35,7 +36,7 @@ import {
   loadMapImage,
 } from './field.js';
 import { bindHuntInput, lockPointer } from './player/input.js';
-import { sound } from './player/audio.js';
+import { sound, stopAmbience, updateAmbience, wakeAudio } from './player/audio.js';
 import { playerStorage } from './player/storage.js';
 const $ = (s) => document.querySelector(s),
   clamp = T.MathUtils.clamp;
@@ -157,6 +158,7 @@ export class Hunt {
       const feet = this.height(x, z) + this.lift;
       return (
         this.targets.some((t) => overlapsBody(t, x, z, feet)) ||
+        this.residents.nearby.some((person) => overlapsBody(person, x, z, feet)) ||
         !!this.streetParade?.blocks(x, z, BODY_RADIUS, null, feet)
       );
     };
@@ -184,6 +186,7 @@ export class Hunt {
     this.scene.background = null;
     this.sky.show(this.scene, 'park');
     this.groundShadow = shadowTexture();
+    this.residents = new Residents(this.groundShadow);
     const shade = new T.MeshBasicMaterial({
       map: this.groundShadow,
       transparent: true,
@@ -210,6 +213,7 @@ export class Hunt {
     });
     this.fieldActors = new T.Group();
     this.fieldActors.add(
+      this.residents.group,
       ...Object.values(this.shotModels),
       this.healthBars,
       this.guide.arrows,
@@ -532,6 +536,7 @@ export class Hunt {
     this.trackingDover = false;
     this.intermission = false;
     this.active = true;
+    this.residents.reset();
     this.elapsed = 0;
     this.huntIndex = 0;
     this.last = 0;
@@ -661,6 +666,23 @@ export class Hunt {
     this.parade.group.visible = nearby;
     if (nearby) this.parade.update(this.elapsed, p);
   }
+  updateResidents(dt) {
+    const p = this.camera.position;
+    const area = this.house.inside ? null : this.venue?.data ??
+      (this.regional ? this.maps?.areaAt(p.x, p.z) : null) ?? this.data;
+    if (area !== this.residents.area) {
+      const solids = this.venue?.solids ?? area?.solids ?? this.world.solids;
+      this.residents.enter(area, (x, z) => solids.blocked(x, z));
+    }
+    return this.residents.update(this.elapsed, dt, p, this.ground, this.streetParade?.nearbyActors);
+  }
+  get soundscape() {
+    if (this.house.inside) return 'cottage';
+    if (this.venue) return this.venue.data.id;
+    if (this.arrivalAtDover) return 'night';
+    if (this.streetParade?.nearbyActors.some((a) => a.float && !a.caught)) return 'parade';
+    return this.residents.area?.id === 'dover' ? 'dover' : 'park';
+  }
   rejoinParade(index = 0) {
     const { viewer, subject } = this.parade.viewpoint(index);
     this.arrive(viewer);
@@ -739,6 +761,7 @@ export class Hunt {
   }
   resume(lock = true) {
     if (!this.active || this.intermission) return;
+    wakeAudio();
     this.playing = true;
     this.last = 0;
     this.keys.clear();
@@ -749,6 +772,7 @@ export class Hunt {
   }
   pause() {
     this.playing = false;
+    stopAmbience();
     this.keys.clear();
     this.dragging = false;
     this.clearTouch();
@@ -842,6 +866,8 @@ export class Hunt {
     bindHuntInput(this, this.inputController.signal);
   }
   dispose() {
+    stopAmbience();
+    this.residents?.dispose();
     this.inputController?.abort();
     this.renderer.setAnimationLoop(null);
     this.weather?.dispose();
@@ -1315,6 +1341,7 @@ export class Hunt {
       this.playerBlocked
     );
     this.updateParade();
+    const localCue = this.updateResidents(delta);
     const hunting =
       !this.house.inside &&
       !this.pendingDestination &&
@@ -1337,6 +1364,7 @@ export class Hunt {
         this.streetParade.nearbyActors,
         this.playerBlocked
       );
+    separateFromActors(this.camera.position, feet, this.residents.nearby, this.playerBlocked);
     this.steps +=
       dt * PLAYER_PACE * Math.hypot(strafe, forward) * (sprint ? 13 : 9);
     const p = this.camera.position;
@@ -1347,6 +1375,8 @@ export class Hunt {
       Math.sin(this.steps) * 0.027;
     const movedX = p.x - oldX,
       movedZ = p.z - oldZ;
+    const actualSpeed = dt ? Math.hypot(movedX, movedZ) / dt : 0;
+    updateAmbience(this.soundscape, actualSpeed, !this.lift, localCue, p, this.yaw);
     const travelYaw =
       Math.hypot(movedX, movedZ) > 0.001
         ? Math.atan2(-movedX, -movedZ)
@@ -1354,7 +1384,7 @@ export class Hunt {
     this.syncView(
       dt,
       false,
-      dt ? Math.hypot(movedX, movedZ) / dt : 0,
+      actualSpeed,
       travelYaw
     );
     this.world.updateSignals(this.elapsed);

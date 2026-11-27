@@ -295,7 +295,7 @@ export class Parade {
     this.time = time;
     if (viewer)
       for (const actor of this.chasers) this.pursue(actor, viewer, dt);
-    this.crowd.update(time, viewer || this.viewpoint().viewer, this.chasers);
+    this.crowd.update(time, viewer || this.viewpoint().viewer, this.chasers, this.floats);
     this.nearbyActors.length = 0;
     const nearby = (p) =>
       !viewer || (p.x - viewer.x) ** 2 + (p.z - viewer.z) ** 2 < 65 ** 2;

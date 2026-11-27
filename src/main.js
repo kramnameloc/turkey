@@ -47,11 +47,15 @@ function refreshBest() {
   $('#best').textContent = b ? formatTime(b) : 'Unrecorded';
 }
 function syncSound() {
-  const b = $('[data-action="sound"]');
-  render(icon(isMuted() ? 'mute' : 'volume'), b.querySelector('i'));
-  b.setAttribute('aria-label', isMuted() ? 'Enable audio' : 'Mute audio');
-  b.title = b.ariaLabel;
-  b.setAttribute('aria-pressed', String(!isMuted()));
+  const enabled = !isMuted();
+  for (const b of document.querySelectorAll('[data-action="sound"]')) {
+    render(icon(enabled ? 'volume' : 'mute'), b.querySelector('i'));
+    b.setAttribute('aria-label', enabled ? 'Mute audio' : 'Enable audio');
+    b.title = b.ariaLabel;
+    b.setAttribute('aria-pressed', String(enabled));
+    const state = b.querySelector('span');
+    if (state) state.textContent = enabled ? 'On' : 'Off';
+  }
 }
 function syncFull() {
   const b = $('[data-action="fullscreen"]'),
@@ -169,6 +173,7 @@ function pause() {
   modalOrigin = 'pause';
   show('pause', pausePanel(game, timerEnabled));
   syncTimer();
+  syncSound();
 }
 function courseClear(bonus) {
   show('course-clear', courseClearPanel(game, bonus, timerEnabled));

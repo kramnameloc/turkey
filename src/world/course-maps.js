@@ -182,6 +182,8 @@ export async function courseMaps(scene, world, region) {
   }
   return {
     prepare,
+    areaAt: (x, z) => sites.find(({ mesh, bounds: b }) => mesh &&
+      x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ),
     blocked: (x, z) => sites.some((s) => s.solids?.occupied(x, z)),
   };
 }
